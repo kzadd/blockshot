@@ -9,7 +9,7 @@ import { PLAYER, type ClientToServerEvents, type ServerToClientEvents, type Vec3
 import type { JoinResult, PlayerSnapshot, StateSnapshot } from '@blockshot/shared';
 
 const SERVER_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-export const SERVER_ENTRY = 'index.js';
+export const SERVER_ENTRY = 'src/index.ts';
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

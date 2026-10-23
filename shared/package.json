@@ -13,5 +13,8 @@
   "types": "./src/index.ts",
   "devDependencies": {
     "@types/node": "^22.9.0"
+  },
+  "dependencies": {
+    "valibot": "^1.5.0"
   }
 }

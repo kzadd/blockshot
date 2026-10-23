@@ -139,3 +139,50 @@ cliente y servidor cambiados a `@blockshot/shared`; `world.js` usa el `rng` comp
   objetos a los spawns) y los de validación de red pasan a constantes con nombre.
 - El paquete compartido se consume como código fuente TS (Vite y tsx lo transpilan): sin build intermedio (KISS).
 - El servidor (aún JS) se ejecuta con `tsx` para poder importar TS; se convierte a TS en el paso 3.
+
+## 3. Servidor en TypeScript: validación (Valibot), logs (Pino), rate limit y modos con Strategy
+
+**Orden ajustado:** el plan separaba validación (3), carpetas por feature (4) y Strategy de modos (7). En el servidor
+se hicieron juntos para convertir `server/index.js` **una sola vez** a su forma final en vez de reescribirlo tres
+veces. El cliente sigue su propio orden (pasos 4 y 6).
+
+**Red de seguridad primero:** `server/test/e2e/` arranca el servidor real en un proceso hijo (puerto libre) y lo
+maneja con bots Socket.IO que solo usan el protocolo público. Se escribieron **contra el servidor JS original**
+(47 tests en verde) y después se reescribió el servidor sin tocarlos: lobby (valores por defecto, saneado, contraseña,
+sala llena, borrado de salas vacías), combate (protección de reaparición, daño cuerpo/cabeza, bajas, regeneración,
+puñalada por la espalda, sin fuego amigo, espera entre cambios de equipo) y todos los modos (Confirmar bajas,
+Infectados, recompensas de racha, CTF, Escalada).
+
+**Estructura:**
+
+```
+server/src/
+  index.ts              arranque: HTTP + Socket.IO + tick fijo + anuncio LAN
+  config.ts, logger.ts  entorno (PORT, NOMBRE, LOG_LEVEL) y Pino (bonito en terminal, JSON en tuberías)
+  http/app.ts           Express: /ping y cliente compilado
+  network/              gateway.ts (validación + rate limit + despacho), rateLimiter.ts, lan.ts (IP, mDNS, banner)
+  rooms/                room.ts (Room + RoomChannel), registry.ts (crear/unirse/salir/lista)
+  players/              player.ts, history.ts (lag comp), loadout.ts, spawn.ts, teams.ts, movement.ts
+  combat/               shooting.ts, damage.ts, weaponBehavior.ts (Strategy: hitscan / cuerpo a cuerpo)
+  modes/                gameMode.ts (interfaz Strategy) + un archivo por modo + index.ts (registro)
+  match/match.ts        fin de partida, «Mejor jugada», reinicio
+  game/tick.ts          regeneración y snapshot por sala
+```
+
+**Decisiones:**
+
+- **`RoomChannel`**: la lógica de juego emite a través de una interfaz (`broadcast`, `broadcastVolatile`, `to`) y no
+  conoce Socket.IO. Permite tests unitarios de modos con un canal falso (paso 10).
+- **Strategy de modos (`GameMode`)**: `initialTeam`, `onKill`, `tick`, `filterSpawns`, `hpFactor`, `onMatchReset`,
+  `snapshot`, `streakRewards`. Cada modo guarda su propio estado (banderas, placas, infección). Añadir un modo = un
+  archivo + una línea en `modes/index.ts`. Desaparecen los `if (room.mode === …)` repartidos por el servidor.
+- **Strategy de armas (`WeaponBehavior`)**: `hitscan` y `melee` (asistencia de cuchillo y puñalada). `usesAmmo`
+  sustituye a los `!w.melee` dispersos.
+- **Valibot** en `shared/src/net/schemas.ts`: valida forma y tipos de cada mensaje; las reglas (cadencia, munición,
+  distancias) siguen en la lógica. Un mensaje inválido se descarta y se registra (`message dropped`, con motivo).
+  Cambio menor y deliberado: antes un cliente que mandaba tipos erróneos (p. ej. un número como nombre) recibía un
+  valor por defecto; ahora el mensaje se descarta. El cliente real siempre manda tipos correctos.
+- **Rate limit**: _token bucket_ por socket y categoría (movimiento 60/s, combate 40/s, lobby 5/s con ráfaga de 10,
+  resto 10/s). El juego normal queda muy por debajo. Los avisos de descarte se limitan a uno por segundo y socket.
+- **Build del servidor** con tsup (un único `dist/index.js` con `@blockshot/shared` incluido); `tsx watch` en desarrollo.
+- `floorBelow` del servidor y de CTF pasa a `/shared` (antes duplicado con `groundAt`).

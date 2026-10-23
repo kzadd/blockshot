@@ -76,6 +76,24 @@ describe('lobby', () => {
     expect((await list(a)).some((x) => x.id === res.room.id)).toBe(false);
   });
 
+  it('drops and logs invalid or flooding messages without crashing', async () => {
+    const a = bot('Hacker');
+    const res = await a.create({});
+    if (!res.ok) throw new Error('create failed');
+    await a.spawn();
+    const raw = a.s as unknown as { emit: (ev: string, ...args: unknown[]) => void };
+    raw.emit('player:shoot', { o: 'nope', d: [[1, 2]] });
+    raw.emit('player:state', { x: 'a' });
+    await sleep(300);
+    expect(server.output()).toContain('message dropped');
+    await sleep(1100); // drop logs are throttled to one per second and socket
+    for (let i = 0; i < 40; i++) raw.emit('rooms:list', () => {});
+    await sleep(300);
+    expect(server.output()).toContain('rate limit');
+    // the server is still alive and answering
+    expect((await list(a)).length).toBeGreaterThan(0);
+  });
+
   it('answers the ping endpoint', async () => {
     const res = await fetch(`${server.url}/ping`);
     expect(await res.text()).toBe('ok');

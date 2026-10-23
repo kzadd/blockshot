@@ -11,8 +11,8 @@ import {
   isTeamMode,
   loadoutOf,
   gunLadder,
-} from '../../../shared/config.js';
-import { castShot } from '../../../shared/physics.js';
+} from '@blockshot/shared';
+import { castShot } from '@blockshot/shared';
 import { buildWorld } from './world.js';
 import { buildCharacter, buildGun, buildArms, makeNameTag } from './models.js';
 import { getSettings, subscribe } from '../settings.js';

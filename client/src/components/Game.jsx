@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { socket } from '../socket.js';
 import { Engine } from '../game/Engine.js';
-import { getMap, CHAR_BY_ID, PLAYER, STREAKS, canSwitchTeam, teamName } from '../../../shared/config.js';
+import { getMap, CHAR_BY_ID, PLAYER, STREAKS, canSwitchTeam, teamName } from '@blockshot/shared';
 import { sfx } from '../game/sound.js';
 import { useSettings } from '../settings.js';
 import { Keys, playCurtain } from '../ui.jsx';

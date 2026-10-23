@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CHARACTERS, WEAPONS, MODE_BY_ID, PLAYER, weightName, damageAt, speedWith } from '../../../shared/config.js';
+import { CHARACTERS, WEAPONS, MODE_BY_ID, PLAYER, weightName, damageAt, speedWith } from '@blockshot/shared';
 import { Keys } from '../ui.jsx';
 
 export const CONTROLS = [

@@ -33,8 +33,8 @@ import {
   STREAK_REWARDS,
   canSwitchTeam,
   teamName,
-} from '../shared/config.js';
-import { castShot, rayAABB } from '../shared/physics.js';
+} from '@blockshot/shared';
+import { castShot, rayAABB } from '@blockshot/shared';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;

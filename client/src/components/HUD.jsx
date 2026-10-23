@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { WEAPONS, STREAK_REWARDS, isTeamMode, gunLadder, teamName } from '../../../shared/config.js';
+import { WEAPONS, STREAK_REWARDS, isTeamMode, gunLadder, teamName } from '@blockshot/shared';
 import { hpColor } from '../game/models.js';
 import { useSettings } from '../settings.js';
 import Crosshair from './Crosshair.jsx';

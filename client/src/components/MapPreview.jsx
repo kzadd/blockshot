@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { getMap } from '../../../shared/config.js';
+import { getMap } from '@blockshot/shared';
 
 // Vista cenital del mapa dibujada a partir de sus cajas: lo más alto, más claro
 export default function MapPreview({ mapId, size, px = 120, className = 'map-preview' }) {

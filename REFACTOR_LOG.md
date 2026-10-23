@@ -109,3 +109,33 @@ scripts raíz (`dev`, `build`, `start`, `clase`, `lint`, `typecheck`, `test`, `f
 - Errores de lint corregidos sin cambiar comportamiento: ternarios usados como sentencia → `if/else`; import sin usar
   (`STREAKS` en el servidor); dependencias de `useEffect` que faltaban (`room.mode`, `room.scoreLimit`, que no cambian
   durante una partida porque `Game` se monta con `key={room.id}`).
+
+## 2. Paquete /shared: tipos, constantes y eventos tipados
+
+**Qué:** `shared/config.js` y `shared/physics.js` pasan a TypeScript estricto en `shared/src`, organizado por dominio:
+
+```
+shared/src/
+  core/math.ts          Vec3, round2, clamp, rng y seedOf (antes duplicado en config.js y world.js)
+  physics/raycast.ts    rayAABB, raySphere, hitboxes, castShot (+ medidas de hitbox con nombre)
+  player/player.ts      PLAYER, PAD
+  weapons/weapons.ts    WEAPONS (Record<WeaponId, Weapon>), damageAt, weightName, constantes de cuchillo
+  characters/…          CHARACTERS, CHAR_BY_ID, SKINS, speedWith
+  modes/modes.ts        MODES, ladders, FLAG, TAG, INFECT, TEAMS, teamName, rachas, loadoutOf…
+  maps/                 types, props, builders/ (un archivo por mapa), maps.ts (getMap, getColliders, groundAt, floorBelow)
+  net/constants.ts      ticks, lag comp, tolerancias de validación, límites de nombres y salas
+  net/events.ts         ClientToServerEvents / ServerToClientEvents y todos los payloads
+```
+
+**Archivos:** `shared/src/**`, `shared/package.json` (`exports` → `src/index.ts`, sin paso de build), imports de
+cliente y servidor cambiados a `@blockshot/shared`; `world.js` usa el `rng` compartido.
+
+**Decisiones:**
+
+- **Red de seguridad: test «golden».** Antes de borrar el JS se calculó un SHA-256 de los 15 mapas (5 × 3 tamaños) y
+  de todas las tablas de gameplay (armas, personajes, modos, jugador…). `shared/src/maps/golden.test.ts` exige que la
+  versión TS produzca exactamente lo mismo, incluido el orden de claves. Pasa al 100 %: los mapas son idénticos bit a bit.
+- Los números mágicos de `getMap` (margen de los muros, rayos y sesgo de la orientación del spawn, distancia de los
+  objetos a los spawns) y los de validación de red pasan a constantes con nombre.
+- El paquete compartido se consume como código fuente TS (Vite y tsx lo transpilan): sin build intermedio (KISS).
+- El servidor (aún JS) se ejecuta con `tsx` para poder importar TS; se convierte a TS en el paso 3.

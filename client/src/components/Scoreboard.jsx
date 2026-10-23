@@ -1,4 +1,4 @@
-import { CHAR_BY_ID, WEAPONS, isTeamMode, gunLadder, teamName } from '../../../shared/config.js';
+import { CHAR_BY_ID, WEAPONS, isTeamMode, gunLadder, teamName } from '@blockshot/shared';
 
 const TEAM_TXT = { 1: 'var(--eq-rojo-txt)', 2: 'var(--eq-azul-txt)' };
 

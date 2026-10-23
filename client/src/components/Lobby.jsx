@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { socket } from '../socket.js';
 import { sfx } from '../game/sound.js';
-import { MAPS, MAP_SIZES, MODES, MODE_BY_ID } from '../../../shared/config.js';
+import { MAPS, MAP_SIZES, MODES, MODE_BY_ID } from '@blockshot/shared';
 import MapPreview from './MapPreview.jsx';
 import Settings from './Settings.jsx';
 import Manual from './Manual.jsx';

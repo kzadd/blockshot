@@ -1,14 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-  CHARACTERS,
-  WEAPONS,
-  CHAR_BY_ID,
-  SKINS,
-  TEAMS,
-  canSwitchTeam,
-  weightName,
-  speedWith,
-} from '../../../shared/config.js';
+import { CHARACTERS, WEAPONS, CHAR_BY_ID, SKINS, TEAMS, canSwitchTeam, weightName, speedWith } from '@blockshot/shared';
 import CharacterPreview from './CharacterPreview.jsx';
 
 // Muestra de cada skin: diagonal de 135° con dos colores

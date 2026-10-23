@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { rng } from '@blockshot/shared'; // aleatorio con semilla: el paisaje sale igual cada vez
 
 // =====================================================================
 //  Dibujo del mapa. Las cajas (colisión) vienen de shared/config.js; aquí solo
@@ -7,16 +8,6 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 //  (barriles, árboles, farolas, cactus) y el paisaje de fuera de los muros,
 //  que es solo decoración. Las mallas se juntan por material para que vaya fluido.
 // =====================================================================
-
-// Aleatorio con semilla: el paisaje sale igual cada vez
-function rng(seed) {
-  return () => {
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 // ------------------------------------------------------------ Texturas
 // Casi todas son grises claros con detalle oscuro: el color lo pone el material (map.colors)

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import { CHAR_BY_ID } from '../../../shared/config.js';
+import { CHAR_BY_ID } from '@blockshot/shared';
 import { buildCharacter, buildGun } from '../game/models.js';
 
 // Personaje en 3D girando (una vuelta cada 6 s) sobre la peana de CSS. Se puede girar arrastrando.

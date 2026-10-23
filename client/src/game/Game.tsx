@@ -1,19 +1,45 @@
 import { useEffect, useRef, useState } from 'react';
-import { socket } from '../socket.js';
-import { Engine } from '../game/Engine.js';
-import { getMap, CHAR_BY_ID, PLAYER, STREAKS, canSwitchTeam, teamName } from '@blockshot/shared';
-import { sfx } from '../game/sound.js';
-import { useSettings } from '../settings.js';
-import { Keys, playCurtain } from '../ui.jsx';
-import HUD, { Feed, RoomInfo } from './HUD.jsx';
-import CharacterSelect from './CharacterSelect.jsx';
-import Scoreboard from './Scoreboard.jsx';
-import Settings from './Settings.jsx';
-import Manual from './Manual.jsx';
+import {
+  CHAR_BY_ID,
+  PLAYER,
+  STREAKS,
+  canSwitchTeam,
+  getMap,
+  isCharacterId,
+  teamName,
+  type CharacterId,
+  type KillEvent,
+  type MatchEnd,
+  type SideTeam,
+  type SkinId,
+} from '@blockshot/shared';
+import type { Session } from '../app/App';
+import CharacterSelect, { type SkinChoice } from '../characters/CharacterSelect';
+import Manual from '../manual/Manual';
+import { socket } from '../network/socket';
+import Settings from '../settings/SettingsDialog';
+import { useSettings } from '../settings/settingsStore';
+import { Keys, playCurtain } from '../ui/ui';
+import { sfx } from './audio/sound';
+import { Engine } from './engine/Engine';
+import HUD, { Feed, RoomInfo, type FeedItem, type KillBanner } from './hud/HUD';
+import type { HudState } from './hud/hudState';
+import Scoreboard from './hud/Scoreboard';
+import { TEAM_TXT } from './hud/teamStyle';
+import type { RoomView } from './roomView';
 
 let feedId = 0;
 
-const PAUSE_KEYS = [
+const CHAR_KEY = 'blockshot:char';
+const SKINS_KEY = 'blockshot:skins';
+/** Killfeed keeps the last few lines, each for FEED_LIFE_MS. */
+const FEED_MAX = 5;
+const FEED_LIFE_MS = 6000;
+const FEED_PRUNE_MS = 300;
+const BANNER_MS = 2300;
+const SHAKE_MS = 170;
+
+const PAUSE_KEYS: [string[], string][] = [
   [['W', 'A', 'S', 'D'], 'Moverse'],
   [['Espacio'], 'Saltar · mantén para encadenar'],
   [['Shift'], 'Esprintar'],
@@ -25,68 +51,70 @@ const PAUSE_KEYS = [
   [['Tab'], 'Marcador'],
   [['Esc'], 'Pausa'],
 ];
-const WIN_COLOR = { 1: 'var(--eq-rojo-txt)', 2: 'var(--eq-azul-txt)' };
 
-const loadChar = () => {
+const loadChar = (): CharacterId | null => {
   try {
-    const id = localStorage.getItem('blockshot:char');
-    return CHAR_BY_ID[id] ? id : null;
+    const id = localStorage.getItem(CHAR_KEY);
+    return isCharacterId(id) ? id : null;
   } catch {
     return null;
   }
 };
-const loadSkins = () => {
+const loadSkins = (): SkinChoice => {
   try {
-    return JSON.parse(localStorage.getItem('blockshot:skins')) || {};
+    return (JSON.parse(localStorage.getItem(SKINS_KEY) ?? 'null') as SkinChoice | null) ?? {};
   } catch {
     return {};
   }
 };
 
-export default function Game({ session, onLeave }) {
-  const mount = useRef(null);
-  const engine = useRef(null);
+interface LastDeath {
+  name: string;
+  char: CharacterId | null;
+  weapon: string;
+  hp: number;
+}
+type MatchState = MatchEnd & { at: number };
+type Menu = 'settings' | 'manual' | null;
+
+export default function Game({ session, onLeave }: { session: Session; onLeave: () => void }) {
+  const mount = useRef<HTMLDivElement>(null);
+  const engine = useRef<Engine | null>(null);
   const settings = useSettings();
-  const [hud, setHud] = useState(null);
-  const [feed, setFeed] = useState([]);
+  const [hud, setHud] = useState<HudState | null>(null);
+  const [feed, setFeed] = useState<FeedItem[]>([]);
   const [showScores, setShowScores] = useState(false);
-  const [match, setMatch] = useState(null);
+  const [match, setMatch] = useState<MatchState | null>(null);
   const [charId, setCharId] = useState(loadChar);
-  const [skins, setSkins] = useState(loadSkins); // skin elegida para cada personaje
-  const [selecting, setSelecting] = useState(true); // al entrar se elige personaje
-  const [menu, setMenu] = useState(null); // 'settings' | 'manual'
-  const [banner, setBanner] = useState(null); // aviso central al eliminar a alguien
-  const [lastDeath, setLastDeath] = useState(null); // quién te eliminó
+  const [skins, setSkins] = useState(loadSkins); // chosen skin for each character
+  const [selecting, setSelecting] = useState(true); // the character is chosen when entering
+  const [menu, setMenu] = useState<Menu>(null);
+  const [banner, setBanner] = useState<KillBanner | null>(null); // centre notice when you kill someone
+  const [lastDeath, setLastDeath] = useState<LastDeath | null>(null); // who killed you
   const [shake, setShake] = useState('');
   const { room, you } = session;
   const map = getMap(room.mapId, room.size);
-  const live = useRef({});
+  const live = useRef({ hud, match, menu });
   live.current = { hud, match, menu };
 
-  const info = {
+  const info: RoomView = {
     name: room.name,
     map: map.name,
     size: map.sizeName,
-    players: hud?.players?.length || 1,
-    max: room.max || '?',
+    players: hud?.players.length || 1,
+    max: room.max,
   };
 
   useEffect(() => {
-    engine.current = new Engine(
-      mount.current,
-      socket,
-      you,
-      setHud,
-      getMap(room.mapId, room.size),
-      room.mode,
-      room.scoreLimit,
-    );
-    return () => engine.current.destroy();
+    if (!mount.current) return undefined;
+    const e = new Engine(mount.current, socket, you, setHud, getMap(room.mapId, room.size), room.mode, room.scoreLimit);
+    engine.current = e;
+    return () => e.destroy();
   }, [you, room.mapId, room.size, room.mode, room.scoreLimit]);
 
-  // Red de seguridad: si algo intenta cerrar la pestaña en plena partida (Ctrl+W, F5…), el navegador pregunta antes
+  // Safety net: if something tries to close the tab mid-game (Ctrl+W, F5…), the browser asks first
   useEffect(() => {
-    const guard = (e) => {
+    const guard = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = '';
     };
@@ -94,20 +122,20 @@ export default function Game({ session, onLeave }) {
     return () => window.removeEventListener('beforeunload', guard);
   }, []);
 
-  // Mientras se elige personaje no se reaparece solo
+  // While choosing a character there is no automatic respawn
   useEffect(() => {
     if (engine.current)
-      engine.current.autoChar = selecting || !charId ? null : { id: charId, skin: skins[charId] || 'base' };
+      engine.current.autoChar = selecting || !charId ? null : { id: charId, skin: skins[charId] ?? 'base' };
   }, [selecting, charId, skins]);
 
-  // Cortinilla de bloques al aparecer / reaparecer
+  // Block curtain when spawning / respawning
   const wasAlive = useRef(false);
   useEffect(() => {
     if (hud?.alive && !wasAlive.current) playCurtain();
     wasAlive.current = !!hud?.alive;
   }, [hud?.alive]);
 
-  // Sacudida suave al recibir daño (desactivable en Ajustes)
+  // Soft shake when taking damage (can be turned off in Settings)
   const lastDamage = useRef(0);
   useEffect(() => {
     const k = hud?.damageKey;
@@ -115,14 +143,16 @@ export default function Game({ session, onLeave }) {
     lastDamage.current = k;
     if (!settings.shake || !hud.alive) return undefined;
     setShake((s) => (s === 'shake-a' ? 'shake-b' : 'shake-a'));
-    const t = setTimeout(() => setShake(''), 170);
+    const t = setTimeout(() => setShake(''), SHAKE_MS);
     return () => clearTimeout(t);
   }, [hud?.damageKey, hud?.alive, settings.shake]);
 
   useEffect(() => {
-    const push = (item) => setFeed((f) => [...f.slice(-4), { ...item, key: ++feedId, t: Date.now() }]);
-    let bannerTimer = 0;
-    const onKill = (d) => {
+    type NewFeedItem = FeedItem extends infer F ? (F extends FeedItem ? Omit<F, 'key' | 't'> : never) : never;
+    const push = (item: NewFeedItem) =>
+      setFeed((f) => [...f.slice(-(FEED_MAX - 1)), { ...item, key: ++feedId, t: Date.now() } as FeedItem]);
+    let bannerTimer: ReturnType<typeof setTimeout> | undefined;
+    const onKill = (d: KillEvent) => {
       push({ type: 'kill', ...d });
       const label = STREAKS[d.streak];
       if (label) push({ type: 'streak', name: d.killerName, team: d.killerTeam, label, n: d.streak });
@@ -132,11 +162,11 @@ export default function Game({ session, onLeave }) {
         if (label || d.reward) sfx.streak();
         clearTimeout(bannerTimer);
         setBanner({ key: Date.now(), name: d.victimName, head: d.head, label, n: d.streak, reward: d.reward });
-        bannerTimer = setTimeout(() => setBanner(null), 2300);
+        bannerTimer = setTimeout(() => setBanner(null), BANNER_MS);
       }
     };
-    const onNotice = (text) => push({ type: 'notice', text });
-    const onEnd = (d) => setMatch({ ...d, at: Date.now() });
+    const onNotice = (text: string) => push({ type: 'notice', text });
+    const onEnd = (d: MatchEnd) => setMatch({ ...d, at: Date.now() });
     const onStart = () => {
       setMatch(null);
       setLastDeath(null);
@@ -147,39 +177,39 @@ export default function Game({ session, onLeave }) {
     socket.on('match:end', onEnd);
     socket.on('match:start', onStart);
     socket.on('disconnect', onDisc);
-    // Cada línea del killfeed dura 6 s (los últimos 300 ms se desvanece)
-    const prune = setInterval(() => setFeed((f) => f.filter((x) => Date.now() - x.t < 6000)), 300);
+    // Each killfeed line lasts 6 s (it fades during the last 300 ms)
+    const prune = setInterval(() => setFeed((f) => f.filter((x) => Date.now() - x.t < FEED_LIFE_MS)), FEED_PRUNE_MS);
 
-    const down = (e) => {
+    const down = (e: KeyboardEvent) => {
       if (e.code === 'Tab') {
         e.preventDefault();
         setShowScores(true);
       }
       const { hud: h, match: m, menu: open } = live.current;
-      // Esc en la pantalla de pausa: volver a jugar (igual que el clic)
+      // Esc on the pause screen: back to the game (same as clicking)
       if (e.code === 'Escape' && !e.repeat && h?.alive && !h.locked && !m && !open) {
-        engine.current.requestLock();
+        engine.current?.requestLock();
         return;
       }
-      // O: ajustes · H o F1: manual
-      const want = e.code === 'KeyO' ? 'settings' : e.code === 'KeyH' || e.code === 'F1' ? 'manual' : null;
+      // O: settings · H or F1: manual
+      const want: Menu = e.code === 'KeyO' ? 'settings' : e.code === 'KeyH' || e.code === 'F1' ? 'manual' : null;
       if (want && !e.repeat) {
         e.preventDefault();
         setMenu((cur) => (cur === want ? null : want));
         document.exitPointerLock?.();
         return;
       }
-      // T: cambiar de equipo (por equipos)
+      // T: switch team (team modes)
       if (e.code === 'KeyT' && !e.repeat && canSwitchTeam(room.mode) && h?.myTeam && !m && !open) {
         socket.emit('team:set', { team: 3 - h.myTeam });
       }
-      // B: cambiar de personaje, solo estando muerto (se aplica al reaparecer)
+      // B: change character, only while dead (applied on respawn)
       if (e.code === 'KeyB' && h?.everSpawned && !h.alive && !m && !open) {
         setSelecting(true);
         document.exitPointerLock?.();
       }
     };
-    const up = (e) => e.code === 'Tab' && setShowScores(false);
+    const up = (e: KeyboardEvent) => e.code === 'Tab' && setShowScores(false);
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
     return () => {
@@ -195,34 +225,36 @@ export default function Game({ session, onLeave }) {
     };
   }, [onLeave, you, room.mode]);
 
-  const pick = (characterId, skin) => {
+  const pick = (characterId: CharacterId, skin: SkinId) => {
     const next = { ...skins, [characterId]: skin };
     try {
-      localStorage.setItem('blockshot:char', characterId);
-      localStorage.setItem('blockshot:skins', JSON.stringify(next));
+      localStorage.setItem(CHAR_KEY, characterId);
+      localStorage.setItem(SKINS_KEY, JSON.stringify(next));
     } catch {}
     setCharId(characterId);
     setSkins(next);
     setSelecting(false);
-    engine.current.requestLock(); // debe ir dentro del clic
-    engine.current.spawn(characterId, skin); // aparece ya, o al acabar la cuenta atrás
+    engine.current?.requestLock(); // must happen inside the click
+    engine.current?.spawn(characterId, skin); // spawns now, or when the countdown ends
   };
   const keep = () => {
     setSelecting(false);
-    engine.current.requestLock();
+    engine.current?.requestLock();
   };
   const leave = () => {
     socket.emit('room:leave');
     onLeave();
   };
+  const switchTeam = (team: SideTeam) => socket.emit('team:set', { team });
 
   const alive = hud?.alive;
   const dead = hud && !alive && hud.everSpawned && !selecting && !match;
   const choosing = hud && !alive && selecting && !match;
   const paused = hud && alive && !hud.locked && !match && !menu;
-  const me = CHAR_BY_ID[charId];
-  const killer = lastDeath && CHAR_BY_ID[lastDeath.char];
+  const me = charId ? CHAR_BY_ID[charId] : null;
+  const killer = lastDeath?.char ? CHAR_BY_ID[lastDeath.char] : null;
   const sec = hud ? Math.ceil(hud.respawnIn / 1000) : 0;
+  const otherTeam = hud?.myTeam === 1 ? 2 : 1;
 
   return (
     <div className={`game ${shake}`}>
@@ -301,12 +333,12 @@ export default function Game({ session, onLeave }) {
           mode={room.mode}
           myTeam={hud.myTeam}
           players={hud.players}
-          onTeam={(team) => socket.emit('team:set', { team })}
+          onTeam={switchTeam}
         />
       )}
 
       {paused && (
-        <div className="pause-bg" onClick={() => engine.current.requestLock()}>
+        <div className="pause-bg" onClick={() => engine.current?.requestLock()}>
           <div className="stage">
             <div className="pause-panel">
               <h2>Pausa</h2>
@@ -329,8 +361,8 @@ export default function Game({ session, onLeave }) {
                   <span className="key">H</span>Manual
                 </button>
                 {canSwitchTeam(room.mode) && hud.myTeam && (
-                  <button className="btn has-key" onClick={() => socket.emit('team:set', { team: 3 - hud.myTeam })}>
-                    <span className="key">T</span>Pasar a {teamName(room.mode, 3 - hud.myTeam)}
+                  <button className="btn has-key" onClick={() => switchTeam(otherTeam)}>
+                    <span className="key">T</span>Pasar a {teamName(room.mode, otherTeam)}
                   </button>
                 )}
                 <button className="btn ghost danger" onClick={leave}>
@@ -347,14 +379,16 @@ export default function Game({ session, onLeave }) {
           <div className="stage">
             {match && (
               <div className="end-head">
-                <h2 style={{ color: WIN_COLOR[match.team] || 'var(--sol)' }}>¡{match.winner} gana la partida!</h2>
+                <h2 style={{ color: match.team ? TEAM_TXT[match.team] : 'var(--sol)' }}>
+                  ¡{match.winner} gana la partida!
+                </h2>
                 <div className="sub">
                   Nueva partida en unos segundos…
                   <div className="pbar fill">
                     <i key={match.at} style={{ animationDuration: `${match.restartIn}ms` }} />
                   </div>
                 </div>
-                {match.best?.length > 0 && (
+                {match.best.length > 0 && (
                   <div className="best">
                     {match.best.map((b, i) => (
                       <div key={b.t} className="best-card" style={{ animationDelay: `${i * 120}ms` }}>

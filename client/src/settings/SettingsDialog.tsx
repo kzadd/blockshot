@@ -1,21 +1,30 @@
 import { useEffect, useState } from 'react';
-import { CROSSHAIRS, CROSSHAIR_COLORS, DEFAULTS, setSettings, useSettings } from '../settings.js';
-import { Check, Slider } from '../ui.jsx';
-import Crosshair from './Crosshair.jsx';
-import { COLORBLIND } from '../palette.js';
+import { Check, Slider } from '../ui/ui';
+import Crosshair from './Crosshair';
+import { COLORBLIND } from './palette';
+import {
+  CROSSHAIRS,
+  CROSSHAIR_COLORS,
+  DEFAULTS,
+  setSettings,
+  useSettings,
+  type CrosshairConfig,
+} from './settingsStore';
 
 const TABS = ['Mira', 'Ratón, vista y sonido', 'Accesibilidad'];
+/** Spread shown while the preview is held down. */
+const PREVIEW_SPREAD = 0.02;
 
-export default function Settings({ onClose }) {
+export default function Settings({ onClose }: { onClose: () => void }) {
   const st = useSettings();
   const [tab, setTab] = useState(0);
   const ch = st.crosshair;
-  const setCh = (patch) => setSettings({ crosshair: patch });
-  const [demo, setDemo] = useState(0); // mantener pulsado la vista previa abre la mira
+  const setCh = (patch: Partial<CrosshairConfig>) => setSettings({ crosshair: patch });
+  const [demo, setDemo] = useState(0); // holding the preview down opens the crosshair
   const custom = !CROSSHAIR_COLORS.includes(ch.color);
 
   useEffect(() => {
-    const esc = (e) => e.code === 'Escape' && onClose();
+    const esc = (e: KeyboardEvent) => e.code === 'Escape' && onClose();
     window.addEventListener('keydown', esc);
     return () => window.removeEventListener('keydown', esc);
   }, [onClose]);
@@ -44,7 +53,7 @@ export default function Settings({ onClose }) {
               <div>
                 <div
                   className="xh-preview"
-                  onMouseDown={() => setDemo(0.02)}
+                  onMouseDown={() => setDemo(PREVIEW_SPREAD)}
                   onMouseUp={() => setDemo(0)}
                   onMouseLeave={() => setDemo(0)}
                 >

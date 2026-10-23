@@ -1,9 +1,34 @@
 import { useEffect, useRef, useState } from 'react';
-import { CHARACTERS, WEAPONS, CHAR_BY_ID, SKINS, TEAMS, canSwitchTeam, weightName, speedWith } from '@blockshot/shared';
-import CharacterPreview from './CharacterPreview.jsx';
+import {
+  CHARACTERS,
+  CHAR_BY_ID,
+  SKINS,
+  TEAMS,
+  WEAPONS,
+  canSwitchTeam,
+  speedWith,
+  weightName,
+  type CharacterId,
+  type ModeId,
+  type PlayerSnapshot,
+  type SideTeam,
+  type SkinId,
+  type Team,
+  type WeaponId,
+} from '@blockshot/shared';
+import type { RoomView } from '../game/roomView';
+import { SIDES, teamVar } from '../game/hud/teamStyle';
+import CharacterPreview from './CharacterPreview';
 
-// Muestra de cada skin: diagonal de 135° con dos colores
-const SKIN_SWATCH = {
+/** Bar scales of the character sheet. */
+const MAX_HP_BAR = 150;
+const SPEED_BAR_MIN = 5;
+const SPEED_BAR_RANGE = 5.5;
+
+export type SkinChoice = Partial<Record<CharacterId, SkinId>>;
+
+// Swatch of each skin: 135° diagonal with two colours
+const SKIN_SWATCH: Record<SkinId, (c: string) => [string, string]> = {
   base: (c) => [c, `color-mix(in oklch, ${c} 55%, #1b2a4a)`],
   camo: () => ['#6b7a3a', '#3d4722'],
   noche: (c) => ['#16181f', c],
@@ -11,7 +36,7 @@ const SKIN_SWATCH = {
   oro: () => ['#ffd34d', '#a8780f'],
 };
 
-function WeaponCard({ id, slot }) {
+function WeaponCard({ id, slot }: { id: WeaponId; slot: string }) {
   const w = WEAPONS[id];
   return (
     <div className="weapon-card">
@@ -41,17 +66,22 @@ function WeaponCard({ id, slot }) {
   );
 }
 
-// Por equipos: elegir equipo (con cuántos hay en cada uno)
-function TeamPicker({ myTeam, players = [], onTeam }) {
-  const count = (t) => players.filter((p) => p.tm === t).length;
+// Team modes: pick a team (with how many players each has)
+interface TeamPickerProps {
+  myTeam: Team;
+  players?: PlayerSnapshot[];
+  onTeam: (t: SideTeam) => void;
+}
+function TeamPicker({ myTeam, players = [], onTeam }: TeamPickerProps) {
+  const count = (t: SideTeam) => players.filter((p) => p.tm === t).length;
   return (
     <div className="team-pick">
       <span>Equipo</span>
-      {[1, 2].map((t) => (
+      {SIDES.map((t) => (
         <button
           key={t}
           className={myTeam === t ? 'on' : ''}
-          style={{ '--t': `var(--eq-${t === 1 ? 'rojo' : 'azul'})` }}
+          style={{ '--t': teamVar(t) }}
           onClick={() => myTeam !== t && onTeam(t)}
         >
           <i />
@@ -64,6 +94,21 @@ function TeamPicker({ myTeam, players = [], onTeam }) {
       ))}
     </div>
   );
+}
+
+interface CharacterSelectProps {
+  info: RoomView;
+  current: CharacterId | null;
+  skins: SkinChoice;
+  respawnIn?: number;
+  fromDeath: boolean;
+  onPick: (id: CharacterId, skin: SkinId) => void;
+  onKeep: (() => void) | null;
+  onLeave: () => void;
+  mode: ModeId;
+  myTeam: Team;
+  players: PlayerSnapshot[];
+  onTeam: (t: SideTeam) => void;
 }
 
 export default function CharacterSelect({
@@ -79,19 +124,20 @@ export default function CharacterSelect({
   myTeam,
   players,
   onTeam,
-}) {
-  const [sel, setSel] = useState(current || CHARACTERS[0].id);
+}: CharacterSelectProps) {
+  const [sel, setSel] = useState<CharacterId>(current ?? CHARACTERS[0]!.id);
   const [skinBy, setSkinBy] = useState(skins);
   const c = CHAR_BY_ID[sel];
-  const skin = skinBy[sel] || 'base';
-  const live = useRef({});
+  const skin: SkinId = skinBy[sel] ?? 'base';
+  const live = useRef({ sel, skin });
   live.current = { sel, skin };
 
   // Atajos: 1–5 elige personaje, Enter juega
   useEffect(() => {
-    const key = (e) => {
+    const key = (e: KeyboardEvent) => {
       const n = Number(e.key);
-      if (n >= 1 && n <= CHARACTERS.length) setSel(CHARACTERS[n - 1].id);
+      const pick = CHARACTERS[n - 1];
+      if (n >= 1 && pick) setSel(pick.id);
       if (e.key === 'Enter') onPick(live.current.sel, live.current.skin);
     };
     window.addEventListener('keydown', key);
@@ -140,7 +186,7 @@ export default function CharacterSelect({
           <div className="char-stage">
             <div className="who">
               <b>{c.name}</b>
-              <small>Skin {SKINS.find((k) => k.id === skin).name}</small>
+              <small>Skin {SKINS.find((k) => k.id === skin)?.name}</small>
             </div>
             <span className="drag">↔ Arrastra para girar</span>
             <span className="peana" />
@@ -171,7 +217,7 @@ export default function CharacterSelect({
             <div className="stat">
               <span>Vida</span>
               <div className="bar">
-                <i style={{ width: `${(c.hp / 150) * 100}%` }} />
+                <i style={{ width: `${(c.hp / MAX_HP_BAR) * 100}%` }} />
               </div>
               <b>{c.hp}</b>
             </div>
@@ -181,7 +227,7 @@ export default function CharacterSelect({
             >
               <span>Velocidad</span>
               <div className="bar">
-                <i style={{ width: `${((speedWith(c, c.primary) - 5) / 5.5) * 100}%` }} />
+                <i style={{ width: `${((speedWith(c, c.primary) - SPEED_BAR_MIN) / SPEED_BAR_RANGE) * 100}%` }} />
               </div>
               <b>{speedWith(c, c.primary)}</b>
             </div>

@@ -1,21 +1,38 @@
-import { useEffect, useRef, useState } from 'react';
-import { socket } from '../socket.js';
-import { sfx } from '../game/sound.js';
-import { MAPS, MAP_SIZES, MODES, MODE_BY_ID } from '@blockshot/shared';
-import MapPreview from './MapPreview.jsx';
-import Settings from './Settings.jsx';
-import Manual from './Manual.jsx';
-import { Slider } from '../ui.jsx';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import {
+  MAPS,
+  MAP_SIZES,
+  MODES,
+  MODE_BY_ID,
+  ROOM_MAX_PLAYERS,
+  ROOM_MIN_PLAYERS,
+  type JoinResult,
+  type MapId,
+  type ModeId,
+  type RoomSummary,
+  type SizeId,
+} from '@blockshot/shared';
+import type { Session } from '../app/App';
+import { sfx } from '../game/audio/sound';
+import Manual from '../manual/Manual';
+import { socket } from '../network/socket';
+import Settings from '../settings/SettingsDialog';
+import { Slider } from '../ui/ui';
+import MapPreview from './MapPreview';
 
-const loadNick = () => {
+const NICK_KEY = 'blockshot:nick';
+/** Show the "cannot connect" toast after this long without a connection. */
+const OFFLINE_NOTICE_MS = 3000;
+
+const loadNick = (): string => {
   try {
-    return localStorage.getItem('blockshot:nick') || '';
+    return localStorage.getItem(NICK_KEY) || '';
   } catch {
     return '';
   }
 };
 
-const MODE_SUB = {
+const MODE_SUB: Record<ModeId, string> = {
   ffa: 'Cada uno por su cuenta',
   teams: 'Rojo contra Azul',
   ctf: 'Roba la bandera rival',
@@ -25,13 +42,23 @@ const MODE_SUB = {
 };
 const EMPTY_COLORS = ['#3a4a6c', '#ffc93c', '#3a4a6c', '#3f7fe0', '#d0533a', '#3aa65a'];
 
-export default function Lobby({ onJoined }) {
+interface RoomForm {
+  name: string;
+  password: string;
+  mapId: MapId;
+  size: SizeId;
+  mode: ModeId;
+  scoreLimit: number;
+  max: number;
+}
+
+export default function Lobby({ onJoined }: { onJoined: (s: Session) => void }) {
   const [nick, setNick] = useState(loadNick);
   const [nickError, setNickError] = useState(false);
-  const [rooms, setRooms] = useState([]);
+  const [rooms, setRooms] = useState<RoomSummary[]>([]);
   const [connected, setConnected] = useState(socket.connected);
-  const [offline, setOffline] = useState(false); // aviso de error de conexión
-  const [form, setForm] = useState({
+  const [offline, setOffline] = useState(false); // connection error notice
+  const [form, setForm] = useState<RoomForm>({
     name: '',
     password: '',
     mapId: 'patio',
@@ -40,15 +67,15 @@ export default function Lobby({ onJoined }) {
     scoreLimit: MODE_BY_ID.ffa.def,
     max: MAP_SIZES.m.players,
   });
-  const [joining, setJoining] = useState(null);
+  const [joining, setJoining] = useState<RoomSummary | null>(null);
   const [pass, setPass] = useState('');
   const [passError, setPassError] = useState('');
   const [toast, setToast] = useState('');
-  const [menu, setMenu] = useState(null); // 'settings' | 'manual'
-  const roomNameRef = useRef(null);
+  const [menu, setMenu] = useState<'settings' | 'manual' | null>(null);
+  const roomNameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const onRooms = (r) => setRooms(r);
+    const onRooms = (r: RoomSummary[]) => setRooms(r);
     const onConn = () => {
       setConnected(true);
       setOffline(false);
@@ -66,10 +93,10 @@ export default function Lobby({ onJoined }) {
     };
   }, []);
 
-  // Si en 3 s no hay conexión, aviso abajo con «Reintentar»
+  // If there is no connection after a few seconds, show a notice with «Reintentar»
   useEffect(() => {
     if (connected) return undefined;
-    const t = setTimeout(() => setOffline(true), 3000);
+    const t = setTimeout(() => setOffline(true), OFFLINE_NOTICE_MS);
     return () => clearTimeout(t);
   }, [connected]);
 
@@ -77,7 +104,7 @@ export default function Lobby({ onJoined }) {
   const needNick = () => {
     if (nickname) {
       try {
-        localStorage.setItem('blockshot:nick', nickname);
+        localStorage.setItem(NICK_KEY, nickname);
       } catch {}
       return false;
     }
@@ -85,19 +112,19 @@ export default function Lobby({ onJoined }) {
     return true;
   };
 
-  const handle = (res) => {
-    if (res?.ok) onJoined(res);
-    else setToast(res?.error || 'No se pudo entrar a la sala.');
+  const handle = (res: JoinResult) => {
+    if (res.ok) onJoined(res);
+    else setToast(res.error || 'No se pudo entrar a la sala.');
   };
 
-  const create = (e) => {
+  const create = (e: FormEvent) => {
     e.preventDefault();
     sfx.unlock();
     if (needNick()) return;
     socket.emit('room:create', { ...form, nickname }, handle);
   };
 
-  const join = (room, password = '') => {
+  const join = (room: RoomSummary, password = '') => {
     sfx.unlock();
     if (needNick()) return;
     if (room.locked && !password) {
@@ -107,19 +134,20 @@ export default function Lobby({ onJoined }) {
       return;
     }
     socket.emit('room:join', { roomId: room.id, password, nickname }, (res) => {
-      if (res?.ok) {
+      if (res.ok) {
         setJoining(null);
         onJoined(res);
-      } else if (password && /contraseña/i.test(res?.error || ''))
+      } else if (password && /contraseña/i.test(res.error || ''))
         setPassError(`Contraseña incorrecta. Pídesela a ${room.host}.`);
       else {
         setJoining(null);
-        setToast(res?.error || 'No se pudo entrar a la sala.');
+        setToast(res.error || 'No se pudo entrar a la sala.');
       }
     });
   };
 
   const mapInfo = MAPS.find((m) => m.id === form.mapId);
+  const mode = MODE_BY_ID[form.mode];
 
   return (
     <div className="lobby">
@@ -188,7 +216,7 @@ export default function Lobby({ onJoined }) {
               <div>
                 <div className="label-row">
                   <span className="label">Mapa</span>
-                  <span className="hint">{mapInfo.desc}</span>
+                  <span className="hint">{mapInfo?.desc}</span>
                 </div>
                 <div className="maps">
                   {MAPS.map((m) => (
@@ -234,11 +262,11 @@ export default function Lobby({ onJoined }) {
                     <span className="hint">
                       {form.mode === 'infect'
                         ? `Aguantar ${form.scoreLimit} min`
-                        : `${form.scoreLimit} ${MODE_BY_ID[form.mode].unit}${form.mode === 'teams' || form.mode === 'kc' ? ' del equipo' : ''}`}
+                        : `${form.scoreLimit} ${mode.unit}${form.mode === 'teams' || form.mode === 'kc' ? ' del equipo' : ''}`}
                     </span>
                   </div>
                   <div className="seg">
-                    {MODE_BY_ID[form.mode].limits.map((n) => (
+                    {mode.limits.map((n) => (
                       <button
                         type="button"
                         key={n}
@@ -247,7 +275,7 @@ export default function Lobby({ onJoined }) {
                         style={{ justifyItems: 'center' }}
                       >
                         <b>{n}</b>
-                        <small>{MODE_BY_ID[form.mode].unit}</small>
+                        <small>{mode.unit}</small>
                       </button>
                     ))}
                   </div>
@@ -275,10 +303,10 @@ export default function Lobby({ onJoined }) {
 
               <div className="create-foot">
                 <Slider
-                  label="Jugadores máximos · 2–24"
+                  label={`Jugadores máximos · ${ROOM_MIN_PLAYERS}–${ROOM_MAX_PLAYERS}`}
                   value={form.max}
-                  min={2}
-                  max={24}
+                  min={ROOM_MIN_PLAYERS}
+                  max={ROOM_MAX_PLAYERS}
                   onChange={(v) => setForm({ ...form, max: v })}
                 />
                 <button className="btn primary lg" disabled={!connected}>

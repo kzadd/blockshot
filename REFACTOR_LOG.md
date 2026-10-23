@@ -186,3 +186,46 @@ server/src/
   resto 10/s). El juego normal queda muy por debajo. Los avisos de descarte se limitan a uno por segundo y socket.
 - **Build del servidor** con tsup (un único `dist/index.js` con `@blockshot/shared` incluido); `tsx watch` en desarrollo.
 - `floorBelow` del servidor y de CTF pasa a `/shared` (antes duplicado con `groundAt`).
+
+## 4. Cliente: carpetas por feature y TypeScript estricto
+
+**Qué:** el cliente pasa de `components/` + `game/` a carpetas por dominio y todo (salvo el motor) a TS estricto:
+
+```
+client/src/
+  main.tsx, env.d.ts      arranque y tipos globales (variables CSS en `style`)
+  app/App.tsx             sesión y cortinilla entre lobby y partida
+  ui/ui.tsx               teclas vivas, Check, Slider, cortinilla, escala --s (uiScale)
+  network/socket.ts       socket tipado con los eventos de /shared
+  settings/               settingsStore.ts, palette.ts (daltonismo), SettingsDialog.tsx, Crosshair.tsx
+  lobby/                  Lobby.tsx, MapPreview.tsx
+  characters/             CharacterSelect.tsx, CharacterPreview.tsx
+  manual/Manual.tsx
+  game/
+    Game.tsx, roomView.ts
+    hud/                  HUD.tsx, Minimap.tsx, Scoreboard.tsx, hudState.ts, teamStyle.ts
+    render/               world.ts (mapa y paisaje), models.ts (personajes y armas)
+    audio/sound.ts
+    engine/Engine.js      (se convierte en el paso 5, junto con el movimiento autoritativo)
+  styles/styles.css
+```
+
+**Decisiones:**
+
+- `Engine.js` se deja en JS en este paso: el paso 5 cambia su movimiento por la simulación compartida y se divide en
+  módulos; convertirlo dos veces no aporta nada.
+- **Minimapa desacoplado:** antes leía `remotes`, `tags`, `flags`, `pos`… del motor. Ahora el motor expone
+  `minimap(now): MinimapView` (interfaz `MinimapSource`) y el componente solo pinta.
+- **DRY:** `TEAM_TXT` / `var(--eq-…)` estaban repetidos en HUD, marcador, fin de partida y selector de equipo →
+  `hud/teamStyle.ts`.
+- `settings.ts` y `Settings.tsx` chocaban en Windows (sistema de archivos sin mayúsculas) → `settingsStore.ts` y
+  `SettingsDialog.tsx`.
+- Comentarios del código traducidos al inglés en los archivos convertidos (regla 6); los textos de la interfaz siguen
+  en español.
+- `buildArms` pierde un parámetro que no usaba (`gunId`).
+- Números mágicos con nombre: escalas de barras de la ficha, tiempos del killfeed y del banner, umbrales de vida y
+  munición baja, cortinilla, vista previa 3D, minimapa.
+
+**Verificado:** lint, typecheck, build y 50 tests en verde; prueba en navegador (Chrome sin ventana) del lobby,
+Infectados en Almacén, plataformas de salto (5,6 m) y velocidad (9,2 m/s corriendo, 10,7 m/s con slide-hop), sin
+errores de consola.

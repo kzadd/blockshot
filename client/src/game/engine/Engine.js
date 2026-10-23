@@ -13,11 +13,11 @@ import {
   gunLadder,
 } from '@blockshot/shared';
 import { castShot } from '@blockshot/shared';
-import { buildWorld } from './world.js';
-import { buildCharacter, buildGun, buildArms, makeNameTag } from './models.js';
-import { getSettings, subscribe } from '../settings.js';
-import { sfx } from './sound.js';
-import { palette, teamColor } from '../palette.js';
+import { buildWorld } from '../render/world';
+import { buildCharacter, buildGun, buildArms, makeNameTag } from '../render/models';
+import { getSettings, subscribe } from '../../settings/settingsStore';
+import { sfx } from '../audio/sound';
+import { palette, teamColor } from '../../settings/palette';
 
 const HUD_MS = 1000 / 15;
 // Retraso con el que se ven los rivales (snapshot cada 50 ms + suavizado): se suma al ping para rebobinar
@@ -703,7 +703,7 @@ export class Engine {
     this.gunHolder.clear();
     const { color, skin } = this.outfit(this.character.id, this.skin, this.myTeam);
     this.gun = buildGun(this.weaponId(), true, color);
-    buildArms(this.gun, this.weaponId(), skin, color);
+    buildArms(this.gun, skin, color);
     this.gunHolder.add(this.gun);
   }
 
@@ -843,6 +843,29 @@ export class Engine {
 
   addTick(x, z, color) {
     this.ticks.push({ key: performance.now() + Math.random(), x, z, color, t: performance.now() });
+  }
+
+  // Lo que dibuja el minimapa: aliados siempre, enemigos un momento tras disparar (o siempre con radar)
+  /** @returns {import('../hud/Minimap').MinimapView} */
+  minimap(now) {
+    const SHOW_SHOT_MS = 1500;
+    const dots = [];
+    for (const r of this.remotes.values()) {
+      if (!r.alive || !r.model) continue;
+      const p = r.model.group.position;
+      const mate = this.isMate(r);
+      const age = this.radar ? 0 : now - (r.lastShot || -1e9);
+      if (!mate && age > SHOW_SHOT_MS) continue;
+      dots.push({ x: p.x, z: p.z, mate, alpha: mate ? 1 : 1 - age / SHOW_SHOT_MS });
+    }
+    const tags = [...this.tags.values()].map((m) => ({ x: m.position.x, z: m.position.z, team: m.userData.team }));
+    const flags = [];
+    for (const t of this.flags ? /** @type {(1 | 2)[]} */ ([1, 2]) : []) {
+      const f = this.flags[t];
+      const p = f.c === this.myId ? this.pos : (this.remotes.get(f.c)?.model?.group.position ?? f);
+      flags.push({ x: p.x, z: p.z, team: t });
+    }
+    return { me: this.alive ? { x: this.pos.x, z: this.pos.z, yaw: this.yaw } : null, dots, tags, flags };
   }
 
   isMate(r) {

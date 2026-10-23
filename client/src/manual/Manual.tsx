@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { CHARACTERS, WEAPONS, MODE_BY_ID, PLAYER, weightName, damageAt, speedWith } from '@blockshot/shared';
-import { Keys } from '../ui.jsx';
+import { Keys } from '../ui/ui';
 
-export const CONTROLS = [
+export const CONTROLS: [string[], string][] = [
   [['W', 'A', 'S', 'D'], 'Moverse'],
   [['Espacio'], 'Saltar. Mantenlo pulsado para encadenar saltos (bunny hop)'],
   [['C', 'Ctrl'], 'Agacharse: más bajo y más preciso. Si vas corriendo, te deslizas'],
@@ -19,7 +19,7 @@ export const CONTROLS = [
   [['Esc'], 'Soltar el ratón / pausa'],
 ];
 
-const STEPS = [
+const STEPS: [string, string][] = [
   ['Escribe tu nombre', 'Así te verán los demás en el marcador y en el killfeed.'],
   ['Crea una sala o entra en una', 'Si tiene candado, pide la contraseña a quien la creó.'],
   ['Elige personaje y skin', 'Cada uno tiene vida, velocidad y armas distintas.'],
@@ -50,7 +50,7 @@ const STEPS = [
   ['Si te eliminan', `Reapareces a los ${PLAYER.respawnDelay / 1000} s. Pulsa B para cambiar de personaje antes.`],
 ];
 
-const TRICKS = [
+const TRICKS: [string, string][] = [
   ['Bunny hop', 'Mantén Espacio al aterrizar: cada salto encadenado conserva la velocidad.'],
   ['Deslízate', 'Corre y pulsa C para entrar en una esquina más rápido y más bajo.'],
   [
@@ -81,11 +81,11 @@ const TRICKS = [
 
 const TABS = ['Controles', 'Cómo jugar', 'Personajes', 'Armas', 'Trucos'];
 
-export default function Manual({ onClose }) {
+export default function Manual({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState(0);
 
   useEffect(() => {
-    const esc = (e) => e.code === 'Escape' && onClose();
+    const esc = (e: KeyboardEvent) => e.code === 'Escape' && onClose();
     window.addEventListener('keydown', esc);
     return () => window.removeEventListener('keydown', esc);
   }, [onClose]);

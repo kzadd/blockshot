@@ -1,9 +1,31 @@
-import { CHAR_BY_ID, WEAPONS, isTeamMode, gunLadder, teamName } from '@blockshot/shared';
+import {
+  CHAR_BY_ID,
+  WEAPONS,
+  gunLadder,
+  isTeamMode,
+  teamName,
+  type ModeId,
+  type PlayerSnapshot,
+  type SideTeam,
+  type WeaponId,
+} from '@blockshot/shared';
+import type { RoomView } from '../roomView';
+import { SIDES, TEAM_TXT, teamVar } from './teamStyle';
 
-const TEAM_TXT = { 1: 'var(--eq-rojo-txt)', 2: 'var(--eq-azul-txt)' };
+/** A streak this long is highlighted with a flame. */
+const HOT_STREAK = 3;
+const BAD_PING_MS = 120;
 
 // caps = título de la columna de puntos propios (Capturas, Placas…) o nada
-function Table({ players, me, numbered, caps, ladder }) {
+interface TableProps {
+  players: PlayerSnapshot[];
+  me: string;
+  numbered?: boolean;
+  caps?: string | null;
+  ladder?: WeaponId[] | null;
+}
+
+function Table({ players, me, numbered, caps, ladder }: TableProps) {
   return (
     <table className="sb-table">
       <thead>
@@ -51,13 +73,13 @@ function Table({ players, me, numbered, caps, ladder }) {
             {caps && <td className="num k">{p.cp ?? 0}</td>}
             {ladder && (
               <td>
-                {p.lv + 1}/{ladder.length} · {WEAPONS[ladder[Math.min(p.lv, ladder.length - 1)]].name}
+                {p.lv + 1}/{ladder.length} · {WEAPONS[ladder[Math.min(p.lv, ladder.length - 1)]!].name}
               </td>
             )}
             <td className="num k">{p.k}</td>
             <td className="num">{p.d}</td>
-            <td className={`num ${p.st >= 3 ? 'fire' : ''}`}>{p.st >= 3 ? `🔥 ${p.st}` : p.st}</td>
-            <td className={`num ping ${p.pg > 120 ? 'bad' : ''}`}>{p.pg || '—'}</td>
+            <td className={`num ${p.st >= HOT_STREAK ? 'fire' : ''}`}>{p.st >= HOT_STREAK ? `🔥 ${p.st}` : p.st}</td>
+            <td className={`num ping ${p.pg > BAD_PING_MS ? 'bad' : ''}`}>{p.pg || '—'}</td>
           </tr>
         ))}
       </tbody>
@@ -65,7 +87,16 @@ function Table({ players, me, numbered, caps, ladder }) {
   );
 }
 
-export default function Scoreboard({ players, me, info, scoreLimit, mode, teamScore }) {
+interface ScoreboardProps {
+  players: PlayerSnapshot[];
+  me: string;
+  info: RoomView;
+  scoreLimit: number;
+  mode: ModeId;
+  teamScore: Record<SideTeam, number> | null;
+}
+
+export default function Scoreboard({ players, me, info, scoreLimit, mode, teamScore }: ScoreboardProps) {
   const ladder = mode === 'gungame' ? gunLadder(scoreLimit) : null;
   const sorted = [...players].sort((a, b) => (ladder ? b.lv - a.lv : 0) || b.k - a.k || a.d - b.d);
   const teams = isTeamMode(mode);
@@ -91,12 +122,8 @@ export default function Scoreboard({ players, me, info, scoreLimit, mode, teamSc
         </span>
       </div>
       {teams ? (
-        [1, 2].map((t) => (
-          <div
-            key={t}
-            className="sb-team"
-            style={{ '--t': `var(--eq-${t === 1 ? 'rojo' : 'azul'})`, '--tt': TEAM_TXT[t] }}
-          >
+        SIDES.map((t) => (
+          <div key={t} className="sb-team" style={{ '--t': teamVar(t), '--tt': TEAM_TXT[t] }}>
             <div className="sb-team-head">
               <b>{infect ? teamName(mode, t) : `Equipo ${teamName(mode, t)}`}</b>
               <span>

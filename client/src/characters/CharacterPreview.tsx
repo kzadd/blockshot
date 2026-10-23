@@ -1,18 +1,37 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import { CHAR_BY_ID } from '@blockshot/shared';
-import { buildCharacter, buildGun } from '../game/models.js';
+import { CHAR_BY_ID, type CharacterId } from '@blockshot/shared';
+import { buildCharacter, buildGun } from '../game/render/models';
+import { uiScale } from '../ui/ui';
 
-// Personaje en 3D girando (una vuelta cada 6 s) sobre la peana de CSS. Se puede girar arrastrando.
-export default function CharacterPreview({ charId, skin }) {
-  const mount = useRef(null);
-  const view = useRef(null);
+const MAX_PIXEL_RATIO = 3;
+/** One full turn every this many seconds while idle. */
+const TURN_SECONDS = 6;
+/** After dragging, the automatic turn waits this long. */
+const IDLE_AFTER_DRAG_MS = 1500;
+const DRAG_SPEED = 0.012;
+const MAX_DT = 0.05;
+const GUN_SCALE = 1.3;
+const AIM_TILT = 0.12;
+
+interface View {
+  holder: THREE.Group;
+  angle: number;
+  drag: number | null;
+  idle: number;
+  raf: number;
+}
+
+// 3D character turning on the CSS pedestal. It can be turned by dragging.
+export default function CharacterPreview({ charId, skin }: { charId: CharacterId; skin: string }) {
+  const mount = useRef<HTMLDivElement>(null);
+  const view = useRef<View | null>(null);
 
   useEffect(() => {
     const el = mount.current;
+    if (!el) return undefined;
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    const uiScale = Number(getComputedStyle(document.documentElement).getPropertyValue('--s')) || 1;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio * uiScale, 3));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio * uiScale(), MAX_PIXEL_RATIO));
     renderer.shadowMap.enabled = true;
     el.appendChild(renderer.domElement);
 
@@ -27,7 +46,7 @@ export default function CharacterPreview({ charId, skin }) {
     rim.position.set(-3, 2, -3);
     scene.add(rim);
 
-    // Solo la sombra: la peana es un óvalo de CSS del color de la clase
+    // Only the shadow: the pedestal is a CSS oval in the class colour
     const base = new THREE.Mesh(new THREE.CircleGeometry(1.1, 40), new THREE.ShadowMaterial({ opacity: 0.35 }));
     base.rotation.x = -Math.PI / 2;
     base.receiveShadow = true;
@@ -39,7 +58,7 @@ export default function CharacterPreview({ charId, skin }) {
 
     const holder = new THREE.Group();
     scene.add(holder);
-    const v = { renderer, scene, camera, holder, angle: 0.5, drag: null, idle: 0, raf: 0 };
+    const v: View = { holder, angle: 0.5, drag: null, idle: 0, raf: 0 };
     view.current = v;
 
     const resize = () => {
@@ -53,12 +72,12 @@ export default function CharacterPreview({ charId, skin }) {
     const ro = new ResizeObserver(resize);
     ro.observe(el);
 
-    const down = (e) => {
+    const down = (e: PointerEvent) => {
       v.drag = e.clientX;
     };
-    const move = (e) => {
+    const move = (e: PointerEvent) => {
       if (v.drag === null) return;
-      v.angle += (e.clientX - v.drag) * 0.012;
+      v.angle += (e.clientX - v.drag) * DRAG_SPEED;
       v.drag = e.clientX;
       v.idle = performance.now();
     };
@@ -70,11 +89,11 @@ export default function CharacterPreview({ charId, skin }) {
     window.addEventListener('pointerup', up);
 
     let last = performance.now();
-    const loop = (now) => {
+    const loop = (now: number) => {
       v.raf = requestAnimationFrame(loop);
-      const dt = Math.min(0.05, (now - last) / 1000);
+      const dt = Math.min(MAX_DT, (now - last) / 1000);
       last = now;
-      if (v.drag === null && now - v.idle > 1500) v.angle += dt * ((Math.PI * 2) / 6);
+      if (v.drag === null && now - v.idle > IDLE_AFTER_DRAG_MS) v.angle += dt * ((Math.PI * 2) / TURN_SECONDS);
       holder.rotation.y = Math.PI + v.angle;
       renderer.render(scene, camera);
     };
@@ -91,20 +110,20 @@ export default function CharacterPreview({ charId, skin }) {
     };
   }, []);
 
-  // Cambiar de personaje o skin: se reconstruye el modelo
+  // Changing character or skin rebuilds the model
   useEffect(() => {
     const v = view.current;
     const ch = CHAR_BY_ID[charId];
-    if (!v || !ch) return;
+    if (!v) return;
     v.holder.clear();
     const model = buildCharacter(ch.id, skin, ch.color);
     model.group.traverse((o) => {
-      if (o.isMesh) o.castShadow = true;
+      if (o instanceof THREE.Mesh) o.castShadow = true;
     });
     const gun = buildGun(ch.primary, false, ch.color);
-    gun.scale.setScalar(1.3);
+    gun.scale.setScalar(GUN_SCALE);
     model.hand.add(gun);
-    model.aim.rotation.x = 0.12;
+    model.aim.rotation.x = AIM_TILT;
     v.holder.add(model.group);
   }, [charId, skin]);
 

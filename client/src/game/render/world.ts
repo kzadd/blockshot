@@ -1,37 +1,47 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { rng } from '@blockshot/shared'; // aleatorio con semilla: el paisaje sale igual cada vez
+import { rng, type BoxKind, type GameMap, type MapBox, type MapColors, type MapId } from '@blockshot/shared'; // seeded random: the scenery is the same every time
 
 // =====================================================================
-//  Dibujo del mapa. Las cajas (colisión) vienen de shared/config.js; aquí solo
-//  se decide su aspecto: texturas pintadas en canvas, objetos con forma propia
-//  (barriles, árboles, farolas, cactus) y el paisaje de fuera de los muros,
-//  que es solo decoración. Las mallas se juntan por material para que vaya fluido.
+//  Map rendering. The boxes (collision) come from the shared package; here we only
+//  decide how they look: canvas-painted textures, props with their own shape
+//  (barrels, trees, lamps, cacti) and the scenery outside the walls,
+//  which is decoration only. Meshes are merged per material so it runs smoothly.
 // =====================================================================
 
-// ------------------------------------------------------------ Texturas
-// Casi todas son grises claros con detalle oscuro: el color lo pone el material (map.colors)
+// ------------------------------------------------------------ Textures
+// Almost all are light grey with dark detail: the material (map.colors) adds the colour
 const S = 256;
-function canvasTex(draw) {
+/** Texture seed: derived from the texture name, so every texture looks the same on every machine. */
+const TEX_SEED_MULT = 7919;
+const TEX_SEED_ADD = 13;
+const ANISOTROPY = 8;
+type Ctx = CanvasRenderingContext2D;
+type Rand = () => number;
+type TexName = keyof typeof GEN;
+
+function canvasTex(name: TexName): THREE.CanvasTexture {
   const c = document.createElement('canvas');
   c.width = c.height = S;
-  const g = c.getContext('2d');
-  const rand = rng(draw.name.length * 7919 + 13);
-  draw(g, rand);
+  const g = c.getContext('2d')!;
+  const rand = rng(name.length * TEX_SEED_MULT + TEX_SEED_ADD);
+  GEN[name](g, rand);
   const tex = new THREE.CanvasTexture(c);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 8;
+  tex.anisotropy = ANISOTROPY;
   return tex;
 }
-const gray = (v, a = 1) => `rgba(${v | 0},${v | 0},${v | 0},${a})`;
-function speckle(g, rand, n, lo, hi, size = 2) {
+/** Cycles through a palette. */
+const pick = <T>(list: readonly T[], i: number): T => list[i % list.length]!;
+const gray = (v: number, a = 1): string => `rgba(${v | 0},${v | 0},${v | 0},${a})`;
+function speckle(g: Ctx, rand: Rand, n: number, lo: number, hi: number, size = 2): void {
   for (let i = 0; i < n; i++) {
     g.fillStyle = gray(lo + rand() * (hi - lo));
     g.fillRect(rand() * S, rand() * S, size, size);
   }
 }
-function blotches(g, rand, n, alpha, r0 = 10, r1 = 40, dark = true) {
+function blotches(g: Ctx, rand: Rand, n: number, alpha: number, r0 = 10, r1 = 40, dark = true): void {
   for (let i = 0; i < n; i++) {
     const x = rand() * S;
     const y = rand() * S;
@@ -175,7 +185,7 @@ const GEN = {
     g.fillRect(0, 0, S, S);
     blotches(g, rand, 60, 0.1, 8, 45);
     blotches(g, rand, 30, 0.15, 8, 35, false);
-    // estratos
+    // rock strata
     for (let i = 0; i < 9; i++) {
       let y = rand() * S;
       g.strokeStyle = `rgba(0,0,0,${0.08 + rand() * 0.12})`;
@@ -284,8 +294,8 @@ const GEN = {
       }
     }
   },
-  // Rayas de peligro: ya trae su color (el material va en blanco)
-  hazard(g) {
+  // Hazard stripes: already coloured (the material is white)
+  hazard(g: Ctx) {
     g.fillStyle = '#e8b923';
     g.fillRect(0, 0, S, S);
     g.fillStyle = '#1c1f24';
@@ -298,17 +308,20 @@ const GEN = {
       g.fill();
     }
   },
-};
-const COLORED = new Set(['hazard']);
+} satisfies Record<string, (g: Ctx, rand: Rand) => void>;
+const COLORED = new Set<string>(['hazard']);
 
-const texCache = new Map();
-function tex(name) {
-  if (!texCache.has(name)) texCache.set(name, canvasTex(GEN[name]));
-  return texCache.get(name);
+const texCache = new Map<string, THREE.CanvasTexture>();
+function tex(name: TexName): THREE.CanvasTexture {
+  let t = texCache.get(name);
+  if (!t) texCache.set(name, (t = canvasTex(name)));
+  return t;
 }
 
-// Aspecto de cada mapa: textura y metros que mide cada repetición. 0 = una textura por cara (cajas)
-const COMMON = {
+// Look of each map: texture and metres per repetition. 0 = one texture per face (crates)
+/** [texture, metres per repetition] · null texture = flat colour */
+type Look = [TexName | null, number?];
+const COMMON: Partial<Record<BoxKind, Look>> = {
   crate: ['crate', 0],
   crate2: ['crate', 0],
   cont1: ['corrugated', 2.6],
@@ -330,7 +343,15 @@ const COMMON = {
   bld3: ['windows', 4],
   bld4: ['windows', 4],
 };
-const THEMES = {
+interface Theme extends Partial<Record<BoxKind, Look>> {
+  wall: Look;
+  ground: [TexName, number, string];
+  sun: number;
+  sky: string;
+  scenery: (batch: Batch, map: GameMap, rand: Rand) => void;
+}
+
+const THEMES: Record<MapId, Theme> = {
   patio: {
     floor: ['paving', 3],
     wall: ['brick', 2.4],
@@ -387,12 +408,12 @@ const THEMES = {
 };
 const CAR_COLORS = ['#c0503e', '#3d6e9e', '#e8e4dc', '#2b2f36', '#c9a13a', '#4f7a45'];
 
-// Caja con UVs escaladas al tamaño real: la textura siempre mide lo mismo
-function tiledBox(w, h, d, tile) {
+// Box with UVs scaled to its real size: the texture always has the same size
+function tiledBox(w: number, h: number, d: number, tile: number | undefined): THREE.BoxGeometry {
   const geo = new THREE.BoxGeometry(w, h, d);
   if (!tile) return geo;
-  const uv = geo.attributes.uv;
-  const dims = [
+  const uv = geo.attributes.uv!;
+  const dims: [number, number][] = [
     [d, h],
     [d, h],
     [w, d],
@@ -403,28 +424,38 @@ function tiledBox(w, h, d, tile) {
   for (let f = 0; f < 6; f++) {
     for (let v = 0; v < 4; v++) {
       const i = f * 4 + v;
-      uv.setXY(i, (uv.getX(i) * dims[f][0]) / tile, (uv.getY(i) * dims[f][1]) / tile);
+      uv.setXY(i, (uv.getX(i) * dims[f]![0]) / tile, (uv.getY(i) * dims[f]![1]) / tile);
     }
   }
   return geo;
 }
 
-// Junta todas las piezas que comparten material en una sola malla
+// Merges every part sharing a material into a single mesh
 class Batch {
-  constructor() {
-    this.parts = new Map();
-  }
-  add(geo, mat, x, y, z, ry = 0, sx = 1, sy = 1, sz = 1) {
+  private readonly parts = new Map<THREE.Material, THREE.BufferGeometry[]>();
+
+  add(
+    geo: THREE.BufferGeometry,
+    mat: THREE.Material,
+    x: number,
+    y: number,
+    z: number,
+    ry = 0,
+    sx = 1,
+    sy = 1,
+    sz = 1,
+  ): void {
     const m = new THREE.Matrix4().compose(
       new THREE.Vector3(x, y, z),
       new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), ry),
       new THREE.Vector3(sx, sy, sz),
     );
     const g = (geo.index ? geo.toNonIndexed() : geo.clone()).applyMatrix4(m);
-    if (!this.parts.has(mat)) this.parts.set(mat, []);
-    this.parts.get(mat).push(g);
+    const list = this.parts.get(mat);
+    if (list) list.push(g);
+    else this.parts.set(mat, [g]);
   }
-  build(scene, { cast = false, receive = false } = {}) {
+  build(scene: THREE.Scene, { cast = false, receive = false } = {}): void {
     for (const [mat, list] of this.parts) {
       const mesh = new THREE.Mesh(mergeGeometries(list), mat);
       mesh.castShadow = cast;
@@ -436,19 +467,22 @@ class Batch {
   }
 }
 
-const matCache = new Map();
-function mat(color, texName, extra = {}) {
+const matCache = new Map<string, THREE.MeshLambertMaterial>();
+function mat(
+  color: string,
+  texName: TexName | null | undefined,
+  extra: THREE.MeshLambertMaterialParameters = {},
+): THREE.MeshLambertMaterial {
   const key = `${color}|${texName}|${JSON.stringify(extra)}`;
-  if (!matCache.has(key)) {
+  let m = matCache.get(key);
+  if (!m) {
     const map = texName ? tex(texName) : null;
-    matCache.set(
-      key,
-      new THREE.MeshLambertMaterial({ color: COLORED.has(texName) ? '#ffffff' : color, map, ...extra }),
-    );
+    m = new THREE.MeshLambertMaterial({ color: texName && COLORED.has(texName) ? '#ffffff' : color, map, ...extra });
+    matCache.set(key, m);
   }
-  return matCache.get(key);
+  return m;
 }
-const glow = (color) => mat(color, null, { emissive: color, emissiveIntensity: 1 });
+const glow = (color: string): THREE.MeshLambertMaterial => mat(color, null, { emissive: color, emissiveIntensity: 1 });
 
 const BOX = new THREE.BoxGeometry(1, 1, 1);
 const CYL = new THREE.CylinderGeometry(0.5, 0.5, 1, 14);
@@ -456,8 +490,8 @@ const CONE4 = new THREE.ConeGeometry(0.71, 1, 4);
 const BLOB = new THREE.IcosahedronGeometry(0.5, 1);
 const BARREL_COLORS = ['#3d6e9e', '#b04a3a', '#c9a13a', '#4f7a45'];
 
-// ------------------------------------------------------------ Objetos con forma propia
-function addTree(batch, x, y, z, s, rand, leafColor = '#4f8f3e') {
+// ------------------------------------------------------------ Props with their own shape
+function addTree(batch: Batch, x: number, y: number, z: number, s: number, rand: Rand, leafColor = '#4f8f3e'): void {
   batch.add(BOX, mat('#6b4a2b', 'bark'), x, y + 1.3 * s, z, 0, 0.35 * s, 2.6 * s, 0.35 * s);
   const leaves = mat(leafColor, 'leaves');
   const top = y + 2.6 * s;
@@ -476,13 +510,14 @@ function addTree(batch, x, y, z, s, rand, leafColor = '#4f8f3e') {
   );
 }
 
-function addProp(batch, b, colors, rand, i) {
+type PropBox = Pick<MapBox, 'x' | 'y' | 'z' | 'w' | 'h' | 'd' | 'c'>;
+function addProp(batch: Batch, b: PropBox, colors: Partial<MapColors>, rand: Rand, i: number): boolean {
   const cx = b.x;
   const cy = b.y + b.h / 2;
   const cz = b.z;
   switch (b.c) {
     case 'barrel': {
-      const color = BARREL_COLORS[i % BARREL_COLORS.length];
+      const color = pick(BARREL_COLORS, i);
       batch.add(CYL, mat(color, 'barrel'), cx, cy, cz, rand() * 6, b.w, b.h, b.d);
       batch.add(CYL, mat('#2b2f36', null), cx, b.y + b.h + 0.01, cz, 0, b.w * 0.92, 0.03, b.d * 0.92);
       return true;
@@ -491,12 +526,12 @@ function addProp(batch, b, colors, rand, i) {
       addTree(batch, cx, b.y, cz, 1, rand);
       return true;
     case 'planter':
-      batch.add(BOX, mat(colors.planter, 'concrete'), cx, cy, cz, 0, b.w, b.h, b.d);
+      batch.add(BOX, mat(colors.planter!, 'concrete'), cx, cy, cz, 0, b.w, b.h, b.d);
       batch.add(BOX, mat('#4a3424', 'sand'), cx, b.y + b.h + 0.005, cz, 0, b.w - 0.2, 0.02, b.d - 0.2);
       return true;
     case 'lamp': {
       const top = b.y + b.h;
-      const metal = mat(colors.lamp, null);
+      const metal = mat(colors.lamp!, null);
       batch.add(CYL, metal, cx, cy, cz, 0, b.w, b.h, b.d);
       batch.add(CYL, metal, cx, b.y + 0.3, cz, 0, b.w * 1.8, 0.6, b.d * 1.8);
       batch.add(BOX, metal, cx, top, cz, 0, 0.5, 0.25, 0.5);
@@ -504,7 +539,7 @@ function addProp(batch, b, colors, rand, i) {
       return true;
     }
     case 'car': {
-      const color = CAR_COLORS[i % CAR_COLORS.length];
+      const color = pick(CAR_COLORS, i);
       const alongX = b.w > b.d;
       batch.add(BOX, mat(color, 'barrel'), cx, b.y + 0.55, cz, 0, b.w, 0.7, b.d);
       const dark = mat('#1c1f24', null);
@@ -513,7 +548,7 @@ function addProp(batch, b, colors, rand, i) {
           const [wx, wz] = alongX ? [s * b.w * 0.32, t * (b.d / 2 - 0.1)] : [t * (b.w / 2 - 0.1), s * b.d * 0.32];
           batch.add(BOX, dark, cx + wx, b.y + 0.35, cz + wz, 0, alongX ? 0.7 : 0.25, 0.7, alongX ? 0.25 : 0.7);
         }
-        // faros
+        // headlights
         const [fx, fz] = alongX ? [s * (b.w / 2), b.d * 0.3] : [b.w * 0.3, s * (b.d / 2)];
         for (const q of [1, -1])
           batch.add(
@@ -532,21 +567,11 @@ function addProp(batch, b, colors, rand, i) {
     }
     case 'carTop': {
       batch.add(BOX, mat('#22303d', null), cx, cy - 0.05, cz, 0, b.w, b.h - 0.1, b.d);
-      batch.add(
-        BOX,
-        mat(CAR_COLORS[i % CAR_COLORS.length], 'barrel'),
-        cx,
-        b.y + b.h - 0.05,
-        cz,
-        0,
-        b.w + 0.04,
-        0.1,
-        b.d + 0.04,
-      );
+      batch.add(BOX, mat(pick(CAR_COLORS, i), 'barrel'), cx, b.y + b.h - 0.05, cz, 0, b.w + 0.04, 0.1, b.d + 0.04);
       return true;
     }
     case 'cactus': {
-      const green = mat(colors.cactus, 'bark');
+      const green = mat(colors.cactus!, 'bark');
       batch.add(BOX, green, cx, cy, cz, 0, b.w, b.h, b.d);
       const side = rand() < 0.5 ? 1 : -1;
       batch.add(BOX, green, cx + side * 0.4, b.y + b.h * 0.5, cz, 0, 0.4, 0.25, 0.25);
@@ -560,14 +585,14 @@ function addProp(batch, b, colors, rand, i) {
   }
 }
 
-// ------------------------------------------------------------ Cielo y nubes
-function addSky(scene, map, theme) {
+// ------------------------------------------------------------ Sky and clouds
+function addSky(scene: THREE.Scene, map: GameMap, theme: Theme): void {
   const R = map.half * 7;
   const geo = new THREE.SphereGeometry(R, 32, 16);
   const top = new THREE.Color(theme.sky);
   const horizon = new THREE.Color(map.sky);
-  const colors = [];
-  const pos = geo.attributes.position;
+  const colors: number[] = [];
+  const pos = geo.attributes.position!;
   for (let i = 0; i < pos.count; i++) {
     const t = Math.max(0, pos.getY(i) / R);
     const c = horizon.clone().lerp(top, Math.pow(t, 0.6));
@@ -581,7 +606,7 @@ function addSky(scene, map, theme) {
   sky.renderOrder = -1;
   scene.add(sky);
 
-  // Sol
+  // Sun
   const sun = new THREE.Mesh(
     new THREE.CircleGeometry(R * 0.04, 24),
     new THREE.MeshBasicMaterial({ color: 0xfff6dc, fog: false }),
@@ -593,7 +618,7 @@ function addSky(scene, map, theme) {
   sun.lookAt(0, 0, 0);
   scene.add(sun);
 
-  // Nubes de bloques
+  // Block clouds
   const rand = rng(map.half * 31 + map.id.length);
   const batch = new Batch();
   const cloud = new THREE.MeshLambertMaterial({
@@ -626,9 +651,9 @@ function addSky(scene, map, theme) {
   batch.build(scene);
 }
 
-// ------------------------------------------------------------ Paisaje fuera de los muros
-// Punto aleatorio fuera de la arena, entre `near` y `far` metros del muro
-function outside(rand, H, near, far) {
+// ------------------------------------------------------------ Scenery outside the walls
+// Random point outside the arena, between `near` and `far` metres from the wall
+function outside(rand: Rand, H: number, near: number, far: number): [number, number] {
   for (;;) {
     const x = (rand() * 2 - 1) * (H + far);
     const z = (rand() * 2 - 1) * (H + far);
@@ -636,7 +661,7 @@ function outside(rand, H, near, far) {
   }
 }
 
-function town(batch, map, rand) {
+function town(batch: Batch, map: GameMap, rand: Rand): void {
   const H = map.half;
   for (let i = 0; i < 70; i++) {
     const [x, z] = outside(rand, H, 3, 45);
@@ -650,15 +675,15 @@ function town(batch, map, rand) {
     const d = 7 + rand() * 5;
     const h = 4 + Math.floor(rand() * 3) * 3;
     const ry = Math.round(rand() * 4) * (Math.PI / 2);
-    batch.add(tiledBoxCached(1), mat(walls[i % walls.length], 'windows'), x, h / 2, z, ry, w, h, d);
-    batch.add(CONE4, mat(roofs[i % roofs.length], 'planks'), x, h + 1.6, z, ry + Math.PI / 4, w * 1.1, 3.2, d * 1.1);
+    batch.add(tiledBoxCached(1), mat(pick(walls, i), 'windows'), x, h / 2, z, ry, w, h, d);
+    batch.add(CONE4, mat(pick(roofs, i), 'planks'), x, h + 1.6, z, ry + Math.PI / 4, w * 1.1, 3.2, d * 1.1);
   }
   hills(batch, map, rand, '#5f8f45');
 }
 
-function industrial(batch, map, rand) {
+function industrial(batch: Batch, map: GameMap, rand: Rand): void {
   const H = map.half;
-  // Estructura del techo del almacén: cerchas y focos colgando
+  // Warehouse roof structure: trusses and hanging lights
   const steel = mat('#4a5562', null);
   const y = map.wallH + 0.4;
   for (let x = -H + 4; x < H; x += 8) {
@@ -670,14 +695,14 @@ function industrial(batch, map, rand) {
     }
   }
   for (const z of [-H / 2, 0, H / 2]) batch.add(BOX, steel, 0, y + 0.5, z, 0, 2 * H + 1, 0.35, 0.35);
-  // Naves y chimeneas alrededor
+  // Sheds and chimneys around
   const cols = ['#8a96a3', '#a3a9b0', '#7b8794', '#b0a48e'];
   for (let i = 0; i < 16; i++) {
     const [x, z] = outside(rand, H, 8, 60);
     const w = 14 + rand() * 18;
     const d = 12 + rand() * 14;
     const h = 9 + rand() * 9;
-    batch.add(tiledBoxCached(1), mat(cols[i % cols.length], 'corrugated'), x, h / 2, z, 0, w, h, d);
+    batch.add(tiledBoxCached(1), mat(pick(cols, i), 'corrugated'), x, h / 2, z, 0, w, h, d);
     batch.add(BOX, mat('#5d6670', 'diamond'), x, h + 0.3, z, 0, w + 0.6, 0.6, d + 0.6);
   }
   for (let i = 0; i < 6; i++) {
@@ -688,7 +713,7 @@ function industrial(batch, map, rand) {
   }
 }
 
-function desert(batch, map, rand) {
+function desert(batch: Batch, map: GameMap, rand: Rand): void {
   const H = map.half;
   const rockCols = ['#c98a5a', '#b0704a', '#d19a64', '#a86a48'];
   for (let i = 0; i < 22; i++) {
@@ -696,18 +721,8 @@ function desert(batch, map, rand) {
     const w = 18 + rand() * 30;
     const d = 18 + rand() * 30;
     const h = 12 + rand() * 30;
-    batch.add(tiledBoxCached(8), mat(rockCols[i % rockCols.length], 'rock'), x, h / 2, z, rand() * 3, w, h, d);
-    batch.add(
-      tiledBoxCached(8),
-      mat(rockCols[(i + 1) % rockCols.length], 'rock'),
-      x,
-      h + 2,
-      z,
-      rand() * 3,
-      w * 0.7,
-      4,
-      d * 0.7,
-    );
+    batch.add(tiledBoxCached(8), mat(pick(rockCols, i), 'rock'), x, h / 2, z, rand() * 3, w, h, d);
+    batch.add(tiledBoxCached(8), mat(pick(rockCols, i + 1), 'rock'), x, h + 2, z, rand() * 3, w * 0.7, 4, d * 0.7);
   }
   for (let i = 0; i < 40; i++) {
     const [x, z] = outside(rand, H, 2, 50);
@@ -716,7 +731,7 @@ function desert(batch, map, rand) {
   }
 }
 
-function city(batch, map, rand) {
+function city(batch: Batch, map: GameMap, rand: Rand): void {
   const H = map.half;
   const cols = ['#9fb0c4', '#c9b79a', '#8a96a3', '#d8c8b0', '#7b8794', '#b58c74'];
   for (let i = 0; i < 40; i++) {
@@ -724,12 +739,12 @@ function city(batch, map, rand) {
     const w = 10 + rand() * 14;
     const d = 10 + rand() * 14;
     const h = 16 + rand() * 45;
-    batch.add(tiledBoxCached(Math.round(h / 6)), mat(cols[i % cols.length], 'windows'), x, h / 2, z, 0, w, h, d);
+    batch.add(tiledBoxCached(Math.round(h / 6)), mat(pick(cols, i), 'windows'), x, h / 2, z, 0, w, h, d);
     batch.add(BOX, mat('#4a5562', 'concrete'), x, h + 0.4, z, 0, w * 0.5, 0.8, d * 0.5);
   }
 }
 
-function hills(batch, map, rand, color) {
+function hills(batch: Batch, map: GameMap, rand: Rand, color: string): void {
   const H = map.half;
   for (let i = 0; i < 14; i++) {
     const a = (i / 14) * Math.PI * 2 + rand() * 0.3;
@@ -739,17 +754,18 @@ function hills(batch, map, rand, color) {
   }
 }
 
-// Cajas de 1 m con la textura repetida `n` veces por cara (se escalan al añadirlas)
-const unitBoxes = new Map();
-function tiledBoxCached(n) {
-  if (!unitBoxes.has(n)) unitBoxes.set(n, tiledBox(1, 1, 1, 1 / n));
-  return unitBoxes.get(n);
+// 1 m boxes with the texture repeated `n` times per face (scaled when added)
+const unitBoxes = new Map<number, THREE.BoxGeometry>();
+function tiledBoxCached(n: number): THREE.BoxGeometry {
+  let geo = unitBoxes.get(n);
+  if (!geo) unitBoxes.set(n, (geo = tiledBox(1, 1, 1, 1 / n)));
+  return geo;
 }
 
-// ------------------------------------------------------------ Mundo
-export function buildWorld(scene, map) {
+// ------------------------------------------------------------ World
+export function buildWorld(scene: THREE.Scene, map: GameMap): void {
   const H = map.half;
-  const theme = THEMES[map.id] || THEMES.patio;
+  const theme = THEMES[map.id];
   scene.background = new THREE.Color(map.sky);
   scene.fog = new THREE.Fog(map.sky, H * 1.9, H * 5);
 
@@ -770,14 +786,14 @@ export function buildWorld(scene, map) {
   let n = 0;
   for (const b of map.boxes) {
     if (b.p && addProp(props, b, map.colors, rand, b.c === 'car' ? ++n : n)) continue;
-    // Plataforma de salto: base oscura y tapa verde que brilla
+    // Jump pad: dark base and glowing green top
     if (b.c === 'pad') {
       props.add(BOX, mat('#2b2f36', 'diamond'), b.x, b.y + b.h * 0.35, b.z, 0, b.w, b.h * 0.7, b.d);
-      props.add(BOX, glow(map.colors.pad), b.x, b.y + b.h * 0.85, b.z, 0, b.w - 0.25, b.h * 0.3, b.d - 0.25);
+      props.add(BOX, glow(map.colors.pad!), b.x, b.y + b.h * 0.85, b.z, 0, b.w - 0.25, b.h * 0.3, b.d - 0.25);
       props.add(BOX, glow('#eafff2'), b.x, b.y + b.h + 0.005, b.z, Math.PI / 4, 0.5, 0.01, 0.5);
       continue;
     }
-    // Edificios: azotea con remate de hormigón
+    // Buildings: rooftop with a concrete coping
     if (b.c.startsWith('bld'))
       props.add(BOX, mat('#7d7f84', 'concrete'), b.x, b.y + b.h + 0.15, b.z, 0, b.w + 0.3, 0.3, b.d + 0.3);
     const [texName, tile] = theme[b.c] || COMMON[b.c] || theme.wall;
@@ -786,7 +802,7 @@ export function buildWorld(scene, map) {
   arena.build(scene, { cast: true, receive: true });
   props.build(scene, { cast: true, receive: true });
 
-  // Remate de los muros exteriores
+  // Coping on the outer walls
   const deco = new Batch();
   const trim = mat(new THREE.Color(map.colors.wall).multiplyScalar(0.7).getStyle(), 'concrete');
   for (const s of [1, -1]) {
@@ -795,12 +811,12 @@ export function buildWorld(scene, map) {
   }
   deco.build(scene, { cast: true, receive: true });
 
-  // Suelo de fuera y paisaje
+  // Outside ground and scenery
   const [gTex, gTile, gColor] = theme.ground;
   const R = H * 14;
   const ground = new THREE.PlaneGeometry(R, R);
   ground.rotateX(-Math.PI / 2);
-  const uv = ground.attributes.uv;
+  const uv = ground.attributes.uv!;
   for (let i = 0; i < uv.count; i++) uv.setXY(i, (uv.getX(i) * R) / gTile, (uv.getY(i) * R) / gTile);
   const gm = new THREE.Mesh(ground, mat(gColor, gTex));
   gm.position.y = -0.03;

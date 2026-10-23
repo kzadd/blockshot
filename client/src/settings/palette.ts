@@ -1,14 +1,23 @@
-import { getSettings, subscribe } from './settings.js';
+import { getSettings, subscribe, type ColorblindMode, type Settings } from './settingsStore';
 
-// Modo daltónico: colores de aliados, enemigos, equipos y barras de vida.
-// Rojo-verde cambia el verde/rojo por azul/naranja; azul-amarillo usa turquesa/rosa.
-export const COLORBLIND = [
+// Colourblind modes: ally, enemy, team and health bar colours.
+// Red-green swaps green/red for blue/orange; blue-yellow uses turquoise/pink.
+export const COLORBLIND: { id: ColorblindMode; name: string; help?: string }[] = [
   { id: 'off', name: 'Desactivado' },
   { id: 'rg', name: 'Rojo-verde', help: 'Protanopía y deuteranopía (lo más común)' },
   { id: 'by', name: 'Azul-amarillo', help: 'Tritanopía' },
 ];
 
-const PALETTES = {
+interface Palette {
+  ally: string;
+  enemy: string;
+  team: Record<1 | 2, string>;
+  teamTxt: Record<1 | 2, string>;
+  /** high, mid, low */
+  hp: [string, string, string];
+}
+
+const PALETTES: Record<ColorblindMode, Palette> = {
   off: {
     ally: '#5ee07a',
     enemy: '#ff5a4d',
@@ -32,15 +41,22 @@ const PALETTES = {
   },
 };
 
-export const palette = (st = getSettings()) => PALETTES[st.colorblind] || PALETTES.off;
-export const teamColor = (t, fallback) => palette().team[t] || fallback;
-export const hpColor = (f) => {
+const HP_HIGH = 0.5;
+const HP_LOW = 0.25;
+
+export const palette = (st: Settings = getSettings()): Palette => PALETTES[st.colorblind] ?? PALETTES.off;
+export function teamColor(t: number): string | undefined;
+export function teamColor(t: number, fallback: string): string;
+export function teamColor(t: number, fallback?: string): string | undefined {
+  return palette().team[t as 1 | 2] ?? fallback;
+}
+export const hpColor = (f: number): string => {
   const [hi, mid, low] = palette().hp;
-  return f > 0.5 ? hi : f > 0.25 ? mid : low;
+  return f > HP_HIGH ? hi : f > HP_LOW ? mid : low;
 };
 
-// Variables CSS del tema (las usan el HUD, el marcador y los menús)
-function applyCss(st) {
+// CSS theme variables (used by the HUD, the scoreboard and the menus)
+function applyCss(st: Settings): void {
   const p = palette(st);
   const s = document.documentElement.style;
   s.setProperty('--aliado', p.ally);

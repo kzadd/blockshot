@@ -26,33 +26,33 @@ Rama: `refactor/arquitectura` (sale de `mecanicas-krunker`, commit `9971280`).
 
 **Mapas** (5 × 3 tamaños: pequeño 52 m, mediano 80 m, grande 112 m):
 
-- [ ] Patio: torre central con escaleras, muros con hueco, habitaciones en las esquinas, 4 plataformas de salto
-- [ ] Almacén: contenedores en columnas (aleatorio con semilla), entreplantas con barandilla, 4 plataformas
-- [ ] Desfiladero: cañón, dos mesetas, 3 puentes, casetas, rocas, 2 plataformas
-- [ ] Polvo: casas, túnel, zonas A/B, puertas con dintel, 2 plataformas
-- [ ] Ciudad: manzanas generadas, callejones, plazas, azoteas con escalera, coches, plataformas en calles
-- [ ] Decoración (barriles, árboles, farolas, cactus, sacos, palés, coches) que se descarta si choca o tapa un spawn
-- [ ] Paisaje exterior por tema (pueblo, industrial, desierto, ciudad), cielo con degradado, nubes, sol, niebla
-- [ ] Spawns con orientación hacia la dirección más despejada; bases de CTF (spawn más al oeste/este)
+- [x] Patio: torre central con escaleras, muros con hueco, habitaciones en las esquinas, 4 plataformas de salto
+- [x] Almacén: contenedores en columnas (aleatorio con semilla), entreplantas con barandilla, 4 plataformas
+- [x] Desfiladero: cañón, dos mesetas, 3 puentes, casetas, rocas, 2 plataformas
+- [x] Polvo: casas, túnel, zonas A/B, puertas con dintel, 2 plataformas
+- [x] Ciudad: manzanas generadas, callejones, plazas, azoteas con escalera, coches, plataformas en calles
+- [x] Decoración (barriles, árboles, farolas, cactus, sacos, palés, coches) que se descarta si choca o tapa un spawn
+- [x] Paisaje exterior por tema (pueblo, industrial, desierto, ciudad), cielo con degradado, nubes, sol, niebla
+- [x] Spawns con orientación hacia la dirección más despejada; bases de CTF (spawn más al oeste/este)
 
 **Armas** (8): rifle, francotirador, escopeta (10 perdigones), subfusil, ametralladora, pistola, revólver, cuchillo.
 
-- [ ] Daño con caída por distancia (`falloff`), multiplicador a la cabeza, cadencia, cargador, recarga
-- [ ] Dispersión: cadera/apuntando, movimiento, aire, agachado, sprint, _bloom_ por ráfaga
-- [ ] Retroceso que se recupera solo; cerrojo del francotirador (sale de la mira), mira telescópica
-- [ ] Peso del arma (velocidad), velocidad al apuntar (`adsSpeed`, `adsMove`)
-- [ ] Cuchillo: golpe con asistencia (cono de 0.8), puñalada por la espalda = 200
+- [x] Daño con caída por distancia (`falloff`), multiplicador a la cabeza, cadencia, cargador, recarga
+- [x] Dispersión: cadera/apuntando, movimiento, aire, agachado, sprint, _bloom_ por ráfaga
+- [x] Retroceso que se recupera solo; cerrojo del francotirador (sale de la mira), mira telescópica
+- [x] Peso del arma (velocidad), velocidad al apuntar (`adsSpeed`, `adsMove`)
+- [x] Cuchillo: golpe con asistencia (cono de 0.8), puñalada por la espalda = 200
 
 **Personajes** (5): Soldado, Cazador, Tanque, Rayo, Bastión. **Skins** (5): Clásico, Camuflaje, Nocturno, Ártico, Dorado.
 
 **Modos** (6):
 
-- [ ] Todos contra todos (10/20/30/50 bajas)
-- [ ] Por equipos (20/40/60/100), sin fuego amigo, equipo con menos gente al entrar, cambio con T (espera 5 s, no en combate)
-- [ ] Captura la bandera (1/3/5/7): coger, soltar al morir, devolver tocándola, vuelve sola a los 20 s, spawns por mitad
-- [ ] Escalada de armas (5 u 8 armas), baja a cuchillo baja un nivel a la víctima
-- [ ] Confirmar bajas (15/30/50/75): placas que caen, confirmar/negar, duran 30 s
-- [ ] Infectados (2/3/5 min): cuenta atrás de 10 s, primer infectado aleatorio, cuchillo + 30 % vida + 15 % velocidad, contagio, victoria por tiempo o exterminio, re-elección si el infectado se va
+- [x] Todos contra todos (10/20/30/50 bajas)
+- [x] Por equipos (20/40/60/100), sin fuego amigo, equipo con menos gente al entrar, cambio con T (espera 5 s, no en combate)
+- [x] Captura la bandera (1/3/5/7): coger, soltar al morir, devolver tocándola, vuelve sola a los 20 s, spawns por mitad
+- [x] Escalada de armas (5 u 8 armas), baja a cuchillo baja un nivel a la víctima
+- [x] Confirmar bajas (15/30/50/75): placas que caen, confirmar/negar, duran 30 s
+- [x] Infectados (2/3/5 min): cuenta atrás de 10 s, primer infectado aleatorio, cuchillo + 30 % vida + 15 % velocidad, contagio, victoria por tiempo o exterminio, re-elección si el infectado se va
 
 **Movimiento:** WASD, salto con _coyote time_ y _buffer_, bunny hop, agacharse, slide con slide-hop, sprint, aceleración en el aire estilo Quake, tope suave/duro de velocidad, subir escalones (0.55 m), plataformas de salto, estamina desactivada (activable).
 
@@ -60,14 +60,14 @@ Rama: `refactor/arquitectura` (sale de `mecanicas-krunker`, commit `9971280`).
 
 **Pantallas:**
 
-- [ ] Lobby: nombre, crear sala (nombre, contraseña, mapa con miniatura, modo, puntos, tamaño, máx. jugadores), lista de salas, modal de contraseña, aviso sin conexión con «Reintentar», toast de error
-- [ ] Selección de personaje: lista 1–5, vista 3D girable, skins, ficha con armas, selector de equipo, «Seguir con…», Enter para jugar
-- [ ] HUD: info de sala + ping, minimapa (aliados, enemigos al disparar, radar, banderas, placas), marcador superior por modo, killfeed, vida a trozos + blindaje + estamina, munición y ranuras, mira configurable dinámica, hitmarker, números de daño 3D, indicador de dirección del daño, «sonido visual», combo ×N, banner de baja, mira telescópica, aviso de bandera, protección, viñeta
-- [ ] Muerte (quién te mató, cuenta atrás, cambiar personaje con B), pausa (Esc), marcador (Tab), fin de partida con «Mejor jugada»
-- [ ] Ajustes (mira 6 estilos/color/tamaño/grosor/separación/contorno/dinámica; sensibilidad, sensibilidad al apuntar, FOV, volumen; daltonismo 3 modos, sacudida)
-- [ ] Manual (5 pestañas), cortinilla de bloques, teclas que se hunden, escala de UI (`--s`), `prefers-reduced-motion`
-- [ ] Pantalla completa + bloqueo de teclado (Ctrl+W), aviso `beforeunload`
-- [ ] Persistencia local: nombre, personaje, skin por personaje, ajustes
+- [x] Lobby: nombre, crear sala (nombre, contraseña, mapa con miniatura, modo, puntos, tamaño, máx. jugadores), lista de salas, modal de contraseña, aviso sin conexión con «Reintentar», toast de error
+- [x] Selección de personaje: lista 1–5, vista 3D girable, skins, ficha con armas, selector de equipo, «Seguir con…», Enter para jugar
+- [x] HUD: info de sala + ping, minimapa (aliados, enemigos al disparar, radar, banderas, placas), marcador superior por modo, killfeed, vida a trozos + blindaje + estamina, munición y ranuras, mira configurable dinámica, hitmarker, números de daño 3D, indicador de dirección del daño, «sonido visual», combo ×N, banner de baja, mira telescópica, aviso de bandera, protección, viñeta
+- [x] Muerte (quién te mató, cuenta atrás, cambiar personaje con B), pausa (Esc), marcador (Tab), fin de partida con «Mejor jugada»
+- [x] Ajustes (mira 6 estilos/color/tamaño/grosor/separación/contorno/dinámica; sensibilidad, sensibilidad al apuntar, FOV, volumen; daltonismo 3 modos, sacudida)
+- [x] Manual (5 pestañas), cortinilla de bloques, teclas que se hunden, escala de UI (`--s`), `prefers-reduced-motion`
+- [x] Pantalla completa + bloqueo de teclado (Ctrl+W), aviso `beforeunload`
+- [x] Persistencia local: nombre, personaje, skin por personaje, ajustes
 
 **Eventos de red actuales** — cliente→servidor: `rooms:list`, `room:create`, `room:join`, `room:leave`, `net:ping`, `player:spawn`, `team:set`, `player:state`, `player:switch`, `player:reload`, `player:shoot`. Servidor→cliente: `rooms`, `notice`, `state`, `player:spawned`, `player:correct`, `damaged`, `hitmarker`, `kill`, `shot`, `loadout`, `flag`, `tag`, `match:end`, `match:start`.
 
@@ -411,9 +411,193 @@ jugadores reales, sin Socket.IO. Posible gracias a `RoomChannel` (paso 3).
 **End-to-end** (`server/test/e2e/`, servidor real en otro proceso, bots que andan con A*): lobby, combate, los 6
 modos, recompensas, movimiento autoritativo (plataformas, anti speed-hack), mensajes inválidos y _flood_.
 
-**Totales:** 91 tests unitarios + 21 e2e (9 archivos + 4 suites e2e, todos en verde). Cobertura de la lógica de
+**Totales:** 91 tests unitarios + 20 e2e (9 archivos + 4 suites e2e, todos en verde). Cobertura de la lógica de
 servidor y `/shared` solo con unitarios (`pnpm test:coverage`): **86 %** de líneas (modos 95 %, combate 91 %,
 jugadores 97 %, mapas y físicas 100 %). Gateway, bucle y red los cubren los e2e, que no cuentan para la cobertura
 porque corren en otro proceso.
 
 Scripts: `pnpm test` (todo), `pnpm test:unit` (rápido, sin e2e), `pnpm test:coverage`.
+
+## Completar el stack (después del paso 10)
+
+Al repasar el stack objetivo quedaban piezas sin hacer; se completaron antes de la verificación:
+
+- **TailwindCSS (solo UI).** Tailwind 4 con tema y utilidades pero **sin preflight** (el sistema de diseño a mano
+  mantiene su base), los tokens del diseño expuestos como colores y fuentes de Tailwind (`text-sol`, `bg-tinta`,
+  `font-display`…) y el CSS del diseño en la capa `components`, para que las utilidades puedan sobrescribirlo. Los
+  estilos en línea simples pasan a utilidades. **No se reescribieron los 948 líneas de CSS a utilidades**: es un
+  diseño ajustado a mano y convertirlo cambiaría píxeles (reglas 1 y 5) sin aportar nada. Verificación: 5 pantallas
+  (lobby, ajustes, manual, lista de salas, modal de contraseña) **idénticas píxel a píxel** antes y después.
+- **stats.js solo en desarrollo:** panel de FPS con `pnpm dev`; el build de producción no lo incluye
+  (`import.meta.env.DEV` + import dinámico).
+- **Conexión explícita** (`client/src/network/connection.ts`): estado conectando / conectado / reconectando con
+  intentos; reconexión manual cuando el servidor cierra el socket (Socket.IO no reintenta ese caso solo); la lista de
+  salas se pide en cada reconexión; si se pierde la partida, el lobby lo explica. Probado matando y arrancando el
+  servidor con un jugador en partida: vuelve al lobby, se reconecta solo y muestra el aviso.
+- **Constantes de gameplay en /shared:** el tiempo de cambio de arma estaba repetido en 3 archivos del cliente, y la
+  dispersión, el retroceso y el _bloom_ eran reglas solo del cliente → `shared/src/weapons/handling.ts`
+  (`WEAPON_HANDLING`, mismos valores).
+- **README** actualizado (pnpm, estructura, red autoritativa, cómo ampliar cada cosa).
+
+### Posible código muerto (marcado con `// TODO(review): posible código muerto`, no borrado)
+
+| Dónde                             | Qué                                                                                                                | Desde cuándo                                                                   |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| `client/src/game/hud/hudState.ts` | campos `characterId`, `hit`, `hitHead`, `killerName`, `mode` del HUD: se publican pero ninguna pantalla los lee    | ya en el original (`emitHud` los mandaba y `HUD.jsx`/`Game.jsx` no los usaban) |
+| `server/src/players/player.ts`    | `spawnTime`: se asigna en cada spawn y nunca se lee                                                                | ya en el original                                                              |
+| `shared/src/modes/modes.ts`       | `TEAMS[t].color`: nunca se lee (los colores de equipo salen de la paleta del cliente, que sigue el modo daltónico) | ya en el original                                                              |
+
+(Se eliminaron dos ayudas que añadí yo durante la migración y no llegaron a usarse: `WEAPON_IDS` e `isWeaponId`.)
+
+---
+
+## 11. Verificación final
+
+### Inventario inicial → evidencia
+
+| Funcionalidad                                                                                      | Estado | Cómo se comprobó                                                                                                                                                                                    |
+| -------------------------------------------------------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 5 mapas × 3 tamaños, decoración, spawns, bases CTF                                                 | ✅     | test _golden_: los 15 mapas son idénticos bit a bit al JS original; los 5 renderizados en el navegador sin errores                                                                                  |
+| Plataformas de salto                                                                               | ✅     | tests de simulación + e2e (el servidor lanza a > 4 m) + navegador                                                                                                                                   |
+| 8 armas (daño, cabeza, caída, cadencia, cargador, recarga, perdigones)                             | ✅     | test unitario que dispara las 8 armas de los 5 personajes con todos sus perdigones; cadencia, recarga y caída por separado; en el navegador, una partida de escalada con las 5 armas de la escalera |
+| Dispersión, _bloom_, retroceso, cerrojo, mira telescópica                                          | ✅     | mismo código, constantes movidas a `WEAPON_HANDLING` con los mismos valores                                                                                                                         |
+| Cuchillo: asistencia y puñalada por la espalda                                                     | ✅     | unitarios (de espaldas mata, de frente 55) + e2e                                                                                                                                                    |
+| 5 personajes, 5 skins                                                                              | ✅     | tablas en el test _golden_; selección 3D en el navegador                                                                                                                                            |
+| 6 modos                                                                                            | ✅     | unitarios de las reglas de cada modo + e2e de cada uno + navegador (CTF, Confirmar bajas, Infectados, Escalada)                                                                                     |
+| Movimiento (bhop, slide-hop, escalones, coyote, buffer, plataformas)                               | ✅     | **equivalencia exacta** con el código original (0,000000 m en 117 m de recorrido) + 14 tests + predicción con corrección 0 en el navegador                                                          |
+| Protección de reaparición, regeneración, reaparición a 3 s                                         | ✅     | unitarios + e2e                                                                                                                                                                                     |
+| Compensación de lag                                                                                | ✅     | unitario: sin rebobinar falla, rebobinando acierta                                                                                                                                                  |
+| Rachas y recompensas (Radar, Blindaje), «Mejor jugada»                                             | ✅     | unitarios + e2e de 7 bajas seguidas + pantalla de fin en el navegador                                                                                                                               |
+| Salas con contraseña, sala llena, borrado, máximo de jugadores                                     | ✅     | unitarios + e2e                                                                                                                                                                                     |
+| mDNS, `/ping`, banner de la consola                                                                | ✅     | `/ping` en e2e; banner visto al arrancar                                                                                                                                                            |
+| Lobby, selección, HUD completo, muerte, pausa, marcador, fin de partida                            | ✅     | capturas en el navegador de cada pantalla; lobby/ajustes/manual/modales idénticos píxel a píxel tras Tailwind                                                                                       |
+| Ajustes (mira, sensibilidad, FOV, volumen, daltonismo, sacudida), manual, cortinilla, teclas vivas | ✅     | mismos componentes tipados; capturas idénticas                                                                                                                                                      |
+| Pantalla completa + bloqueo de teclado, aviso al cerrar                                            | ✅     | mismo código (`input.ts`, `Game.tsx`)                                                                                                                                                               |
+| Persistencia local (nombre, personaje, skin, ajustes)                                              | ✅     | mismas claves de `localStorage`                                                                                                                                                                     |
+
+### Cambios de comportamiento (todos deliberados y pequeños)
+
+1. **Movimiento autoritativo:** el servidor decide dónde estás; el cliente predice y se corrige. Desaparecen
+   `player:state` y `player:correct`. Atravesar paredes o moverse más rápido ya no es posible.
+2. **Física a 60 Hz fija** con render interpolado (antes un paso por frame): idéntico a 60 FPS, independiente de los
+   FPS en el resto.
+3. **Rivales 100 ms en el pasado**, interpolados entre snapshots (antes perseguían el último con un `lerp`).
+4. **Mensajes inválidos se descartan** (antes algunos tipos erróneos se convertían en un valor por defecto).
+5. **Origen del disparo:** tolerancia de 3 m + velocidad × 0,25 s (el cliente va un poco por delante del servidor).
+6. **Aviso al perder la conexión** en plena partida (antes se volvía al lobby sin explicación).
+
+### Observaciones (sin tocar, por la regla 5)
+
+- En la Escalada de armas, al ganar el marcador muestra «6/5» en la columna de arma del ganador: el nivel sube antes
+  de comprobar el fin de la partida. Ya pasaba en el original.
+
+### Cifras
+
+|                                                            | Antes                | Después                            |
+| ---------------------------------------------------------- | -------------------- | ---------------------------------- |
+| Tests                                                      | 0                    | 119 (99 unitarios + 20 end-to-end) |
+| Cobertura de la lógica de servidor y `/shared` (unitarios) | —                    | 86 % de líneas                     |
+| Commits de React por segundo con el jugador quieto         | 11                   | 0,7                                |
+| Tamaño de snapshot de 12 jugadores                         | 2816 B (JSON)        | 2049 B (MessagePack)               |
+| JavaScript que descarga el lobby                           | 859 KB               | 281 KB                             |
+| Correcciones de la predicción en partida real              | (no había autoridad) | 0 en 103 acks                      |
+
+### Estructura final
+
+```
+blockshot/
+  package.json, pnpm-workspace.yaml, tsconfig.base.json, eslint.config.js, vitest.config.ts
+  .prettierrc.json, .editorconfig, .gitattributes, commitlint.config.js, .husky/
+  REFACTOR_LOG.md, README.md
+  shared/src/
+    core/math.ts                 Vec3, round2, clamp, rng, seedOf
+    player/player.ts             PLAYER, PAD
+    weapons/weapons.ts           WEAPONS, damageAt, weightName
+    weapons/handling.ts          WEAPON_HANDLING (cambio de arma, dispersión, retroceso, bloom)
+    characters/characters.ts     CHARACTERS, SKINS
+    modes/modes.ts               MODES, escaleras, FLAG, TAG, INFECT, TEAMS, rachas, loadoutOf
+    maps/                        types, props, builders/{patio,almacen,desfiladero,polvo,ciudad}.ts, maps.ts
+    movement/movement.ts         simulación determinista (servidor y cliente)
+    physics/raycast.ts           raycast AABB/esfera, hitboxes, castShot
+    net/                         constants.ts, events.ts (tipados), schemas.ts (Valibot)
+  server/src/
+    index.ts, config.ts, logger.ts
+    http/app.ts
+    network/                     gateway.ts, rateLimiter.ts, lan.ts
+    rooms/                       room.ts (RoomChannel), registry.ts
+    players/                     player.ts, movement.ts, history.ts, spawn.ts, loadout.ts, teams.ts
+    combat/                      shooting.ts, damage.ts, weaponBehavior.ts
+    modes/                       gameMode.ts, freeForAll, teamDeathmatch, captureTheFlag, gunGame, killConfirmed, infected, scoring, index
+    match/match.ts
+    game/                        loop.ts (paso fijo), tick.ts (snapshot)
+    testing/fakeRoom.ts
+  server/test/e2e/               harness.ts, pathfinding.ts, lobby/combat/modes/movement.test.ts
+  client/src/
+    main.tsx, env.d.ts
+    app/App.tsx                  sesión, carga diferida del juego
+    ui/ui.tsx                    teclas vivas, Check, Slider, cortinilla, escala
+    network/                     socket.ts (tipado, MessagePack), connection.ts
+    settings/                    settingsStore.ts, palette.ts, SettingsDialog.tsx, Crosshair.tsx
+    lobby/                       Lobby.tsx, MapPreview.tsx
+    characters/                  CharacterSelect.tsx, CharacterPreview.tsx
+    manual/Manual.tsx
+    styles/                      tailwind.css, styles.css
+    game/
+      Game.tsx, modeUi.ts, roomView.ts
+      engine/                    Engine.ts, input.ts, localPlayer.ts, remotePlayers.ts, weapons.ts, viewModel.ts,
+                                 cameraRig.ts, objectives.ts, effects.ts, pool.ts, netClient.ts, events.ts, util.ts, devStats.ts
+      hud/                       HUD.tsx, Minimap.tsx, Scoreboard.tsx, hudStore.ts, hudState.ts, teamStyle.ts
+      screens/                   DeathScreen.tsx, PauseMenu.tsx, ScoresLayer.tsx, CharacterScreen.tsx
+      render/                    world.ts, models.ts
+      audio/                     sound.ts, audioEvents.ts
+```
+
+### Cómo probarlo a mano
+
+Arranque: `pnpm install` y `pnpm clase`; abre `http://localhost:3000` en dos navegadores (o dos PCs de la red).
+Para ver los FPS, `pnpm dev` y entra por `http://localhost:5173`.
+
+**Cada mapa** (crea una sala por mapa, mejor en tamaño Mediano; repite alguno en Pequeño y Grande):
+
+- **Patio:** sube a la torre por las escaleras y por las plataformas verdes junto a ellas; entra en una habitación de esquina.
+- **Almacén:** usa la plataforma del centro para subir a los contenedores y las de los extremos para las entreplantas.
+- **Desfiladero:** cruza los tres puentes; baja al cañón y sube a la meseta con la plataforma (o por las escaleras).
+- **Polvo:** recorre túnel, medio y pasillo largo hasta las zonas A y B; salta en las plataformas del medio.
+- **Ciudad:** busca un edificio con escalera a la azotea y una plataforma en mitad de una calle.
+- En todos: el minimapa coincide con el mapa, no se atraviesan paredes y las balas no las cruzan.
+
+**Cada arma** (elige cada personaje; la tecla 3 es el cuchillo para todos):
+
+- **Soldado:** rifle (automático, ráfagas cortas, la mira vuelve sola) y pistola (semiautomática).
+- **Cazador:** francotirador (mira telescópica con clic derecho, cerrojo tras cada tiro, de un tiro al cuerpo tumba a
+  todos menos al Tanque; si te mueves o saltas con la mira puesta el tiro se desvía).
+- **Tanque:** escopeta (10 perdigones, letal de cerca) y revólver.
+- **Rayo:** subfusil (el más rápido).
+- **Bastión:** ametralladora (80 balas, recarga larga, te frena) y revólver.
+- **Cuchillo:** de frente quita 55; por la espalda mata de un golpe.
+- Comprueba: números de daño, marca de acierto (roja en la cabeza o en la baja), recarga con R o automática,
+  cambio con 1/2/3/Q/rueda.
+
+**Cada modo** (dos jugadores como mínimo):
+
+- **Todos contra todos:** a 10 bajas termina; aparecen las tarjetas de «Mejor jugada» y a los 8 s empieza otra.
+- **Por equipos:** cada uno en un color, sin fuego amigo; T cambia de equipo (no en pleno combate, espera 5 s).
+- **Captura la bandera:** coge la bandera rival, muere con ella (cae), devuélvela tocándola, captúrala con la tuya en casa.
+- **Escalada de armas (5):** cada baja da la siguiente arma; un cuchillazo baja un nivel a la víctima; se gana con el cuchillo.
+- **Confirmar bajas:** al matar cae una placa; recógela tú (punto) o que la recoja un compañero de la víctima (niega).
+- **Infectados (2 min):** a los 10 s de haber 2 vivos uno se infecta (verde, solo cuchillo, más rápido); quien muere
+  se infecta; ganan los supervivientes si llega el tiempo a 0.
+- **Rachas:** 5 bajas seguidas → «RADAR» en el minimapa; 7 → barra plateada de blindaje bajo la vida.
+
+**Red:** con dos PCs, muévete y comprueba que el otro te ve fluido; dispara a alguien que corre (si en tu pantalla le
+diste, cuenta); cierra el servidor con alguien en partida y vuelve a abrirlo: el jugador vuelve al lobby, se reconecta
+solo y ve el aviso.
+
+### Resumen
+
+El juego es el mismo (mapas idénticos bit a bit, movimiento equivalente al original al milímetro, mismas armas, modos,
+controles y pantallas) sobre una base nueva: monorepo pnpm en TypeScript estricto, servidor autoritativo a paso fijo
+con predicción y reconciliación en el cliente, mensajes validados y limitados, modos y armas como estrategias, motor
+del cliente fuera de React y dividido por responsabilidades, HUD con Zustand, MessagePack, carga diferida y 119 tests.
+Lo único que no se aplicó del stack es **Rapier** (justificado en el paso 8). El código marcado como posible código
+muerto queda listado arriba para revisarlo.

@@ -337,3 +337,32 @@ La mayor parte se aplicó donde tocaba al reescribir cada pieza; aquí se resume
   tiene su módulo; un ECS no resuelve ningún problema concreto de este código.
 
 Tests: 2 nuevos de `modeUi` (cada modo tiene presentación y se mantienen los textos originales).
+
+## 8. Físicas con Rapier (no aplicado) y audio con Howler
+
+**Rapier: decisión de no migrar** (regla 4). Motivos concretos de este proyecto:
+
+- Los mapas son **solo cajas alineadas a los ejes** y la colisión jugador-mundo es una cápsula aproximada como caja
+  contra AABB. La simulación compartida hace eso en unas 60 líneas puras y deterministas.
+- El movimiento es la seña del juego (bunny hop, slide-hop, subir escalones de 0,55 m, _coyote time_, plataformas).
+  Rapier obligaría a reimplementarlo sobre su _character controller_, con otra resolución de contactos: el tacto
+  **cambiaría** (contra las reglas 1 y 5). Con la simulación actual se ha demostrado equivalencia exacta con el original.
+- El servidor autoritativo ejecuta la misma función que el cliente sin WASM ni inicialización asíncrona; con Rapier
+  habría que cargar ~2 MB de WASM en cada navegador y en el servidor solo para cajas.
+- Los disparos ya usan raycast AABB/esfera compartido y probado.
+
+Si algún día hay rampas u objetos dinámicos, la interfaz `stepMovement(state, input, dt, ctx)` permite cambiar la
+implementación por debajo sin tocar red ni cliente.
+
+**Howler: aplicado con criterio.** Los sonidos siguen sintetizados (no hay archivos de audio), pero el
+`AudioContext` lo gestiona Howler: creación, desbloqueo con el primer gesto en todos los navegadores (incluido iOS) y
+volumen global (`Howler.volume`). Las voces sintéticas se conectan a `Howler.masterGain` mediante un nodo propio.
+Dos detalles que hubo que resolver:
+
+- Howler puede **recrear el contexto** al desbloquear (si la frecuencia de muestreo no es 44,1 kHz, lo normal en PC a
+  48 kHz): el sintetizador detecta el cambio y rehace sus nodos.
+- `Howler.autoSuspend` duerme el contexto a los 30 s sin _Howls_ sonando, y los sonidos sintéticos no cuentan:
+  se desactiva.
+
+Verificado en el navegador: contexto en `running`, volumen de los ajustes aplicado, y 1 s de ráfaga de rifle genera
+20 voces (10 disparos × ruido + golpe grave), igual que antes.

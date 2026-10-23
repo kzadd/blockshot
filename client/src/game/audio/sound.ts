@@ -1,4 +1,6 @@
-// Sounds synthesised with WebAudio: no audio files needed.
+// Sounds synthesised with WebAudio: no audio files needed. Howler owns the AudioContext (creation, unlocking
+// on the first user gesture in every browser, global volume); the synthesised voices plug into its master gain.
+import { Howler } from 'howler';
 import type { WeaponId } from '@blockshot/shared';
 
 interface ShotPreset {
@@ -30,36 +32,48 @@ const MIN_THUD_VOLUME = 0.01;
 
 class Sfx {
   private ctx: AudioContext | null = null;
+  /** our share of Howler's master volume */
   private master: GainNode | null = null;
   private noise: AudioBuffer | null = null;
-  private volume = 0.8;
+
+  constructor() {
+    // Howler only counts its own Howls when deciding to suspend the context: with synthesised sounds it would
+    // go silent after 30 s without a Howl playing
+    Howler.autoSuspend = false;
+  }
 
   setVolume(v: number): void {
-    this.volume = v;
-    if (this.master) this.master.gain.value = MASTER_GAIN * v;
+    Howler.volume(v);
+  }
+
+  /** Howler may replace its AudioContext (e.g. when unlocking audio with a new sample rate): follow it. */
+  private nodes(): { ctx: AudioContext; master: GainNode } | null {
+    const ctx = Howler.ctx;
+    if (!ctx || !Howler.masterGain) return null;
+    if (ctx !== this.ctx || !this.master) {
+      this.ctx = ctx;
+      this.master = ctx.createGain();
+      this.master.gain.value = MASTER_GAIN;
+      this.master.connect(Howler.masterGain);
+      const len = ctx.sampleRate * NOISE_SECONDS;
+      this.noise = ctx.createBuffer(1, len, ctx.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    }
+    return { ctx, master: this.master };
   }
 
   /** Browsers only allow audio after a user gesture: call this from a click or key handler. */
   unlock(): void {
-    if (!this.ctx) {
-      const AC =
-        window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (!AC) return;
-      this.ctx = new AC();
-      this.master = this.ctx.createGain();
-      this.master.gain.value = MASTER_GAIN * this.volume;
-      this.master.connect(this.ctx.destination);
-      const len = this.ctx.sampleRate * NOISE_SECONDS;
-      this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
-      const data = this.noise.getChannelData(0);
-      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
-    }
-    if (this.ctx.state === 'suspended') void this.ctx.resume();
+    if (!Howler.ctx) Howler.volume(Howler.volume()); // creates the context
+    if (Howler.ctx?.state === 'suspended') void Howler.ctx.resume();
+    this.nodes();
   }
 
   shot(kind: WeaponId | null | undefined, vol = 1): void {
-    const { ctx, master } = this;
-    if (!ctx || !master || vol < MIN_SHOT_VOLUME) return;
+    const n = this.nodes();
+    if (!n || vol < MIN_SHOT_VOLUME) return;
+    const { ctx, master } = n;
     const p = PRESETS[kind ?? 'rifle'];
     const t = ctx.currentTime;
     const src = ctx.createBufferSource();
@@ -87,8 +101,9 @@ class Sfx {
   }
 
   blip(freq: number, dur: number, type: OscillatorType = 'square', vol = 0.2, delay = 0): void {
-    const { ctx, master } = this;
-    if (!ctx || !master) return;
+    const n = this.nodes();
+    if (!n) return;
+    const { ctx, master } = n;
     const t = ctx.currentTime + delay;
     const o = ctx.createOscillator();
     o.type = type;
@@ -108,8 +123,9 @@ class Sfx {
 
   /** Short filtered noise: steps, landings and slides. */
   thud(freq: number, dur: number, vol: number, type: BiquadFilterType = 'lowpass'): void {
-    const { ctx, master } = this;
-    if (!ctx || !master || vol < MIN_THUD_VOLUME) return;
+    const n = this.nodes();
+    if (!n || vol < MIN_THUD_VOLUME) return;
+    const { ctx, master } = n;
     const t = ctx.currentTime;
     const src = ctx.createBufferSource();
     src.buffer = this.noise;
@@ -148,8 +164,9 @@ class Sfx {
   }
   /** Jump pad: upward sweep. */
   pad(): void {
-    const { ctx, master } = this;
-    if (!ctx || !master) return;
+    const n = this.nodes();
+    if (!n) return;
+    const { ctx, master } = n;
     const t = ctx.currentTime;
     const o = ctx.createOscillator();
     o.type = 'triangle';

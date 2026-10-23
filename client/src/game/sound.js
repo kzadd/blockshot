@@ -7,6 +7,7 @@ const PRESETS = {
   lmg: { f: 1900, dur: 0.13, thump: 100, v: 0.95 },
   pistol: { f: 2800, dur: 0.1, thump: 180, v: 0.8 },
   revolver: { f: 1700, dur: 0.22, thump: 90, v: 1.1 },
+  knife: { f: 5200, dur: 0.12, thump: 40, v: 0.35 }, // silbido del tajo
 };
 
 class Sfx {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CHARACTERS, WEAPONS, CHAR_BY_ID, SKINS, TEAMS, weightName, speedWith } from '../../../shared/config.js';
+import { CHARACTERS, WEAPONS, CHAR_BY_ID, SKINS, TEAMS, isTeamMode, weightName, speedWith } from '../../../shared/config.js';
 import CharacterPreview from './CharacterPreview.jsx';
 
 // Muestra de cada skin: diagonal de 135° con dos colores
@@ -113,7 +113,7 @@ export default function CharacterSelect({ info, current, skins, respawnIn = 0, f
             <div className="top"><h3>{c.name}</h3><span className="role">{c.role}</span></div>
             <p>{c.desc}</p>
             <div className="stat"><span>Vida</span><div className="bar"><i style={{ width: `${(c.hp / 150) * 100}%` }} /></div><b>{c.hp}</b></div>
-            <div className="stat" title={`Con ${WEAPONS[c.secondary].name.toLowerCase()}: ${speedWith(c, c.secondary)} m/s`}><span>Velocidad</span><div className="bar"><i style={{ width: `${((speedWith(c, c.primary) - 5) / 4.5) * 100}%` }} /></div><b>{speedWith(c, c.primary)}</b></div>
+            <div className="stat" title={`Con ${WEAPONS[c.secondary].name.toLowerCase()}: ${speedWith(c, c.secondary)} m/s`}><span>Velocidad</span><div className="bar"><i style={{ width: `${((speedWith(c, c.primary) - 5) / 5.5) * 100}%` }} /></div><b>{speedWith(c, c.primary)}</b></div>
             <WeaponCard id={c.primary} slot="Principal · 1" />
             <WeaponCard id={c.secondary} slot="Secundaria · 2" />
             <button className="btn primary lg play" onClick={() => onPick(sel, skin)}>Jugar como {c.name}</button>
@@ -121,7 +121,7 @@ export default function CharacterSelect({ info, current, skins, respawnIn = 0, f
         </div>
 
         <div className="select-foot">
-          {mode === 'teams' && myTeam ? <TeamPicker myTeam={myTeam} players={players} onTeam={onTeam} /> : <span>Sala: <b>{info.name}</b></span>}
+          {isTeamMode(mode) && myTeam ? <TeamPicker myTeam={myTeam} players={players} onTeam={onTeam} /> : <span>Sala: <b>{info.name}</b></span>}
           {onKeep && current && <button className="btn" onClick={onKeep}>Seguir con {CHAR_BY_ID[current].name}</button>}
           <button className="btn ghost" onClick={onLeave}>Salir de la sala</button>
         </div>

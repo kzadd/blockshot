@@ -2,11 +2,15 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 
 // ------------------------------------------------------------ Escala (--s)
-// 1 a 1280×720, hasta 1.5 a 1920×1080. Todas las pantallas se dibujan sobre ese lienzo.
+// Todas las pantallas se dibujan sobre un lienzo de diseño de ~1280×720 que se escala a la ventana.
+// Se deja algo más pequeño que «llenar la pantalla» (UI_FIT) para que respire, y puede bajar de 1
+// en portátiles con la barra del navegador (~650 px de alto) para que nada se corte.
+const UI_FIT = 0.9;
 export function useUiScale() {
   useEffect(() => {
     const apply = () => {
-      const s = Math.min(1.5, Math.max(1, Math.min(window.innerWidth / 1280, window.innerHeight / 720)));
+      const fit = Math.min(window.innerWidth / 1280, window.innerHeight / 720) * UI_FIT;
+      const s = Math.min(1.25, Math.max(0.7, fit));
       document.documentElement.style.setProperty('--s', String(Math.round(s * 1000) / 1000));
     };
     apply();

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { TEAMS } from '../../../shared/config.js';
+import { TEAMS, WEAPONS, isTeamMode, gunLadder } from '../../../shared/config.js';
 import { hpColor } from '../game/models.js';
 import { useSettings } from '../settings.js';
 import Crosshair from './Crosshair.jsx';
@@ -17,7 +17,7 @@ const HeadIcon = () => (
 );
 
 export function Feed({ feed, you, mode }) {
-  const color = (t) => (mode === 'teams' ? TEAM_TXT[t] : undefined);
+  const color = (t) => (isTeamMode(mode) ? TEAM_TXT[t] : undefined);
   const now = Date.now();
   return (
     <div className="feed">
@@ -113,12 +113,14 @@ function Ammo({ hud }) {
   const low = hud.mag > 0 && hud.mag <= hud.magSize * 0.25;
   return (
     <div className="ammo">
-      <span className="hud-txt" style={{ fontSize: 14 }}>{hud.weaponName}</span>
+      <span className="hud-txt" style={{ fontSize: 14 }}>{hud.gunLevel ? `Arma ${hud.gunLevel}/${hud.gunTotal} · ` : ''}{hud.weaponName}</span>
       {hud.reloading ? (
         <div className="reloading">
           <b>Recargando</b>
           <div className="pbar"><i style={{ width: `${hud.reloadPct * 100}%`, transition: 'none' }} /></div>
         </div>
+      ) : hud.melee ? (
+        <div className="count"><b>🔪</b></div>
       ) : (
         <div className={`count ${hud.mag === 0 ? 'empty' : low ? 'low' : ''}`}><b>{hud.mag}</b><small>/{hud.magSize}</small></div>
       )}
@@ -133,8 +135,17 @@ function Ammo({ hud }) {
   );
 }
 
+// Captura la bandera: dónde está la bandera de cada equipo
+function flagStatus(f, players, you) {
+  if (!f) return '';
+  if (f.h) return '🚩 En su base';
+  if (!f.c) return '🚩 En el suelo';
+  if (f.c === you) return '🚩 ¡La llevas tú!';
+  return `🚩 La lleva ${players?.find((p) => p.id === f.c)?.n ?? '…'}`;
+}
+
 function TopCenter({ hud, mode, scoreLimit, you }) {
-  if (mode === 'teams' && hud.teamScore) {
+  if (isTeamMode(mode) && hud.teamScore) {
     return (
       <div className="team-score">
         {[1, 2].map((t) => (
@@ -142,8 +153,26 @@ function TopCenter({ hud, mode, scoreLimit, you }) {
             <small>{TEAMS[t].name.toUpperCase()}{hud.myTeam === t ? ' · TÚ' : ''}</small>
             <b>{hud.teamScore[t]}</b>
             <span className="bar"><i style={{ width: `${(hud.teamScore[t] / scoreLimit) * 100}%` }} /></span>
+            {hud.flags && <span className="flag-st">{flagStatus(hud.flags[t], hud.players, you)}</span>}
           </div>
         ))}
+      </div>
+    );
+  }
+  if (mode === 'gungame') {
+    // Escalada de armas: quién va más arriba en la escalera
+    const ladder = gunLadder(scoreLimit);
+    const sorted = [...(hud.players || [])].sort((a, b) => b.lv - a.lv || b.k - a.k);
+    if (!sorted.length) return null;
+    const pos = sorted.findIndex((p) => p.id === you) + 1;
+    const top = sorted[0];
+    const me = sorted[pos - 1];
+    const gun = (p) => `${WEAPONS[ladder[Math.min(p.lv, ladder.length - 1)]].name} (${p.lv + 1}/${ladder.length})`;
+    return (
+      <div className="leader">
+        <span className="first">1º {pos === 1 ? 'Tú' : top.n} · {gun(top)}</span>
+        <span className="sep" />
+        <span>{pos === 1 ? `Tú · ${gun(me)}` : `Tú ${pos}º · ${me ? gun(me) : ''}`}</span>
       </div>
     );
   }
@@ -218,6 +247,9 @@ export default function HUD({ hud, info, engine, map, mode, scoreLimit, you, fee
                 </div>
               )}
             </>
+          )}
+          {hud.flags && hud.myTeam && hud.flags[3 - hud.myTeam]?.c === you && !scoped && (
+            <div className="ctf-carry">🚩 Llevas la bandera<small>{hud.flags[hud.myTeam]?.h ? 'Llévala a tu base' : 'Tu bandera no está en tu base: recupérala para capturar'}</small></div>
           )}
           {hud.protect > 0 && !scoped && (
             <div className="spawn-prot">🛡 Protegido {Math.ceil(hud.protect / 1000)} s<small>Disparar quita la protección</small></div>

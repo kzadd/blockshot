@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { socket } from '../socket.js';
 import { sfx } from '../game/sound.js';
-import { MAPS, MAP_SIZES, MODES, SCORE_LIMIT, TEAM_SCORE_LIMIT } from '../../../shared/config.js';
+import { MAPS, MAP_SIZES, MODES, MODE_BY_ID } from '../../../shared/config.js';
 import MapPreview from './MapPreview.jsx';
 import Settings from './Settings.jsx';
 import Manual from './Manual.jsx';
@@ -16,8 +16,10 @@ const loadNick = () => {
 };
 
 const MODE_SUB = {
-  ffa: `Gana quien llega a ${SCORE_LIMIT} bajas`,
-  teams: `Rojo contra Azul · a ${TEAM_SCORE_LIMIT}`,
+  ffa: 'Cada uno por su cuenta',
+  teams: 'Rojo contra Azul',
+  ctf: 'Roba la bandera rival',
+  gungame: 'Un arma nueva por baja',
 };
 const EMPTY_COLORS = ['#3a4a6c', '#ffc93c', '#3a4a6c', '#3f7fe0', '#d0533a', '#3aa65a'];
 
@@ -27,7 +29,7 @@ export default function Lobby({ onJoined }) {
   const [rooms, setRooms] = useState([]);
   const [connected, setConnected] = useState(socket.connected);
   const [offline, setOffline] = useState(false); // aviso de error de conexión
-  const [form, setForm] = useState({ name: '', password: '', mapId: 'patio', size: 'm', mode: 'ffa', max: MAP_SIZES.m.players });
+  const [form, setForm] = useState({ name: '', password: '', mapId: 'patio', size: 'm', mode: 'ffa', scoreLimit: MODE_BY_ID.ffa.def, max: MAP_SIZES.m.players });
   const [joining, setJoining] = useState(null);
   const [pass, setPass] = useState('');
   const [passError, setPassError] = useState('');
@@ -160,7 +162,7 @@ export default function Lobby({ onJoined }) {
                 <div className="maps">
                   {MAPS.map((m) => (
                     <button type="button" key={m.id} className={`map-card ${form.mapId === m.id ? 'on' : ''}`} onClick={() => setForm({ ...form, mapId: m.id })}>
-                      <MapPreview mapId={m.id} size={form.size} px={56} className="map-thumb" />
+                      <MapPreview mapId={m.id} size={form.size} px={48} className="map-thumb" />
                       <span><b>{m.name}</b><small>{m.tag}</small></span>
                     </button>
                   ))}
@@ -169,9 +171,9 @@ export default function Lobby({ onJoined }) {
 
               <div>
                 <div className="label-row"><span className="label">Modo de juego</span></div>
-                <div className="seg">
+                <div className="seg modes">
                   {MODES.map((m) => (
-                    <button type="button" key={m.id} className={form.mode === m.id ? 'on' : ''} onClick={() => setForm({ ...form, mode: m.id })}>
+                    <button type="button" key={m.id} className={form.mode === m.id ? 'on' : ''} onClick={() => setForm({ ...form, mode: m.id, scoreLimit: m.def })}>
                       <b>{m.name}</b>
                       <small>{MODE_SUB[m.id]}</small>
                     </button>
@@ -179,15 +181,29 @@ export default function Lobby({ onJoined }) {
                 </div>
               </div>
 
-              <div>
-                <div className="label-row"><span className="label">Tamaño</span></div>
-                <div className="seg">
-                  {Object.values(MAP_SIZES).map((z) => (
-                    <button type="button" key={z.id} className={form.size === z.id ? 'on' : ''} onClick={() => setForm({ ...form, size: z.id, max: z.players })}>
-                      <b>{z.name}</b>
-                      <small>{z.half * 2} m · ~{z.players} jug.</small>
-                    </button>
-                  ))}
+              <div className="row-2">
+                <div>
+                  <div className="label-row"><span className="label">Para ganar</span><span className="hint">{form.scoreLimit} {MODE_BY_ID[form.mode].unit}{form.mode === 'teams' ? ' del equipo' : ''}</span></div>
+                  <div className="seg">
+                    {MODE_BY_ID[form.mode].limits.map((n) => (
+                      <button type="button" key={n} className={form.scoreLimit === n ? 'on' : ''} onClick={() => setForm({ ...form, scoreLimit: n })} style={{ justifyItems: 'center' }}>
+                        <b>{n}</b>
+                        <small>{MODE_BY_ID[form.mode].unit}</small>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="label-row"><span className="label">Tamaño</span></div>
+                  <div className="seg">
+                    {Object.values(MAP_SIZES).map((z) => (
+                      <button type="button" key={z.id} className={form.size === z.id ? 'on' : ''} onClick={() => setForm({ ...form, size: z.id, max: z.players })}>
+                        <b>{z.name}</b>
+                        <small>{z.half * 2} m</small>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -221,7 +237,7 @@ export default function Lobby({ onJoined }) {
                         <MapPreview mapId={r.mapId} size={r.sizeId} px={44} className="map-thumb" />
                         <div className="room-name">
                           <b>{r.name}{r.locked ? ' 🔒' : ''}</b>
-                          <small>{r.map} · {r.size} · {r.mode} · de {r.host}</small>
+                          <small>{r.map} · {r.size} · {r.mode} a {r.limit} · de {r.host}</small>
                         </div>
                         <div className="room-count">
                           {r.players}/{r.max}

@@ -8,16 +8,29 @@ import { rayAABB } from './physics.js';
 
 export const SERVER_TICK_MS = 50; // 20 snapshots/seg del servidor
 export const CLIENT_SEND_MS = 50; // 20 envíos/seg de posición
-export const SCORE_LIMIT = 20; // kills para ganar la partida (todos contra todos)
-export const TEAM_SCORE_LIMIT = 40; // kills del equipo para ganar (por equipos)
 export const MATCH_RESTART_MS = 8000;
 export const LAG_COMP_MAX_MS = 250;
 export const TEAM_SWITCH_COOLDOWN = 5000; // ms entre cambios de equipo // hasta cuánto atrás rebobina el servidor para comprobar un disparo
 
+// limits = opciones de puntos para ganar al crear la sala · def = la marcada por defecto
 export const MODES = [
-  { id: 'ffa', name: 'Todos contra todos' },
-  { id: 'teams', name: 'Por equipos' },
+  { id: 'ffa', name: 'Todos contra todos', limits: [10, 20, 30, 50], def: 20, unit: 'bajas' },
+  { id: 'teams', name: 'Por equipos', limits: [20, 40, 60, 100], def: 40, unit: 'bajas' },
+  { id: 'ctf', name: 'Captura la bandera', limits: [1, 3, 5, 7], def: 3, unit: 'capturas' },
+  { id: 'gungame', name: 'Escalada de armas', limits: [5, 8], def: 8, unit: 'armas' },
 ];
+// Escalada de armas: todos empiezan con la primera y cada baja da la siguiente.
+// Gana quien consigue una baja con la última (el cuchillo). Una baja a cuchillo le quita un arma a la víctima.
+export const GUN_LADDERS = {
+  5: ['smg', 'shotgun', 'sniper', 'pistol', 'knife'],
+  8: ['rifle', 'smg', 'shotgun', 'lmg', 'sniper', 'revolver', 'pistol', 'knife'],
+};
+export const gunLadder = (limit) => GUN_LADDERS[limit] || GUN_LADDERS[8];
+export const MODE_BY_ID = Object.fromEntries(MODES.map((m) => [m.id, m]));
+// Modos con equipo Rojo contra Azul
+export const isTeamMode = (mode) => mode === 'teams' || mode === 'ctf';
+// Captura la bandera: radio para coger / devolver / capturar y tiempo hasta que vuelve sola
+export const FLAG = { radius: 1.6, returnMs: 20000 };
 export const TEAMS = {
   1: { name: 'Rojo', color: '#ff5a4d' },
   2: { name: 'Azul', color: '#4da3ff' },
@@ -59,14 +72,15 @@ export const PLAYER = {
 // falloff = [desde m, hasta m, daño mínimo]: el daño baja con la distancia
 // moveSpread / airSpread = cuánto se abre la dispersión corriendo / en el aire
 // bolt = cerrojo: tras cada disparo se sale de la mira durante boltTime ms
+// bloom = cuánto se abre la dispersión con cada disparo seguido (hasta bloomMax); el primer tiro va al centro
 export const WEAPONS = {
   rifle: {
     name: 'Rifle de asalto', damage: 24, headMult: 1.6, fireRate: 100, mag: 30, reload: 2000,
-    auto: true, spread: 0.022, adsSpread: 0.004, pellets: 1, range: 200, recoil: 0.012, zoom: 1.6, sound: 'rifle',
-    weight: 0.97, adsSpeed: 12, adsMove: 0.6, falloff: [35, 90, 0.7],
+    auto: true, spread: 0.012, adsSpread: 0.002, pellets: 1, range: 200, recoil: 0.008, zoom: 1.6, sound: 'rifle',
+    weight: 0.97, adsSpeed: 12, adsMove: 0.6, falloff: [35, 90, 0.7], bloom: 0.0022, bloomMax: 0.018,
   },
   sniper: {
-    name: 'Francotirador', damage: 125, headMult: 2, fireRate: 1100, boltTime: 550, mag: 5, reload: 2700,
+    name: 'Francotirador', damage: 120, headMult: 2, fireRate: 1100, boltTime: 550, mag: 5, reload: 2700,
     auto: false, spread: 0.12, adsSpread: 0.0008, pellets: 1, range: 400, recoil: 0.07, zoom: 5, scope: true, sound: 'sniper',
     weight: 0.95, adsSpeed: 20, adsMove: 0.55, moveSpread: 3, airSpread: 4, bolt: true,
   },
@@ -77,25 +91,41 @@ export const WEAPONS = {
   },
   smg: {
     name: 'Subfusil', damage: 16, headMult: 1.5, fireRate: 68, mag: 35, reload: 1600,
-    auto: true, spread: 0.028, adsSpread: 0.012, pellets: 1, range: 90, recoil: 0.008, zoom: 1.4, sound: 'smg',
-    weight: 1, adsSpeed: 20, adsMove: 0.75, falloff: [15, 45, 0.6],
+    auto: true, spread: 0.018, adsSpread: 0.007, pellets: 1, range: 90, recoil: 0.0055, zoom: 1.4, sound: 'smg',
+    weight: 1, adsSpeed: 20, adsMove: 0.75, falloff: [15, 45, 0.6], bloom: 0.0016, bloomMax: 0.018,
   },
   lmg: {
     name: 'Ametralladora', damage: 21, headMult: 1.5, fireRate: 115, mag: 80, reload: 4200,
-    auto: true, spread: 0.04, adsSpread: 0.012, pellets: 1, range: 160, recoil: 0.014, zoom: 1.5, sound: 'lmg',
-    weight: 0.9, adsSpeed: 9, adsMove: 0.55, falloff: [40, 110, 0.7],
+    auto: true, spread: 0.018, adsSpread: 0.005, pellets: 1, range: 160, recoil: 0.0075, zoom: 1.5, sound: 'lmg',
+    weight: 0.9, adsSpeed: 9, adsMove: 0.55, falloff: [40, 110, 0.7], bloom: 0.0015, bloomMax: 0.02,
   },
   pistol: {
     name: 'Pistola', damage: 25, headMult: 1.6, fireRate: 220, mag: 12, reload: 1300,
-    auto: false, spread: 0.012, adsSpread: 0.004, pellets: 1, range: 100, recoil: 0.02, zoom: 1.35, sound: 'pistol',
-    weight: 1.03, adsSpeed: 20, adsMove: 0.8, falloff: [20, 60, 0.65],
+    auto: false, spread: 0.008, adsSpread: 0.0025, pellets: 1, range: 100, recoil: 0.018, zoom: 1.35, sound: 'pistol',
+    weight: 1.03, adsSpeed: 20, adsMove: 0.8, falloff: [20, 60, 0.65], bloom: 0.003, bloomMax: 0.012,
   },
   revolver: {
     name: 'Revólver', damage: 50, headMult: 1.8, fireRate: 600, mag: 6, reload: 2200,
-    auto: false, spread: 0.01, adsSpread: 0.002, pellets: 1, range: 120, recoil: 0.045, zoom: 1.5, sound: 'revolver',
-    weight: 1, adsSpeed: 14, adsMove: 0.7, falloff: [25, 70, 0.7],
+    auto: false, spread: 0.008, adsSpread: 0.0018, pellets: 1, range: 120, recoil: 0.04, zoom: 1.5, sound: 'revolver',
+    weight: 1, adsSpeed: 14, adsMove: 0.7, falloff: [25, 70, 0.7], bloom: 0.005, bloomMax: 0.014,
+  },
+  // Cuerpo a cuerpo: todos lo llevan (tecla 3). Por la espalda mata de un golpe
+  knife: {
+    name: 'Cuchillo', damage: 55, headMult: 1.2, fireRate: 480, mag: 1, reload: 0,
+    auto: true, spread: 0, adsSpread: 0, pellets: 1, range: 2.6, recoil: 0, zoom: 1, sound: 'knife',
+    weight: 1.12, adsSpeed: 20, adsMove: 1, melee: true, backstab: 200,
   },
 };
+
+// Armas que lleva un jugador, por orden de tecla (1, 2, 3)
+export function loadoutOf(mode, ch, level = 0, limit = 8) {
+  if (mode === 'gungame') {
+    const ladder = gunLadder(limit);
+    const w = ladder[Math.min(level, ladder.length - 1)];
+    return w === 'knife' ? ['knife'] : [w, 'knife'];
+  }
+  return [ch.primary, ch.secondary, 'knife'];
+}
 
 // Peso del arma en palabras (para la selección de personaje y el manual)
 export const weightName = (w) => ((w.weight ?? 1) >= 1 ? 'Ligera' : w.weight >= 0.95 ? 'Media' : 'Pesada');
@@ -119,7 +149,7 @@ export const CHARACTERS = [
   {
     id: 'cazador', name: 'Cazador', color: '#3aa65a', hp: 90, speed: 7.6,
     primary: 'sniper', secondary: 'pistol',
-    role: 'Larga distancia', desc: 'Un disparo al cuerpo basta (al Tanque, a la cabeza). Busca altura y apunta.',
+    role: 'Larga distancia', desc: 'Un tiro al cuerpo tumba a todos menos al Tanque (a él, a la cabeza). Busca altura.',
   },
   {
     id: 'tanque', name: 'Tanque', color: '#d0533a', hp: 150, speed: 6.8,
@@ -127,7 +157,7 @@ export const CHARACTERS = [
     role: 'Cuerpo a cuerpo', desc: 'Mucha vida y escopeta. Letal de cerca, lento de lejos.',
   },
   {
-    id: 'rayo', name: 'Rayo', color: '#e8b923', hp: 85, speed: 8.9,
+    id: 'rayo', name: 'Rayo', color: '#e8b923', hp: 85, speed: 10.4,
     primary: 'smg', secondary: 'pistol',
     role: 'Velocidad', desc: 'El más rápido. Entra, dispara y sal antes de que te vean.',
   },
@@ -154,7 +184,27 @@ export const SKINS = [
 //  Cada mapa es una función que coloca las cajas según el tamaño de la arena
 //  (H = mitad del lado: la arena va de -H a H). Todo lo que sea caja tiene
 //  colisión y bloquea balas.
+//  P(x, z, partes) coloca un objeto de decoración (barril, árbol, farola…) sobre
+//  el suelo que haya en (x, z). Si choca con otra caja o tapa un punto de
+//  aparición se descarta entero, así que se pueden poner sin miedo.
+//  El aspecto de cada tipo (cilindro, hojas, bombilla…) está en client/src/game/world.js.
 // ---------------------------------------------------------------------
+
+// Partes de cada objeto: [dx, dy, dz, ancho, alto, fondo, tipo]
+const BARREL = [[0, 0, 0, 0.85, 1.1, 0.85, 'barrel']];
+const TREE = [[0, 0, 0, 1.6, 0.7, 1.6, 'planter'], [0, 0.7, 0, 0.35, 2.6, 0.35, 'trunk']];
+const LAMP = [[0, 0, 0, 0.25, 4.2, 0.25, 'lamp']];
+const CACTUS = [[0, 0, 0, 0.45, 2.3, 0.45, 'cactus']];
+const sandbags = (w, d) => [[0, 0, 0, w, 0.95, d, 'sandbag']];
+const PALLET = [[0, 0, 0, 1.2, 0.15, 1.2, 'pallet'], [0, 0.15, 0, 1, 1, 1, 'crate']];
+// Colores de los objetos (minimapa y vista previa; el 3D los usa como tinte)
+const PROP_COLORS = {
+  barrel: '#3d6e9e', planter: '#9a8f80', trunk: '#6b4a2b', lamp: '#3a3f47',
+  sandbag: '#b8a57a', pallet: '#a8834f', cactus: '#4f8a45', car: '#c0503e', carTop: '#2b3a4a',
+};
+const car = (alongX) => (alongX
+  ? [[0, 0, 0, 4.2, 1, 1.9, 'car'], [0.3, 1, 0, 2.2, 0.75, 1.7, 'carTop']]
+  : [[0, 0, 0, 1.9, 1, 4.2, 'car'], [0, 1, 0.3, 1.7, 0.75, 2.2, 'carTop']]);
 export const MAP_SIZES = {
   s: { id: 's', name: 'Pequeño', half: 26, players: 6 },
   m: { id: 'm', name: 'Mediano', half: 40, players: 12 },
@@ -183,7 +233,7 @@ function stairs(B, x, z, axis, dir, steps, width, c = 'step') {
 }
 
 // --- Patio: torre central, muros intermedios y habitaciones en las esquinas
-function buildPatio({ B, S, H }) {
+function buildPatio({ B, S, P, H }) {
   const k = H / 40;
   B(0, 0, 0, 12, 3, 12, 'platform');
   for (const s of [1, -1]) {
@@ -231,6 +281,25 @@ function buildPatio({ B, S, H }) {
     }
   }
 
+  // Árboles en jardineras, farolas junto a la torre, barriles y sacos terreros
+  for (const sx of [1, -1]) {
+    for (const sz of [1, -1]) {
+      P(sx * 0.62 * H, sz * 0.3 * H, TREE);
+      P(sx * 0.3 * H, sz * 0.62 * H, TREE);
+      P(sx * 7.6, sz * 7.6, LAMP);
+    }
+  }
+  const d0 = rings[0];
+  for (const s of [1, -1]) {
+    for (const z of [0.3 * H, -0.3 * H]) {
+      P(s * (H - 1.2), z, BARREL);
+      P(s * (H - 1.2), z + 1, BARREL);
+      P(s * (H - 2.2), z + 0.5, BARREL);
+    }
+    P(s * (d0 + 3), 0, sandbags(1, 3));
+    P(0, s * (d0 + 3), sandbags(3, 1));
+  }
+
   const spawns = [
     [-31, -31], [31, -31], [-31, 31], [31, 31], [0, -34], [0, 34], [-34, 0], [34, 0],
     [20, 30], [-20, -30], [30, -14], [-30, 14],
@@ -239,7 +308,7 @@ function buildPatio({ B, S, H }) {
 }
 
 // --- Almacén: filas de contenedores, pasillos estrechos y entreplantas
-function buildAlmacen({ B, S, H, rand }) {
+function buildAlmacen({ B, S, P, H, rand }) {
   const mL = Math.round(0.55 * H);
   for (const s of [1, -1]) {
     // Entreplanta pegada al muro norte/sur, con barandilla y escaleras en los extremos
@@ -272,6 +341,22 @@ function buildAlmacen({ B, S, H, rand }) {
   B(2, 0, 1.6, 2.4, 2.4, 2.4, 'crate2');
   B(4.4, 0, 1.6, 2.4, 1.2, 2.4, 'crate');
 
+  // Barriles junto a las paredes y palés con cajas por los pasillos
+  for (const s of [1, -1]) {
+    for (const z of [0.3 * H, -0.3 * H]) {
+      P(s * (H - 1.2), z, BARREL);
+      P(s * (H - 1.2), z + 1, BARREL);
+      P(s * (H - 2.2), z + 0.5, BARREL);
+    }
+  }
+  for (let i = 0; i < Math.round(H / 4); i++) {
+    const x = (rand() * 2 - 1) * (H - 6);
+    const z = (rand() * 2 - 1) * (H - 9);
+    P(x, z, rand() < 0.5 ? PALLET : BARREL);
+  }
+  P(-4.6, 2.8, PALLET);
+  P(-0.2, -4.2, BARREL);
+
   for (const z of [-0.6, 0, 0.6]) {
     S(H - 1.8, z * H);
     S(-(H - 1.8), z * H);
@@ -284,7 +369,7 @@ function buildAlmacen({ B, S, H, rand }) {
 }
 
 // --- Desfiladero: un cañón entre dos mesetas altas unidas por puentes
-function buildDesfiladero({ B, S, H, rand }) {
+function buildDesfiladero({ B, S, P: Prop, H, rand }) {
   const P = Math.max(10, Math.round(0.32 * H)); // el cañón va de -P a P
   const bridges = [0, 0.5 * H, -0.5 * H];
   for (const s of [1, -1]) {
@@ -306,6 +391,20 @@ function buildDesfiladero({ B, S, H, rand }) {
   }
   for (const z of bridges) B(0, 3.4, z, 2 * P, 0.6, 4, 'bridge');
 
+  // Sacos terreros a la entrada de los puentes, cactus y barriles
+  for (const s of [1, -1]) {
+    for (const z of bridges) Prop(s * (P + 2.6), z + 3.2, sandbags(1, 2));
+    for (const z of [-0.45, 0.1, 0.6]) {
+      const cx = s * (P + 0.55 * (H - P));
+      Prop(cx + s * 2.6, s * z * H - 1.4, BARREL);
+      Prop(cx + s * 2.6, s * z * H - 0.4, BARREL);
+    }
+    for (let i = 0; i < Math.round(H / 6); i++) {
+      Prop(s * (P + 2 + rand() * (H - P - 4)), (rand() * 2 - 1) * (H - 3), CACTUS);
+    }
+  }
+  for (let i = 0; i < Math.round(H / 10); i++) Prop((rand() * 2 - 1) * (P - 2), (rand() * 2 - 1) * (H - 4), CACTUS);
+
   // Rocas en el fondo del cañón (lejos del pie de las escaleras y de los spawns)
   const avoid = [0.25, 0.7, 0.45, 0.85].flatMap((f) => [f * H, -f * H]);
   for (let z = -H + 7; z < H - 6; z += 8) {
@@ -325,13 +424,133 @@ function buildDesfiladero({ B, S, H, rand }) {
   }
 }
 
+// --- Polvo: pueblo del desierto con tres rutas (túnel, medio y pasillo largo) y dos zonas de
+// bombas en el norte. Coordenadas pensadas para el mediano (80 m) y escaladas al resto.
+function buildPolvo({ B, S, P, H }) {
+  const k = H / 40;
+  // Rectángulo [x1,x2] × [z1,z2] de alto h, apoyado en y
+  const R = (x1, x2, z1, z2, h, c = 'wall2', y = 0) => B(((x1 + x2) / 2) * k, y, ((z1 + z2) / 2) * k, (x2 - x1) * k, h, (z2 - z1) * k, c);
+  // Casas: entre ellas quedan los pasillos
+  R(-22, -6, -12, -2, 7);
+  R(-22, -6, 2, 12, 7);
+  R(6, 22, -12, -8, 7);
+  R(6, 22, -4, 12, 7);
+  R(-22, -6, 18, 28, 7);
+  R(6, 22, 18, 28, 7);
+  R(30, 40, -10, 26, 8, 'wall');
+  R(-40, -30, -10, 26, 8, 'wall');
+  R(-8, 8, -30, -24, 4);
+  // Puertas del medio y del pasillo largo, con dintel
+  R(-14, -2, -17, -15, 5);
+  R(2, 14, -17, -15, 5);
+  R(-2, 2, -17, -15, 1, 'wall2', 4);
+  R(22, 26, 13, 15, 7);
+  R(26, 30, 13, 15, 2.4, 'wall2', 4.6);
+  // Túnel de B y conector cubierto del medio a B
+  R(-30, -22, 2, 22, 1, 'roof', 3.4);
+  R(-22, -6, -2, 2, 1, 'roof', 3.6);
+  // Zona A: plataforma con escalones
+  R(24, 36, -34, -24, 1, 'platform');
+  R(22, 24, -32, -26, 0.5, 'step');
+  R(27, 33, -24, -22, 0.5, 'step');
+  R(28, 30.4, -31, -28.6, 2.4, 'crate2', 1);
+  R(32, 34.4, -28, -25.6, 1.2, 'crate', 1);
+  // Zona B
+  R(-36, -24, -34, -26, 0.5, 'platform');
+  R(-31, -28.6, -31, -28.6, 2.4, 'crate2', 0.5);
+  R(-27, -24.6, -34, -31.6, 1.2, 'crate', 0.5);
+  R(-35, -33.4, -26, -24.4, 1.6, 'crate');
+  // Coberturas por las rutas
+  R(-1, 1, -7, -5, 2, 'crate');
+  R(-2.6, -1.4, 5.4, 6.6, 1.2, 'crate');
+  R(25, 26.6, -1, 0.6, 1.2, 'crate');
+  R(-11, -9, 32, 34, 1.2, 'crate');
+  R(9, 11, 32, 34, 1.2, 'crate2');
+  R(-19, -17, -18, -16, 1.2, 'crate');
+  R(-13, -11, -35, -33, 1.2, 'crate');
+  R(11, 13, -35, -33, 1.2, 'crate2');
+  // Decoración
+  for (const s of [1, -1]) {
+    P(s * 3 * k, 30 * k, TREE);
+    P(s * 30 * k, -36 * k, sandbags(3, 1));
+    P(s * 26 * k, 28 * k, BARREL);
+    P(s * 26.9 * k, 28.6 * k, BARREL);
+    P(s * 4 * k, -20 * k, BARREL);
+    P(s * 18 * k, 16 * k, BARREL);
+  }
+  P(-26 * k, -12 * k, BARREL);
+  P(27 * k, -15 * k, sandbags(1, 3));
+
+  const spawns = [
+    [0, 35], [-8, 36], [8, 36], [-16, 35], [16, 35], [0, -36], [-10, -37], [10, -37],
+    [-35, 32], [35, 32], [-35, -14], [35, -14], [26, 20], [-26, 20],
+  ];
+  for (const [x, z] of spawns) S(x * k, z * k);
+}
+
+// --- Ciudad: manzanas de edificios con calles, callejones, plazas y alguna azotea con escalera
+function buildCiudad({ B, S, P, H, rand }) {
+  const n = H < 34 ? 3 : H < 50 ? 4 : 5; // manzanas por lado
+  const sw = 7; // ancho de calle
+  const bs = (2 * H - (n + 1) * sw) / n; // lado de manzana
+  const at = (i) => -H + sw + bs / 2 + i * (bs + sw); // centro de la manzana i
+  const street = (i) => -H + sw / 2 + i * (bs + sw); // centro de la calle i
+  const cols = ['bld1', 'bld2', 'bld3', 'bld4'];
+  const plaza = Math.floor((n - 1) / 2);
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      const cx = at(i);
+      const cz = at(j);
+      const c = cols[Math.floor(rand() * cols.length)];
+      const roll = rand();
+      if ((i === plaza && j === plaza) || roll < 0.1) {
+        // Plaza: fuente, árboles y bancos
+        B(cx, 0, cz, 3, 0.8, 3, 'platform');
+        for (const [dx, dz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) P(cx + dx * (bs / 2 - 1.5), cz + dz * (bs / 2 - 1.5), TREE);
+        P(cx, cz + bs / 2 - 1, sandbags(2.4, 0.6));
+        continue;
+      }
+      const h = 4 + Math.floor(rand() * 4) * 2.5;
+      if (roll < 0.28) {
+        // Edificio bajo con escalera a la azotea
+        B(cx + 1.25, 0, cz, bs - 2.5, 3.5, bs, c);
+        stairs(B, cx - bs / 2 + 1.25, cz + bs / 2 - 0.5, 'z', 1, 7, 2.5);
+      } else if (roll < 0.6) {
+        // Dos edificios con un callejón en medio
+        const w = (bs - 2.6) / 2;
+        const h2 = 4 + Math.floor(rand() * 4) * 2.5;
+        if (rand() < 0.5) {
+          B(cx - (w + 2.6) / 2, 0, cz, w, h, bs, c);
+          B(cx + (w + 2.6) / 2, 0, cz, w, h2, bs, cols[Math.floor(rand() * cols.length)]);
+        } else {
+          B(cx, 0, cz - (w + 2.6) / 2, bs, h, w, c);
+          B(cx, 0, cz + (w + 2.6) / 2, bs, h2, w, cols[Math.floor(rand() * cols.length)]);
+        }
+      } else B(cx, 0, cz, bs, h, bs, c);
+    }
+  }
+  // Coches aparcados, farolas y barriles en las calles
+  for (let i = 0; i <= n; i++) {
+    for (let j = 0; j < n; j++) {
+      const side = rand() < 0.5 ? 1 : -1;
+      if (rand() < 0.55) P(at(j) + (rand() - 0.5) * bs * 0.5, street(i) + side * 2.2, car(true));
+      if (rand() < 0.55) P(street(i) + side * 2.2, at(j) + (rand() - 0.5) * bs * 0.5, car(false));
+      if (rand() < 0.3) P(at(j) + bs / 2 - 0.6, street(i) - side * 2.8, BARREL);
+    }
+    for (let j = 0; j <= n; j++) {
+      if (rand() < 0.5) P(street(i) + sw / 2 - 0.4, street(j) + sw / 2 - 0.4, LAMP);
+      S(street(i), street(j));
+    }
+  }
+}
+
 const MAP_DEFS = {
   patio: {
     name: 'Patio', tag: 'Equilibrado', desc: 'Torre central y habitaciones en las esquinas. Equilibrado.',
     build: buildPatio, wallH: 8, sky: '#9fd4ff',
     colors: {
-      floor: '#d6cdb8', wall: '#7e97aa', wall2: '#c48d5f', platform: '#8e84bd',
-      step: '#b4abd8', crate: '#d4a24c', crate2: '#6fa86a',
+      floor: '#d6cdb8', wall: '#b0705a', wall2: '#dcc6a2', platform: '#a8a196',
+      step: '#c2bbaf', crate: '#c99a55', crate2: '#6f8f5a',
     },
   },
   almacen: {
@@ -348,6 +567,22 @@ const MAP_DEFS = {
     colors: {
       floor: '#e0c08f', wall: '#b0704a', wall2: '#c98a5a', platform: '#d19a64',
       step: '#a87a4e', bridge: '#8a6440', rock: '#9b8b7a', crate: '#d4a24c',
+    },
+  },
+  polvo: {
+    name: 'Polvo', tag: 'Pasillos', desc: 'Pueblo del desierto: túnel, medio y pasillo largo hasta dos zonas.',
+    build: buildPolvo, wallH: 9, sky: '#ffe7c2',
+    colors: {
+      floor: '#dcc49a', wall: '#c9a878', wall2: '#e0c9a0', roof: '#8a6a4a', platform: '#c7b08a',
+      step: '#b9a27c', crate: '#c99a55', crate2: '#8f7a52',
+    },
+  },
+  ciudad: {
+    name: 'Ciudad', tag: 'Calles', desc: 'Manzanas de edificios, callejones, plazas y azoteas.',
+    build: buildCiudad, wallH: 14, sky: '#a9cbe8',
+    colors: {
+      floor: '#6b6e74', wall: '#8a8f99', bld1: '#c9b79a', bld2: '#9fb0c4', bld3: '#d8c8b0', bld4: '#b58c74',
+      platform: '#a8a196', step: '#bdb6aa', crate: '#c99a55',
     },
   },
 };
@@ -375,12 +610,30 @@ function spawnYaw(cols, x, y, z) {
   }
   return r2(best);
 }
-function groundAt(boxes, x, z) {
+export function groundAt(boxes, x, z) {
   let y = 0;
   for (const b of boxes) {
     if (Math.abs(x - b.x) <= b.w / 2 && Math.abs(z - b.z) <= b.d / 2) y = Math.max(y, b.y + b.h);
   }
   return r2(y);
+}
+
+// Coloca los objetos de decoración que caben: sobre el suelo, sin chocar con nada y lejos de los spawns
+function placeProps(boxes, points, props) {
+  const hit = (a, b) =>
+    Math.abs(a.x - b.x) < (a.w + b.w) / 2 - 0.01 && Math.abs(a.z - b.z) < (a.d + b.d) / 2 - 0.01 &&
+    a.y < b.y + b.h - 0.01 && b.y < a.y + a.h - 0.01;
+  let id = 0;
+  for (const { x, z, parts } of props) {
+    const y = groundAt(boxes, x, z);
+    const list = parts.map(([dx, dy, dz, w, h, d, c]) => ({ x: r2(x + dx), y: r2(y + dy), z: r2(z + dz), w, h, d, c, p: id + 1 }));
+    const blocked = list.some((b) =>
+      boxes.some((o) => o.c !== 'floor' && hit(b, o)) ||
+      points.some(([sx, sz]) => Math.abs(sx - b.x) < b.w / 2 + 1.3 && Math.abs(sz - b.z) < b.d / 2 + 1.3));
+    if (blocked) continue;
+    id++;
+    boxes.push(...list);
+  }
 }
 
 const mapCache = new Map();
@@ -401,14 +654,21 @@ export function getMap(mapId, sizeId) {
   B(0, 0, H + 0.5, 2 * H + 2, def.wallH, 1);
   B(-H - 0.5, 0, 0, 1, def.wallH, 2 * H);
   B(H + 0.5, 0, 0, 1, def.wallH, 2 * H);
-  def.build({ B, S: (x, z) => points.push([r2(x), r2(z)]), H, rand: rng(seedOf(key)) });
+  const props = [];
+  const Prop = (x, z, parts) => props.push({ x, z, parts });
+  def.build({ B, S: (x, z) => points.push([r2(x), r2(z)]), P: Prop, H, rand: rng(seedOf(key)) });
+  placeProps(boxes, points, props);
 
   const map = {
     id, size, name: def.name, sizeName: MAP_SIZES[size].name, half: H, bounds: H - 0.4,
-    wallH: def.wallH, sky: def.sky, colors: def.colors, boxes,
+    wallH: def.wallH, sky: def.sky, colors: { ...PROP_COLORS, ...def.colors }, boxes,
     spawns: [],
   };
   const cols = getColliders(map);
+  // Bases de Captura la bandera: el punto de aparición más al oeste (Rojo) y el más al este (Azul)
+  const side = (s) => [...points].sort((a, b) => s * (a[0] - b[0]) || Math.abs(a[1]) - Math.abs(b[1]))[0];
+  const base = ([x, z]) => [x, groundAt(boxes, x, z), z];
+  map.bases = { 1: base(side(1)), 2: base(side(-1)) };
   map.spawns = points.map(([x, z]) => {
     const y = groundAt(boxes, x, z);
     return [x, y, z, spawnYaw(cols, x, y, z)]; // [x, y, z, orientación]

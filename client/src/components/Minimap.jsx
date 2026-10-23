@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { palette } from '../palette.js';
+import { palette, teamColor } from '../palette.js';
 
 const SIZE = 164; // interior del recuadro de 170 con borde de 3
 const PAD = 6;
@@ -72,6 +72,19 @@ export default function Minimap({ engine, map }) {
         dot(toPx(p.x), toPx(p.z), mate ? palette().ally : palette().enemy);
       }
       g.globalAlpha = 1;
+
+      // Captura la bandera: banderas siempre visibles (siguen a quien las lleva)
+      for (const t of e.flags ? [1, 2] : []) {
+        const f = e.flags[t];
+        const p = f.c === e.myId ? e.pos : e.remotes.get(f.c)?.model?.group.position ?? f;
+        const x = toPx(p.x);
+        const y = toPx(p.z);
+        g.fillStyle = '#0b1426';
+        g.fillRect(x - 1.5, y - 9, 3, 14);
+        g.fillRect(x, y - 10, 11, 9);
+        g.fillStyle = teamColor(t);
+        g.fillRect(x + 1.5, y - 8.5, 8, 6);
+      }
 
       if (e.alive) {
         g.save();

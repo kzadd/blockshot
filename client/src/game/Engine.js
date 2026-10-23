@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PLAYER, WEAPONS, CHAR_BY_ID, CLIENT_SEND_MS, getColliders } from '../../../shared/config.js';
+import { PLAYER, WEAPONS, CHAR_BY_ID, CLIENT_SEND_MS, FLAG, getColliders, isTeamMode, loadoutOf, gunLadder } from '../../../shared/config.js';
 import { castShot } from '../../../shared/physics.js';
 import { buildWorld } from './world.js';
 import { buildCharacter, buildGun, buildArms, makeNameTag } from './models.js';
@@ -27,6 +27,34 @@ const bubbleGeo = new THREE.SphereGeometry(1, 18, 12);
 const bubbleMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.18, depthWrite: false });
 
 const damp = (k, dt) => 1 - Math.exp(-k * dt);
+
+// Icono de bandera que se ve a través de las paredes
+function flagMarker(color) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  g.fillStyle = color;
+  g.strokeStyle = '#1b2a4a';
+  g.lineWidth = 6;
+  g.beginPath();
+  g.arc(32, 32, 26, 0, Math.PI * 2);
+  g.fill();
+  g.stroke();
+  g.fillStyle = '#ffffff';
+  g.fillRect(22, 16, 4, 32);
+  g.beginPath();
+  g.moveTo(26, 16);
+  g.lineTo(44, 23);
+  g.lineTo(26, 31);
+  g.fill();
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true, sizeAttenuation: false }));
+  s.scale.set(0.045, 0.045, 1);
+  s.position.y = 3;
+  s.renderOrder = 6;
+  return s;
+}
 function dampAngle(a, b, k) {
   let d = b - a;
   while (d > Math.PI) d -= Math.PI * 2;
@@ -43,13 +71,18 @@ function spreadDir(base, s) {
 }
 
 export class Engine {
-  constructor(container, socket, myId, onHud, map, mode = 'ffa') {
+  constructor(container, socket, myId, onHud, map, mode = 'ffa', limit = 0) {
     this.container = container;
     this.socket = socket;
     this.myId = myId;
     this.onHud = onHud;
     this.map = map;
     this.mode = mode;
+    this.limit = limit; // puntos para ganar (en Escalada de armas, cuántas armas tiene la escalera)
+    this.level = 0; // Escalada de armas: arma por la que vas
+    this.loadout = []; // armas por tecla (1, 2, 3)
+    this.prevSlot = 1;
+    this.swingAt = 0; // último golpe de cuchillo (animación)
     this.myTeam = 0;
     this.teamScore = null;
     this.rtt = 0;
@@ -68,6 +101,8 @@ export class Engine {
 
     this.scene = new THREE.Scene();
     buildWorld(this.scene, map);
+    this.flags = null; // Captura la bandera: estado que manda el servidor
+    this.buildFlags();
     const aspect = container.clientWidth / container.clientHeight;
     this.camera = new THREE.PerspectiveCamera(this.baseFov, aspect, 0.05, map.half * 10);
     this.camera.rotation.order = 'YXZ';
@@ -94,7 +129,7 @@ export class Engine {
     this.character = null;
     this.slot = 0;
     this.ammo = [];
-    this.lastShot = [0, 0];
+    this.lastShot = [0, 0, 0];
     this.swapUntil = 0;
     this.mouseDown = false;
     this.triggerReleased = true;
@@ -120,6 +155,7 @@ export class Engine {
     this.eye = PLAYER.eye;
     this.kick = 0;
     this.recoil = 0; // retroceso acumulado que se recupera solo
+    this.bloom = 0; // dispersión extra por disparar seguido (se recupera sola)
     this.bobT = 0;
     this.fov = this.baseFov;
     this.damageDirs = [];
@@ -168,6 +204,7 @@ export class Engine {
 
   applySettings(st) {
     this.sens = st.sens;
+    this.adsSens = st.adsSens ?? 0.9;
     this.baseFov = st.fov;
     sfx.setVolume(st.volume);
     // Modo daltónico: se vuelven a pintar los rivales, los nombres y el arma
@@ -178,12 +215,60 @@ export class Engine {
   refreshColors() {
     for (const r of this.remotes.values()) r.team = -1;
     if (this.alive) this.setGun();
+    this.buildFlags();
+  }
+
+  // Banderas y bases de Captura la bandera, del color de cada equipo
+  buildFlags() {
+    for (const o of this.flagObjs || []) this.scene.remove(o.group, o.pad);
+    this.flagObjs = null;
+    if (this.mode !== 'ctf' || !this.map.bases) return;
+    this.flagObjs = [1, 2].map((t) => {
+      const color = teamColor(t);
+      const group = new THREE.Group();
+      const pole = new THREE.Mesh(new THREE.BoxGeometry(0.08, 2.4, 0.08), new THREE.MeshLambertMaterial({ color: 0xdddddd }));
+      pole.position.y = 1.2;
+      const cloth = new THREE.Mesh(new THREE.BoxGeometry(1, 0.65, 0.05), new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: 0.35 }));
+      cloth.geometry.translate(0.52, 0, 0);
+      cloth.position.y = 2;
+      group.add(pole, cloth, flagMarker(color));
+      const [x, y, z] = this.map.bases[t];
+      const pad = new THREE.Mesh(
+        new THREE.CylinderGeometry(FLAG.radius, FLAG.radius, 0.08, 28),
+        new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: 0.25, transparent: true, opacity: 0.6 }),
+      );
+      pad.position.set(x, y + 0.04, z);
+      group.position.set(x, y, z);
+      this.scene.add(group, pad);
+      return { t, group, cloth, pad };
+    });
+  }
+
+  updateFlags(dt, now) {
+    if (!this.flagObjs || !this.flags) return;
+    for (const o of this.flagObjs) {
+      const f = this.flags[o.t];
+      const g = o.group;
+      // La que llevas tú no se dibuja (la tendrías delante de la cara); el HUD lo avisa
+      g.visible = f.c !== this.myId;
+      const r = f.c && this.remotes.get(f.c);
+      if (r?.model) {
+        g.position.copy(r.model.group.position);
+        g.position.y += 0.4;
+        g.rotation.y = r.model.group.rotation.y;
+      } else {
+        const to = tmp.set(f.x, f.y, f.z);
+        if (g.position.distanceTo(to) > 4) g.position.copy(to);
+        else g.position.lerp(to, damp(12, dt));
+      }
+      o.cloth.rotation.y = Math.sin(now * 0.004 + o.t) * 0.3;
+    }
   }
 
   // Por equipos todos visten el color de su equipo; en todos contra todos, el del personaje y su skin
   outfit(charId, skin, team) {
     const ch = CHAR_BY_ID[charId];
-    if (this.mode === 'teams' && team) return { color: teamColor(team, ch.color), skin: 'base' };
+    if (isTeamMode(this.mode) && team) return { color: teamColor(team, ch.color), skin: 'base' };
     return { color: ch.color, skin };
   }
 
@@ -202,14 +287,16 @@ export class Engine {
         if (e.code === 'Space') this.jumpPressedAt = performance.now();
         if (e.code === 'Digit1') this.switchSlot(0);
         if (e.code === 'Digit2') this.switchSlot(1);
-        if (e.code === 'KeyQ') this.switchSlot(1 - this.slot);
+        if (e.code === 'Digit3') this.switchSlot(2);
+        if (e.code === 'KeyQ') this.switchSlot(this.prevSlot);
         if (e.code === 'KeyR') this.startReload();
       },
       keyup: (e) => this.keys.delete(e.code),
       mousemove: (e) => {
         if (!this.locked || !this.alive) return;
-        // Con zoom la mira va más lenta, pero menos que el zoom (si no, el francotirador se arrastra)
-        const s = 0.0022 * Math.pow(this.fov / this.baseFov, 0.6) * this.sens;
+        // Apuntando, la mira se siente igual que sin apuntar (se compensa el zoom) y un poco más
+        // lenta según «Sensibilidad al apuntar» en Ajustes
+        const s = 0.0022 * this.sens * this.aimSensMult();
         this.yaw -= e.movementX * s;
         this.pitch = Math.max(-1.55, Math.min(1.55, this.pitch - e.movementY * s));
         // si bajas tú la mira para compensar el retroceso, ya no hace falta recuperarlo
@@ -227,7 +314,7 @@ export class Engine {
         }
         if (e.button === 2) this.aiming = false;
       },
-      wheel: () => this.locked && this.alive && this.switchSlot(1 - this.slot),
+      wheel: (e) => this.locked && this.alive && this.switchSlot((this.slot + (e.deltaY < 0 ? this.loadout.length - 1 : 1)) % this.loadout.length),
       contextmenu: (e) => e.preventDefault(),
       lockchange: () => {
         this.locked = document.pointerLockElement === el;
@@ -303,6 +390,20 @@ export class Engine {
     on('kill', (d) => {
       if (d.victim === this.myId) this.die(d);
     });
+    on('loadout', (d) => {
+      // Escalada de armas: nueva arma (por subir o por un cuchillazo)
+      const up = d.level > this.level;
+      this.level = d.level;
+      if (this.alive) {
+        this.equip();
+        this.swapUntil = performance.now() + 250;
+      }
+      if (up) sfx.streak();
+    });
+    on('flag', (d) => {
+      if (d.type === 'capture') sfx.streak();
+      else if (d.type === 'take' || d.type === 'return') sfx.blip(d.type === 'take' ? 880 : 520, 0.12, 'triangle', 0.2);
+    });
     on('player:correct', (d) => {
       this.pos.set(d.x, d.y, d.z);
       this.vel.set(0, 0, 0);
@@ -329,9 +430,10 @@ export class Engine {
     this.socket.emit('player:spawn', { characterId, skin });
   }
 
-  onState({ players, ts }) {
+  onState({ players, ts, fl }) {
     this.players = players;
     this.teamScore = ts;
+    this.flags = fl || null;
     const me = players.find((p) => p.id === this.myId);
     if (me && me.tm !== this.myTeam) {
       this.myTeam = me.tm;
@@ -363,7 +465,7 @@ export class Engine {
       if (!r.model) continue;
       const ch = CHAR_BY_ID[r.charId];
       r.tag.userData.setHp(p.h / ch.hp);
-      const wid = p.s === 0 ? ch.primary : ch.secondary;
+      const wid = loadoutOf(this.mode, ch, p.lv, this.limit)[p.s] ?? ch.primary;
       if (wid !== r.weaponId) this.setRemoteGun(r, wid);
       if (r.alive && !r.wasAlive) {
         r.model.group.position.copy(r.target);
@@ -381,7 +483,7 @@ export class Engine {
     r.model = buildCharacter(p.c, skin, color);
     r.color = color;
     // Por equipos: nombre del color de su equipo (los aliados se ven a través de las paredes); si no, color de enemigo
-    const teams = this.mode === 'teams';
+    const teams = isTeamMode(this.mode);
     const mate = teams && p.tm === this.myTeam;
     const tag = makeNameTag(p.n, teams ? teamColor(p.tm, palette().enemy) : palette().enemy, mate);
     tag.position.y = 2.3;
@@ -427,13 +529,8 @@ export class Engine {
     this.protUntil = performance.now() + PLAYER.spawnProtection;
     this.everSpawned = true;
     this.deathPos = null;
-    this.slot = 0;
-    this.lastShot = [0, 0];
     this.recoil = 0;
-    this.ammo = [
-      { mag: WEAPONS[this.character.primary].mag, reloadEnd: 0 },
-      { mag: WEAPONS[this.character.secondary].mag, reloadEnd: 0 },
-    ];
+    this.level = d.level ?? 0;
     this.sliding = false;
     this.crouching = false;
     this.height = PLAYER.height;
@@ -443,7 +540,7 @@ export class Engine {
     this.landDip = 0;
     this.eye = PLAYER.eye;
     this.aimLerp = 0;
-    this.setGun();
+    this.equip();
   }
 
   die(d) {
@@ -464,7 +561,7 @@ export class Engine {
     const g = r.model.group.position;
     if (!this.isMate(r) && this.alive && g.distanceTo(this.pos) < 45) this.addTick(g.x, g.z, '#ffc93c');
     const from = new THREE.Vector3(g.x, g.y + (r.sl ? 0.85 : 1.35), g.z);
-    for (const end of e) {
+    for (const end of WEAPONS[w]?.melee ? [] : e) {
       const to = new THREE.Vector3(...end);
       this.addTracer(from, to);
       this.addImpact(to, false);
@@ -475,7 +572,27 @@ export class Engine {
 
   // ============================================================ Armas
   weaponId(slot = this.slot) {
-    return slot === 0 ? this.character.primary : this.character.secondary;
+    return this.loadout[slot] ?? this.loadout[0];
+  }
+
+  // Armas según el modo y el nivel, con cargadores llenos
+  equip() {
+    this.loadout = loadoutOf(this.mode, this.character, this.level, this.limit);
+    this.ammo = this.loadout.map((id) => ({ mag: WEAPONS[id].mag, reloadEnd: 0 }));
+    this.lastShot = this.loadout.map(() => 0);
+    this.slot = 0;
+    this.prevSlot = 1;
+    this.bloom = 0;
+    this.setGun();
+  }
+
+  // Multiplicador de sensibilidad: 1 sin apuntar; apuntando, compensa el zoom × adsSens
+  aimSensMult() {
+    if (!this.alive) return 1;
+    const w = this.weapon();
+    const t = w.scope ? (this.scoped() ? 1 : 0) : this.aimLerp;
+    const zoom = 1 + (w.zoom - 1) * t;
+    return 1 + (this.adsSens / zoom - 1) * t;
   }
   weapon() {
     return WEAPONS[this.weaponId()];
@@ -490,10 +607,12 @@ export class Engine {
   }
 
   switchSlot(s) {
-    if (!this.alive || s === this.slot) return;
+    if (!this.alive || s === this.slot || s >= this.loadout.length) return;
     this.ammo[this.slot].reloadEnd = 0;
+    this.prevSlot = this.slot;
     this.slot = s;
     this.swapUntil = performance.now() + 250;
+    this.bloom = 0;
     this.aiming = false;
     this.setGun();
     this.socket.emit('player:switch', { slot: s });
@@ -502,7 +621,7 @@ export class Engine {
   startReload() {
     const w = this.weapon();
     const a = this.ammo[this.slot];
-    if (a.reloadEnd || a.mag === w.mag) return;
+    if (w.melee || a.reloadEnd || a.mag === w.mag) return;
     a.reloadEnd = performance.now() + w.reload;
     this.socket.emit('player:reload');
     sfx.reload();
@@ -529,7 +648,7 @@ export class Engine {
       a.mag = w.mag;
       a.reloadEnd = 0;
     }
-    if (a.mag === 0 && !a.reloadEnd) this.startReload();
+    if (a.mag === 0 && !a.reloadEnd && !w.melee) this.startReload();
     if ((this.mouseDown || this.clicked) && this.locked) this.tryShoot(now, w, a);
     this.clicked = false;
   }
@@ -540,8 +659,9 @@ export class Engine {
     const hs = Math.hypot(this.vel.x, this.vel.z);
     // Con la mira telescópica ya en pantalla, el tiro va a donde ves (sin esperar a que termine de subir)
     const t = this.scoped() ? 1 : this.aimLerp * this.aimLerp * (3 - 2 * this.aimLerp);
-    let sp = w.spread + (w.adsSpread - w.spread) * t;
-    const move = 0.8 + ((w.moveSpread ?? 0.8) - 0.8) * t;
+    // Base (cadera → apuntando) + lo que se ha abierto por disparar seguido (apuntando se abre la mitad)
+    let sp = w.spread + (w.adsSpread - w.spread) * t + this.bloom * (1 - 0.5 * t);
+    const move = 0.6 + ((w.moveSpread ?? 0.6) - 0.6) * t;
     const air = 1.8 + ((w.airSpread ?? 1.8) - 1.8) * t;
     sp *= 1 + Math.min(hs / 8, 1) * move;
     if (!this.grounded) sp *= air;
@@ -558,6 +678,7 @@ export class Engine {
     this.lastShot[this.slot] = now;
     this.protUntil = 0; // disparar quita la protección de reaparición
     this.sprintBlockUntil = now + 400;
+    if (w.melee) return this.swing(now, w);
     a.mag--;
 
     const cam = this.camera;
@@ -582,14 +703,27 @@ export class Engine {
       if (hit) this.addImpact(end, hit.type === 'player');
     }
     this.socket.emit('player:shoot', { o, d: dirs, lag: Math.round(this.rtt / 2 + VIEW_DELAY_MS) });
+    this.bloom = Math.min(w.bloomMax ?? 0, this.bloom + (w.bloom ?? 0));
     this.pendingShots.push(now);
 
-    const kickUp = w.recoil * (0.8 + Math.random() * 0.4);
+    // Apuntando el retroceso es menor
+    const kickUp = w.recoil * (0.8 + Math.random() * 0.4) * (1 - 0.35 * this.aimLerp);
     this.pitch = Math.min(1.55, this.pitch + kickUp);
     this.recoil += kickUp;
-    this.yaw += (Math.random() - 0.5) * w.recoil * 0.5;
+    this.yaw += (Math.random() - 0.5) * w.recoil * 0.3;
     this.kick = 1;
     this.flashTime = now;
+    sfx.shot(w.sound, 1);
+  }
+
+  // Cuchillazo: sin trazadora ni retroceso; el servidor perdona un poco la puntería a esta distancia
+  swing(now, w) {
+    const cam = this.camera;
+    const d = cam.getWorldDirection(new THREE.Vector3());
+    const o = [cam.position.x, cam.position.y, cam.position.z];
+    this.socket.emit('player:shoot', { o, d: [[+d.x.toFixed(4), +d.y.toFixed(4), +d.z.toFixed(4)]], lag: Math.round(this.rtt / 2 + VIEW_DELAY_MS) });
+    this.pendingShots.push(now);
+    this.swingAt = now;
     sfx.shot(w.sound, 1);
   }
 
@@ -602,7 +736,7 @@ export class Engine {
   }
 
   isMate(r) {
-    return this.mode === 'teams' && r.team === this.myTeam;
+    return isTeamMode(this.mode) && r.team === this.myTeam;
   }
 
   // ============================================================ Efectos
@@ -858,7 +992,7 @@ export class Engine {
       // Cerrojo (francotirador): tras disparar se sale de la mira hasta poder volver a disparar
       const bolt = w.bolt && now - this.lastShot[this.slot] < (w.boltTime ?? w.fireRate * 0.85);
       const busy = this.ammo[this.slot].reloadEnd || now < this.swapUntil || bolt;
-      this.aimLerp += ((this.aiming && !busy ? 1 : 0) - this.aimLerp) * damp(w.adsSpeed ?? 16, dt);
+      this.aimLerp += ((this.aiming && !busy && !w.melee ? 1 : 0) - this.aimLerp) * damp(w.adsSpeed ?? 16, dt);
       const running = this.sprinting && Math.hypot(this.vel.x, this.vel.z) > 1;
       this.sprintLerp += ((running ? 1 : 0) - this.sprintLerp) * damp(10, dt);
       const fovT = this.baseFov / (1 + (w.zoom - 1) * (w.scope ? (this.scoped() ? 1 : 0) : this.aimLerp)) + (this.sliding ? 6 : 0) + this.sprintLerp * 5;
@@ -912,8 +1046,20 @@ export class Engine {
     y -= sp * 0.05;
     rx -= sp * 0.3;
 
+    // Cuchillo: tajo de derecha a izquierda
+    let ry = sp * 0.7;
+    let rz = (this.sliding ? 0.25 : 0) + sp * 0.3;
+    const sw = (now - this.swingAt) / 280;
+    if (w.melee && sw < 1) {
+      const k = Math.sin(sw * Math.PI);
+      x -= k * 0.18;
+      z -= k * 0.12;
+      ry += k * 0.9;
+      rz -= k * 0.6;
+      rx -= k * 0.3;
+    }
     this.gunHolder.position.set(x, y, z);
-    this.gunHolder.rotation.set(rx, sp * 0.7, (this.sliding ? 0.25 : 0) + sp * 0.3);
+    this.gunHolder.rotation.set(rx, ry, rz);
     if (this.gun.userData.flash) this.gun.userData.flash.visible = now - this.flashTime < 45;
   }
 
@@ -974,6 +1120,9 @@ export class Engine {
     this.updateViewmodel(dt, now);
     this.updateRemotes(dt);
     this.updateEffects(dt);
+    this.updateFlags(dt, now);
+    // La dispersión por ráfaga baja en cuanto dejas de disparar
+    if (this.alive && now - this.lastShot[this.slot] > 140) this.bloom *= Math.exp(-7 * dt);
 
     this.sendAcc += dt * 1000;
     if (this.sendAcc >= CLIENT_SEND_MS) {
@@ -1020,7 +1169,10 @@ export class Engine {
       reloading: !!a?.reloadEnd,
       reloadPct: a?.reloadEnd ? Math.min(1, 1 - (a.reloadEnd - now) / w.reload) : 0,
       slot: this.slot,
-      loadout: this.character ? [WEAPONS[this.character.primary].name, WEAPONS[this.character.secondary].name] : [],
+      loadout: this.loadout.map((id) => WEAPONS[id].name),
+      melee: !!w?.melee,
+      gunLevel: this.mode === 'gungame' ? this.level + 1 : 0,
+      gunTotal: this.mode === 'gungame' ? gunLadder(this.limit).length : 0,
       scoped: this.scoped(),
       protect: this.alive ? Math.max(0, this.protUntil - now) : 0,
       hit: now - this.hitTime < 220,
@@ -1043,6 +1195,7 @@ export class Engine {
       damageKey: this.damageTime,
       deathKey: this.deathAt,
       teamScore: this.teamScore,
+      flags: this.flags,
       ping: Math.round(this.rtt),
     });
   }

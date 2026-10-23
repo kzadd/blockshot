@@ -8,9 +8,9 @@ import { fileURLToPath } from 'node:url';
 import { Server } from 'socket.io';
 import multicastDns from 'multicast-dns';
 import {
-  CHAR_BY_ID, WEAPONS, PLAYER, MAPS, damageAt, TEAM_SWITCH_COOLDOWN, MAP_SIZES, SKINS, SCORE_LIMIT, TEAM_SCORE_LIMIT, LAG_COMP_MAX_MS, MODES, TEAMS, STREAKS, SERVER_TICK_MS, MATCH_RESTART_MS, getColliders, getMap,
+  CHAR_BY_ID, WEAPONS, PLAYER, MAPS, damageAt, TEAM_SWITCH_COOLDOWN, MAP_SIZES, SKINS, LAG_COMP_MAX_MS, MODES, MODE_BY_ID, isTeamMode, FLAG, loadoutOf, gunLadder, TEAMS, STREAKS, SERVER_TICK_MS, MATCH_RESTART_MS, getColliders, getMap,
 } from '../shared/config.js';
-import { castShot } from '../shared/physics.js';
+import { castShot, rayAABB } from '../shared/physics.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
@@ -44,9 +44,9 @@ const r2 = (n) => Math.round(n * 100) / 100;
 const summary = (r) => ({
   id: r.id, name: r.name, players: r.players.size, max: r.max, locked: !!r.passHash, host: r.hostName,
   map: r.map.name, size: r.map.sizeName, mode: MODES.find((m) => m.id === r.mode).name,
-  mapId: r.map.id, sizeId: r.map.size, modeId: r.mode,
+  mapId: r.map.id, sizeId: r.map.size, modeId: r.mode, limit: r.scoreLimit,
 });
-const isTeams = (room) => room.mode === 'teams';
+const isTeams = (room) => isTeamMode(room.mode);
 const sameTeam = (room, a, b) => isTeams(room) && a.team === b.team;
 const roomList = () => [...rooms.values()].map(summary);
 const broadcastRooms = () => io.to('lobby').emit('rooms', roomList());
@@ -58,9 +58,15 @@ function ctx(socket) {
 }
 
 function weaponIdOf(p, slot = p.slot) {
-  const c = CHAR_BY_ID[p.characterId];
-  if (!c) return null;
-  return slot === 0 ? c.primary : c.secondary;
+  return p.loadout?.[slot] ?? null;
+}
+
+// Armas del jugador según el modo (en Escalada de armas, según su nivel), con cargadores llenos
+function equip(room, p) {
+  p.loadout = loadoutOf(room.mode, CHAR_BY_ID[p.characterId], p.level, room.scoreLimit);
+  p.ammo = p.loadout.map((id) => ({ mag: WEAPONS[id].mag, reloadEnd: 0 }));
+  p.lastShot = p.loadout.map(() => 0);
+  p.slot = 0;
 }
 
 function pickSpawn(room, me) {
@@ -68,7 +74,13 @@ function pickSpawn(room, me) {
   const enemies = others.filter((p) => !sameTeam(room, p, me));
   const mates = others.filter((p) => sameTeam(room, p, me));
   const near = (list, s) => Math.min(...list.map((e) => Math.hypot(e.x - s[0], e.z - s[2])));
-  const scored = room.map.spawns.map((s) => ({
+  // Captura la bandera: cada equipo aparece en su mitad (Rojo al oeste, Azul al este)
+  let spawns = room.map.spawns;
+  if (room.mode === 'ctf' && me.team) {
+    const mine = spawns.filter((s) => (me.team === 1 ? s[0] < -1 : s[0] > 1));
+    if (mine.length) spawns = mine;
+  }
+  const scored = spawns.map((s) => ({
     s,
     d: (enemies.length ? near(enemies, s) : Math.random() * 100) - (mates.length ? near(mates, s) * 0.3 : 0),
   }));
@@ -108,12 +120,11 @@ function spawnPlayer(socket, room, p, ch, skin) {
   const [x, y, z, ry] = pickSpawn(room, p);
   Object.assign(p, {
     characterId: ch.id, skin: SKINS.some((k) => k.id === skin) ? skin : 'base', alive: true, hp: ch.hp, maxHp: ch.hp, x, y, z,
-    ry, rx: 0, slot: 0, sl: 0, cr: 0,
-    ammo: [{ mag: WEAPONS[ch.primary].mag, reloadEnd: 0 }, { mag: WEAPONS[ch.secondary].mag, reloadEnd: 0 }],
-    lastShot: [0, 0], spawnTime: now, protUntil: now + PLAYER.spawnProtection, lastState: now, lastDamage: 0, hist: [],
+    ry, rx: 0, sl: 0, cr: 0, spawnTime: now, protUntil: now + PLAYER.spawnProtection, lastState: now, lastDamage: 0, hist: [],
   });
+  equip(room, p);
   record(p, now);
-  socket.emit('player:spawned', { x, y, z, ry: p.ry, characterId: ch.id, skin: p.skin, hp: ch.hp });
+  socket.emit('player:spawned', { x, y, z, ry: p.ry, characterId: ch.id, skin: p.skin, hp: ch.hp, level: p.level });
 }
 
 function joinRoom(socket, room, nickname, cb) {
@@ -122,7 +133,7 @@ function joinRoom(socket, room, nickname, cb) {
     x: 0, y: 0, z: 0, ry: 0, rx: 0, slot: 0, sl: 0, cr: 0, skin: 'base', kills: 0, deaths: 0,
     ammo: [], lastShot: [0, 0], lastDamage: 0, deathTime: 0, spawnTime: 0, protUntil: 0, lastState: 0,
     team: isTeams(room) ? smallerTeam(room) : 0, streak: 0, ping: 0, hist: [],
-    bestStreak: 0, heads: 0, shots: 0, hits: 0,
+    bestStreak: 0, heads: 0, shots: 0, hits: 0, caps: 0, level: 0, loadout: [],
   };
   room.players.set(socket.id, p);
   socket.leave('lobby');
@@ -170,6 +181,74 @@ function bestPlays(room) {
   return out;
 }
 
+// ---------------------------------------------------------------- Captura la bandera
+// Cada equipo tiene una bandera en su base. Se coge la del rival pasando por encima,
+// se captura llevándola a tu base con la tuya en casa. Si muere quien la lleva cae al
+// suelo: un compañero del dueño la devuelve tocándola, o vuelve sola a los 20 s.
+const homeFlag = ([x, y, z]) => ({ home: [x, y, z], x, y, z, carrier: null, atHome: true, droppedAt: 0 });
+function resetFlags(room) {
+  room.flags = room.mode === 'ctf' ? { 1: homeFlag(room.map.bases[1]), 2: homeFlag(room.map.bases[2]) } : null;
+}
+const nearFlag = (p, x, y, z) => Math.hypot(p.x - x, p.z - z) < FLAG.radius && Math.abs(p.y - y) < 2.5;
+// Suelo justo debajo de un punto (no el tejado de encima si estaba bajo un puente)
+function floorBelow(room, x, y, z) {
+  let best = 0;
+  for (const b of room.map.boxes) {
+    const top = b.y + b.h;
+    if (Math.abs(x - b.x) <= b.w / 2 && Math.abs(z - b.z) <= b.d / 2 && top <= y + 0.2) best = Math.max(best, top);
+  }
+  return best;
+}
+const flagEvent = (room, type, team, name) => io.to(room.id).emit('flag', { type, team, name });
+
+function updateFlags(room, now) {
+  for (const t of [1, 2]) {
+    const f = room.flags[t];
+    if (f.carrier) {
+      const c = room.players.get(f.carrier);
+      if (c && c.alive && c.team !== t) {
+        Object.assign(f, { x: c.x, y: c.y, z: c.z });
+        continue;
+      }
+      // Quien la llevaba murió, se fue o se cambió de equipo: cae donde estaba
+      Object.assign(f, { carrier: null, y: floorBelow(room, f.x, f.y, f.z), droppedAt: now });
+      const name = c?.name ?? f.carrierName;
+      io.to(room.id).emit('notice', `${name} soltó la bandera ${TEAMS[t].name}`);
+      flagEvent(room, 'drop', t, name);
+    } else if (!f.atHome && now - f.droppedAt > FLAG.returnMs) {
+      Object.assign(room.flags, { [t]: homeFlag(f.home) });
+      io.to(room.id).emit('notice', `La bandera ${TEAMS[t].name} volvió a su base`);
+      flagEvent(room, 'return', t);
+    }
+  }
+  for (const p of room.players.values()) {
+    if (!p.alive || !p.team) continue;
+    const own = room.flags[p.team];
+    const enemy = room.flags[3 - p.team];
+    if (!enemy.carrier && nearFlag(p, enemy.x, enemy.y, enemy.z)) {
+      Object.assign(enemy, { carrier: p.id, carrierName: p.name, atHome: false });
+      p.protUntil = 0;
+      io.to(room.id).emit('notice', `${p.name} cogió la bandera ${TEAMS[3 - p.team].name}`);
+      flagEvent(room, 'take', 3 - p.team, p.name);
+    }
+    if (!own.carrier && !own.atHome && nearFlag(p, own.x, own.y, own.z)) {
+      room.flags[p.team] = homeFlag(own.home);
+      io.to(room.id).emit('notice', `${p.name} devolvió la bandera ${TEAMS[p.team].name}`);
+      flagEvent(room, 'return', p.team, p.name);
+    }
+    const home = room.flags[p.team];
+    if (enemy.carrier === p.id && home.atHome && nearFlag(p, ...home.home)) {
+      room.flags[3 - p.team] = homeFlag(enemy.home);
+      room.teamScore[p.team]++;
+      p.caps++;
+      io.to(room.id).emit('notice', `¡${p.name} capturó la bandera ${TEAMS[3 - p.team].name}!`);
+      flagEvent(room, 'capture', 3 - p.team, p.name);
+      if (room.teamScore[p.team] >= room.scoreLimit) return endMatch(room, `Equipo ${TEAMS[p.team].name}`, p.team);
+    }
+  }
+}
+const flagState = (f) => ({ x: r2(f.x), y: r2(f.y), z: r2(f.z), c: f.carrier, h: f.atHome ? 1 : 0 });
+
 function endMatch(room, winnerName, winnerTeam = 0) {
   room.matchOver = true;
   for (const p of room.players.values()) p.alive = false;
@@ -179,19 +258,20 @@ function endMatch(room, winnerName, winnerTeam = 0) {
   io.to(room.id).emit('match:end', { winner: winnerName, team: winnerTeam, scores, best: bestPlays(room), restartIn: MATCH_RESTART_MS });
   room.restartTimer = setTimeout(() => {
     room.teamScore = { 1: 0, 2: 0 };
+    resetFlags(room);
     for (const p of room.players.values()) {
       p.kills = 0;
       p.deaths = 0;
       p.deathTime = 0;
       p.streak = 0;
-      Object.assign(p, { bestStreak: 0, heads: 0, shots: 0, hits: 0 });
+      Object.assign(p, { bestStreak: 0, heads: 0, shots: 0, hits: 0, caps: 0, level: 0 });
     }
     room.matchOver = false;
     io.to(room.id).emit('match:start');
   }, MATCH_RESTART_MS);
 }
 
-function applyDamage(room, shooter, victim, dmg, head, weaponName, socket, at3) {
+function applyDamage(room, shooter, victim, dmg, head, w, socket, at3) {
   const now = Date.now();
   // Recién reaparecido: invulnerable unos segundos (hasta que dispare)
   if (!victim.alive || now < victim.protUntil) return;
@@ -218,12 +298,47 @@ function applyDamage(room, shooter, victim, dmg, head, weaponName, socket, at3) 
     killer: shooter.id, killerName: shooter.name, killerTeam: shooter.team,
     killerChar: shooter.characterId, killerHp: Math.ceil(shooter.hp),
     victim: victim.id, victimName: victim.name, victimTeam: victim.team,
-    weapon: weaponName, head, streak: shooter.streak, ended,
+    weapon: w.name, head, streak: shooter.streak, ended,
   });
-  if (isTeams(room)) {
+  if (room.mode === 'gungame') return gunGameKill(room, shooter, victim, w);
+  // En Captura la bandera las bajas no suman: solo las capturas
+  if (room.mode === 'teams') {
     room.teamScore[shooter.team]++;
     if (room.teamScore[shooter.team] >= room.scoreLimit) endMatch(room, `Equipo ${TEAMS[shooter.team].name}`, shooter.team);
-  } else if (shooter.kills >= room.scoreLimit) endMatch(room, shooter.name);
+  } else if (room.mode === 'ffa' && shooter.kills >= room.scoreLimit) endMatch(room, shooter.name);
+}
+
+// Escalada de armas: la baja te da la siguiente arma; con la última (cuchillo) ganas.
+// Una baja a cuchillo además le quita un arma a la víctima.
+function gunGameKill(room, shooter, victim, w) {
+  const ladder = gunLadder(room.scoreLimit);
+  if (w.melee && victim.level > 0) {
+    victim.level--;
+    equip(room, victim);
+    io.to(victim.id).emit('loadout', { level: victim.level });
+    io.to(room.id).emit('notice', `${victim.name} baja al arma ${victim.level + 1} por un cuchillazo`);
+  }
+  shooter.level++;
+  if (shooter.level >= ladder.length) return endMatch(room, shooter.name);
+  equip(room, shooter);
+  io.to(shooter.id).emit('loadout', { level: shooter.level });
+  if (shooter.level === ladder.length - 1) io.to(room.id).emit('notice', `¡${shooter.name} llegó al cuchillo!`);
+}
+
+// Cuchillo: además del rayo, acierta a quien esté muy cerca y delante (no hace falta apuntar al píxel)
+function meleeTarget(room, o, d, targets, range) {
+  let best = null;
+  for (const t of targets) {
+    const c = [t.x, t.y + 1, t.z];
+    const v = [c[0] - o[0], c[1] - o[1], c[2] - o[2]];
+    const dist = Math.hypot(...v);
+    if (dist > range || (best && dist > best.t)) continue;
+    if ((v[0] * d[0] + v[1] * d[1] + v[2] * d[2]) / dist < 0.8) continue;
+    const dir = v.map((x) => x / dist);
+    if (room.colliders.some((b) => rayAABB(o, dir, b.min, b.max) < dist)) continue;
+    best = { t: dist, hit: { type: 'player', id: t.id, head: false } };
+  }
+  return best;
 }
 
 // ---------------------------------------------------------------- Sockets
@@ -243,10 +358,11 @@ io.on('connection', (socket) => {
     const size = MAP_SIZES[data.size] ? data.size : 'm';
     const max = Math.min(24, Math.max(2, Number(data.max) || MAP_SIZES[size].players));
     const map = getMap(mapId, size);
-    const mode = data.mode === 'teams' ? 'teams' : 'ffa';
+    const mode = MODE_BY_ID[data.mode] ? data.mode : 'ffa';
+    const limit = Number(data.scoreLimit);
     const room = {
       mode,
-      scoreLimit: mode === 'teams' ? TEAM_SCORE_LIMIT : SCORE_LIMIT,
+      scoreLimit: MODE_BY_ID[mode].limits.includes(limit) ? limit : MODE_BY_ID[mode].def,
       teamScore: { 1: 0, 2: 0 },
       id: crypto.randomBytes(3).toString('hex'),
       name: clean(data.name, 24, `Sala de ${nickname}`),
@@ -259,6 +375,7 @@ io.on('connection', (socket) => {
       matchOver: false,
       restartTimer: null,
     };
+    resetFlags(room);
     rooms.set(room.id, room);
     joinRoom(socket, room, nickname, cb);
   });
@@ -344,7 +461,7 @@ io.on('connection', (socket) => {
 
   socket.on('player:switch', (d = {}) => {
     const c = ctx(socket);
-    if (!c || !c.p.alive || (d.slot !== 0 && d.slot !== 1)) return;
+    if (!c || !c.p.alive || !Number.isInteger(d.slot) || d.slot < 0 || d.slot >= c.p.loadout.length) return;
     c.p.ammo[c.p.slot].reloadEnd = 0; // cambiar de arma cancela la recarga
     c.p.slot = d.slot;
   });
@@ -355,7 +472,7 @@ io.on('connection', (socket) => {
     const { p } = c;
     const w = WEAPONS[weaponIdOf(p)];
     const a = p.ammo[p.slot];
-    if (!a.reloadEnd && a.mag < w.mag) a.reloadEnd = Date.now() + w.reload;
+    if (w && !w.melee && !a.reloadEnd && a.mag < w.mag) a.reloadEnd = Date.now() + w.reload;
   });
 
   socket.on('player:shoot', (data = {}) => {
@@ -365,6 +482,7 @@ io.on('connection', (socket) => {
     const w = WEAPONS[weaponIdOf(p)];
     const a = p.ammo[p.slot];
     const now = Date.now();
+    if (!w || !a) return;
 
     if (a.reloadEnd) {
       if (now >= a.reloadEnd - 150) {
@@ -385,7 +503,7 @@ io.on('connection', (socket) => {
       dirs.push([d[0] / len, d[1] / len, d[2] / len]);
     }
 
-    a.mag--;
+    if (!w.melee) a.mag--;
     p.lastShot[p.slot] = now;
     p.protUntil = 0; // disparar quita la protección de reaparición
 
@@ -398,7 +516,8 @@ io.on('connection', (socket) => {
     const ends = [];
     const damage = new Map(); // id -> { dmg, head }
     for (const d of dirs) {
-      const { t, hit } = castShot(o, d, room.colliders, targets, p.id, w.range);
+      let { t, hit } = castShot(o, d, room.colliders, targets, p.id, w.range);
+      if (w.melee && hit?.type !== 'player') ({ t, hit } = meleeTarget(room, o, d, targets, w.range) || { t, hit });
       ends.push([r2(o[0] + d[0] * t), r2(o[1] + d[1] * t), r2(o[2] + d[2] * t)]);
       if (hit?.type === 'player') {
         const e = damage.get(hit.id) || { dmg: 0, head: false, at: null };
@@ -414,7 +533,16 @@ io.on('connection', (socket) => {
     socket.to(room.id).emit('shot', { id: p.id, w: weaponIdOf(p), e: ends });
     for (const [id, { dmg, head, at }] of damage) {
       const victim = room.players.get(id);
-      if (victim) applyDamage(room, p, victim, dmg, head, w.name, socket, at);
+      if (!victim) continue;
+      // Cuchillo por la espalda: el atacante está detrás de hacia donde mira la víctima
+      let hurt = dmg;
+      if (w.backstab) {
+        const rx = p.x - victim.x;
+        const rz = p.z - victim.z;
+        const len = Math.hypot(rx, rz) || 1;
+        if ((-Math.sin(victim.ry) * rx - Math.cos(victim.ry) * rz) / len < -0.35) hurt = w.backstab;
+      }
+      applyDamage(room, p, victim, hurt, head, w, socket, at);
     }
   });
 
@@ -426,6 +554,7 @@ setInterval(() => {
   const now = Date.now();
   const dt = SERVER_TICK_MS / 1000;
   for (const room of rooms.values()) {
+    if (room.flags && !room.matchOver) updateFlags(room, now);
     const players = [];
     for (const p of room.players.values()) {
       if (p.alive && p.hp < p.maxHp && now - p.lastDamage > PLAYER.regenDelay) {
@@ -434,10 +563,11 @@ setInterval(() => {
       players.push({
         id: p.id, n: p.name, c: p.characterId, sk: p.skin, x: r2(p.x), y: r2(p.y), z: r2(p.z),
         ry: r2(p.ry), rx: r2(p.rx), s: p.slot, sl: p.sl, cr: p.cr, a: p.alive ? 1 : 0,
-        h: Math.ceil(p.hp), pr: p.alive && now < p.protUntil ? 1 : 0, k: p.kills, d: p.deaths, tm: p.team, pg: p.ping, st: p.streak,
+        h: Math.ceil(p.hp), pr: p.alive && now < p.protUntil ? 1 : 0, k: p.kills, d: p.deaths, tm: p.team, pg: p.ping, st: p.streak, cp: p.caps, lv: p.level,
       });
     }
-    io.to(room.id).volatile.emit('state', { players, ts: isTeams(room) ? room.teamScore : null });
+    const fl = room.flags ? { 1: flagState(room.flags[1]), 2: flagState(room.flags[2]) } : null;
+    io.to(room.id).volatile.emit('state', { players, ts: isTeams(room) ? room.teamScore : null, fl });
   }
 }, SERVER_TICK_MS);
 

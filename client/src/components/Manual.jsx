@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CHARACTERS, WEAPONS, SCORE_LIMIT, TEAM_SCORE_LIMIT, PLAYER, weightName, damageAt, speedWith } from '../../../shared/config.js';
+import { CHARACTERS, WEAPONS, MODE_BY_ID, PLAYER, weightName, damageAt, speedWith } from '../../../shared/config.js';
 import { Keys } from '../ui.jsx';
 
 export const CONTROLS = [
@@ -10,7 +10,7 @@ export const CONTROLS = [
   [['Clic izq.'], 'Disparar'],
   [['Clic der.'], 'Apuntar (mira telescópica con el francotirador)'],
   [['R'], 'Recargar'],
-  [['1', '2', 'Q', 'Rueda'], 'Cambiar de arma'],
+  [['1', '2', '3', 'Q', 'Rueda'], 'Cambiar de arma (3: cuchillo, por la espalda mata de un golpe)'],
   [['Tab'], 'Ver el marcador (mantener)'],
   [['B'], 'Cambiar de personaje (solo estando muerto)'],
   [['T'], 'Cambiar de equipo (por equipos; no en pleno combate)'],
@@ -24,7 +24,9 @@ const STEPS = [
   ['Crea una sala o entra en una', 'Si tiene candado, pide la contraseña a quien la creó.'],
   ['Elige personaje y skin', 'Cada uno tiene vida, velocidad y armas distintas.'],
   ['Haz clic para jugar', 'El ratón queda capturado. Esc lo suelta y abre la pausa; otro Esc (o un clic) vuelve al juego.'],
-  ['Gana la partida', `Todos contra todos: ${SCORE_LIMIT} bajas. Por equipos: el primer equipo en llegar a ${TEAM_SCORE_LIMIT}.`],
+  ['Gana la partida', `Quien crea la sala elige los puntos. Por defecto: ${MODE_BY_ID.ffa.def} bajas (todos contra todos), ${MODE_BY_ID.teams.def} bajas del equipo (por equipos) o ${MODE_BY_ID.ctf.def} capturas.`],
+  ['Escalada de armas', 'Todos empiezan con la misma arma y cada baja da la siguiente. Gana quien elimine con el cuchillo.'],
+  ['Captura la bandera', 'Coge la bandera rival pasando por encima y llévala a tu base con la tuya en casa. Si cae, tócala para devolverla.'],
   ['Si te eliminan', `Reapareces a los ${PLAYER.respawnDelay / 1000} s. Pulsa B para cambiar de personaje antes.`],
 ];
 
@@ -122,10 +124,10 @@ export default function Manual({ onClose }) {
                     <td>{w.pellets > 1 ? `${w.damage}×${w.pellets}` : w.damage}{w.falloff && ` → ${Math.round(damageAt(w, w.falloff[1]))}`}</td>
                     <td className="head">×{w.headMult}</td>
                     <td>{(1000 / w.fireRate).toFixed(1)}</td>
-                    <td>{w.mag}</td>
-                    <td>{(w.reload / 1000).toFixed(1)} s</td>
+                    <td>{w.melee ? '—' : w.mag}</td>
+                    <td>{w.melee ? '—' : `${(w.reload / 1000).toFixed(1)} s`}</td>
                     <td>{weightName(w)}</td>
-                    <td>{w.auto ? 'Automática' : 'Semiautomática'}</td>
+                    <td>{w.melee ? `Cuerpo a cuerpo · espalda ${w.backstab}` : w.auto ? 'Automática' : 'Semiautomática'}</td>
                   </tr>
                 ))}
               </tbody>

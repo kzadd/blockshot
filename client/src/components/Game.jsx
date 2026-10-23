@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { socket } from '../socket.js';
 import { Engine } from '../game/Engine.js';
-import { getMap, CHAR_BY_ID, PLAYER, STREAKS, TEAMS } from '../../../shared/config.js';
+import { getMap, CHAR_BY_ID, PLAYER, STREAKS, TEAMS, isTeamMode } from '../../../shared/config.js';
 import { sfx } from '../game/sound.js';
 import { useSettings } from '../settings.js';
 import { Keys, playCurtain } from '../ui.jsx';
@@ -17,7 +17,7 @@ const PAUSE_KEYS = [
   [['W', 'A', 'S', 'D'], 'Moverse'], [['Espacio'], 'Saltar · mantén para encadenar'],
   [['Shift'], 'Esprintar'], [['C'], 'Agacharse · deslizarse'],
   [['Clic izq.'], 'Disparar'], [['Clic der.'], 'Apuntar'],
-  [['R'], 'Recargar'], [['1', '2', 'Q'], 'Cambiar de arma'],
+  [['R'], 'Recargar'], [['1', '2', '3', 'Q'], 'Cambiar de arma (3: cuchillo)'],
   [['Tab'], 'Marcador'], [['Esc'], 'Pausa'],
 ];
 const WIN_COLOR = { 1: 'var(--eq-rojo-txt)', 2: 'var(--eq-azul-txt)' };
@@ -61,7 +61,7 @@ export default function Game({ session, onLeave }) {
   const info = { name: room.name, map: map.name, size: map.sizeName, players: hud?.players?.length || 1, max: room.max || '?' };
 
   useEffect(() => {
-    engine.current = new Engine(mount.current, socket, you, setHud, getMap(room.mapId, room.size), room.mode);
+    engine.current = new Engine(mount.current, socket, you, setHud, getMap(room.mapId, room.size), room.mode, room.scoreLimit);
     return () => engine.current.destroy();
   }, [you, room.mapId, room.size, room.mode]);
 
@@ -150,7 +150,7 @@ export default function Game({ session, onLeave }) {
         return;
       }
       // T: cambiar de equipo (por equipos)
-      if (e.code === 'KeyT' && !e.repeat && room.mode === 'teams' && h?.myTeam && !m && !open) {
+      if (e.code === 'KeyT' && !e.repeat && isTeamMode(room.mode) && h?.myTeam && !m && !open) {
         socket.emit('team:set', { team: 3 - h.myTeam });
       }
       // B: cambiar de personaje, solo estando muerto (se aplica al reaparecer)
@@ -264,8 +264,8 @@ export default function Game({ session, onLeave }) {
         <div className="pause-bg" onClick={() => engine.current.requestLock()}>
           <div className="stage">
             <div className="pause-panel">
-              <h2>Haz clic o pulsa Esc para jugar</h2>
-              <p className="sub">Partida en pausa para ti · los demás siguen jugando</p>
+              <h2>Pausa</h2>
+              <p className="sub"><b>Haz clic o pulsa Esc para volver</b> · los demás siguen jugando</p>
               <div className="key-grid">
                 {PAUSE_KEYS.map(([keys, what]) => (
                   <div className="key-row" key={what}><Keys keys={keys} /><span>{what}</span></div>
@@ -274,7 +274,7 @@ export default function Game({ session, onLeave }) {
               <div className="actions" onClick={(e) => e.stopPropagation()}>
                 <button className="btn has-key" onClick={() => setMenu('settings')}><span className="key">O</span>Ajustes</button>
                 <button className="btn has-key" onClick={() => setMenu('manual')}><span className="key">H</span>Manual</button>
-                {room.mode === 'teams' && hud.myTeam && (
+                {isTeamMode(room.mode) && hud.myTeam && (
                   <button className="btn has-key" onClick={() => socket.emit('team:set', { team: 3 - hud.myTeam })}>
                     <span className="key">T</span>Pasar a {TEAMS[3 - hud.myTeam].name}
                   </button>

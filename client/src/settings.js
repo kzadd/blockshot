@@ -13,6 +13,7 @@ export const CROSSHAIR_COLORS = ['#ffffff', '#5ee07a', '#ffc93c', '#4ee6ff', '#f
 
 export const DEFAULTS = {
   sens: 1, // multiplicador de sensibilidad del ratón
+  adsSens: 0.9, // al apuntar: 1 = se siente igual que sin apuntar; menos = más lenta
   fov: 80, // campo de visión en grados
   volume: 0.8,
   shake: true, // sacudida suave del HUD y la cámara al recibir daño

@@ -60,9 +60,13 @@ desde la red en el puerto 5173).
 1. Escribe tu nombre.
 2. Crea una sala (nombre, contraseña opcional, mapa, tamaño y máximo de jugadores) o entra en una de la lista. Las salas con 🔒 piden contraseña.
 3. Elige personaje y skin (se ven en 3D; arrastra para girarlos). Al morir reapareces solo a los 3 s con el mismo; pulsa **B** mientras estás muerto si quieres cambiarlo.
-4. **Todos contra todos:** gana el primero en llegar a 20 bajas. **Por equipos** (Rojo contra Azul: al entrar se te pone en el
-   equipo con menos gente y puedes cambiarte en la pantalla de personaje o con **T**):
-   gana el primer equipo en llegar a 40 bajas, sin fuego amigo. La partida se reinicia sola a los 8 s.
+4. **Modos** (quien crea la sala elige a cuántos puntos se juega):
+   - **Todos contra todos:** gana el primero en llegar a las bajas elegidas (20 por defecto).
+   - **Por equipos** (Rojo contra Azul: al entrar se te pone en el equipo con menos gente y puedes cambiarte en la
+     pantalla de personaje o con **T**): gana el primer equipo en llegar a las bajas elegidas, sin fuego amigo.
+   - **Captura la bandera:** roba la bandera rival y llévala a tu base con la tuya en casa.
+   - **Escalada de armas:** todos llevan la misma arma y cada baja da la siguiente; gana quien elimine con el cuchillo.
+   La partida se reinicia sola a los 8 s. Todos los personajes llevan cuchillo (tecla **3**); por la espalda mata de un golpe.
 
 | Tecla | Acción |
 |---|---|
@@ -92,7 +96,7 @@ todo, hay que esperar a que se recupere un poco para volver a esprintar (barra f
 
 **Armas:** las pesadas (francotirador, ametralladora) frenan al llevarlas en la mano; saca la secundaria para correr.
 Apuntar tarda un momento (más con las pesadas) y la precisión llega al terminar de subir el arma. Casi todas pierden
-daño con la distancia. El francotirador hace 125 al cuerpo y 250 a la cabeza: mata de un tiro a todos menos al Tanque (150 de vida), al que hay que darle en la cabeza; tras
+daño con la distancia. El francotirador hace 120 al cuerpo y 240 a la cabeza: de un tiro al cuerpo mata a todos menos al Tanque (150 de vida), al que hay que darle en la cabeza; tras
 cada disparo hay que volver a apuntar (cerrojo), y si te mueves o saltas con la mira puesta el tiro se desvía.
 
 En pantalla: **minimapa** (aliados en verde; los enemigos solo aparecen en rojo 2 s después de disparar),
@@ -105,7 +109,7 @@ Más vida = más lento. La velocidad (m/s) es con la principal / con la secundar
 
 | Personaje | Vida | Velocidad | Principal | Secundaria |
 |---|---|---|---|---|
-| Rayo | 85 | 8.9 / 9.2 | Subfusil | Pistola |
+| Rayo | 85 | 10.4 / 10.7 | Subfusil | Pistola |
 | Cazador | 90 | 7.2 / 7.8 | Francotirador | Pistola |
 | Soldado | 100 | 7.1 / 7.5 | Rifle de asalto | Pistola |
 | Bastión | 120 | 6.6 / 7.3 | Ametralladora | Revólver |
@@ -147,7 +151,7 @@ client/src/
   Para darle un accesorio propio (casco, gorra…), añade una función en `EXTRAS` (`client/src/game/models.js`).
 - **Skin nueva:** añade su id en `SKINS` (`shared/config.js`) y sus colores en `skinPalette` (`models.js`).
 - **Ajustes y mira:** valores por defecto en `client/src/settings.js`; se guardan en el navegador de cada jugador.
-- **Mapas:** hay tres (Patio, Almacén y Desfiladero) en tres tamaños (pequeño 52 m, mediano 80 m, grande 112 m).
+- **Mapas:** hay cinco (Patio, Almacén, Desfiladero, Polvo y Ciudad) en tres tamaños (pequeño 52 m, mediano 80 m, grande 112 m).
   Cada mapa es una función `build*` en `shared/config.js` que recibe `H` (mitad del lado) y coloca cajas con
   `B(x, y, z, ancho, alto, fondo, color)` (x/z = centro, y = base) y spawns con `S(x, z)`. Para añadir uno nuevo,
   escribe su función y regístralo en `MAP_DEFS`. Todo lo que sea caja ya tiene colisión y bloquea balas.

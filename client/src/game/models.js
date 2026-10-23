@@ -315,6 +315,14 @@ const GUNS = {
     box(0.01, 0.015, 0.01, 0, 0.058, -0.15, 'o');
     for (const x of [-0.012, 0.012]) box(0.01, 0.015, 0.012, x, 0.058, 0.07, 'o');
   },
+  knife(box) {
+    box(0.03, 0.1, 0.035, 0, -0.04, 0.06, 'r', 0.15); // mango
+    for (const y of [-0.07, -0.04, -0.01]) box(0.032, 0.008, 0.037, 0, y, 0.06, 'o');
+    box(0.06, 0.014, 0.03, 0, 0.012, 0.03, 'm'); // guarda
+    box(0.006, 0.035, 0.2, 0, 0.022, -0.08, 's'); // hoja
+    box(0.007, 0.012, 0.06, 0, 0.038, -0.19, 's', -0.5); // punta
+    box(0.008, 0.004, 0.2, 0, 0.005, -0.08, 'c'); // filo con el color
+  },
   revolver(box, cyl) {
     cyl(0.02, 0.2, 0, 0.03, -0.17, 's'); // cañón
     box(0.02, 0.02, 0.2, 0, 0.052, -0.17, 's');
@@ -331,7 +339,7 @@ const GUNS = {
 
 // Altura (y del arma) que queda en el centro de la pantalla al apuntar: el punto rojo o la punta
 // del punto de mira. Al apuntar se oculta la cruz del HUD y se apunta con esto.
-const SIGHT_Y = { rifle: 0.104, sniper: 0.125, shotgun: 0.064, smg: 0.1, lmg: 0.13, pistol: 0.0655, revolver: 0.08 };
+const SIGHT_Y = { knife: 0.02, rifle: 0.104, sniper: 0.125, shotgun: 0.064, smg: 0.1, lmg: 0.13, pistol: 0.0655, revolver: 0.08 };
 
 export function buildGun(id, withFlash = false, tint = '#ffc93c') {
   const draw = GUNS[id] || GUNS.pistol;

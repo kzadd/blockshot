@@ -36,6 +36,7 @@ import type { HudState, DamageMark, SoundMark } from '../hud/hudState';
 import type { MinimapSource, MinimapView } from '../hud/Minimap';
 import { buildWorld } from '../render/world';
 import { CameraRig } from './cameraRig';
+import { createDevStats, type FrameStats } from './devStats';
 import { Effects } from './effects';
 import { EventBus } from './events';
 import { InputController } from './input';
@@ -105,6 +106,8 @@ export class Engine implements MinimapSource {
   private readonly offs: (() => void)[] = [];
   private readonly clock = new THREE.Clock();
   private raf = 0;
+  private stats: FrameStats | null = null;
+  private disposed = false;
 
   // Our player
   private character: Character | null = null;
@@ -214,6 +217,10 @@ export class Engine implements MinimapSource {
     this.bindNet();
     this.loop = this.loop.bind(this);
     this.raf = requestAnimationFrame(this.loop);
+    void createDevStats(container).then((s) => {
+      if (this.disposed) s?.dispose();
+      else this.stats = s;
+    });
   }
 
   // ============================================================ Settings and looks
@@ -518,6 +525,7 @@ export class Engine implements MinimapSource {
       this.renderer.clearDepth();
       this.renderer.render(this.vm.scene, this.vm.camera);
     }
+    this.stats?.update();
   }
 
   private objectiveSources() {
@@ -647,7 +655,9 @@ export class Engine implements MinimapSource {
   }
 
   destroy(): void {
+    this.disposed = true;
     cancelAnimationFrame(this.raf);
+    this.stats?.dispose();
     for (const f of this.offs) f();
     this.net.dispose();
     this.input.dispose();

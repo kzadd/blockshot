@@ -1,0 +1,27 @@
+{
+  "name": "blockshot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Shooter multijugador estilo arena para jugar en clase (LAN)",
+  "scripts": {
+    "dev": "concurrently -k -n server,client -c cyan,magenta \"node --watch server/index.js\" \"vite\"",
+    "build": "vite build",
+    "start": "node server/index.js",
+    "clase": "vite build && node server/index.js"
+  },
+  "dependencies": {
+    "express": "^4.21.1",
+    "multicast-dns": "^7.2.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "socket.io": "^4.8.0",
+    "socket.io-client": "^4.8.0",
+    "three": "^0.169.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.2",
+    "concurrently": "^9.0.1",
+    "vite": "^5.4.8"
+  }
+}

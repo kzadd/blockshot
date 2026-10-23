@@ -1,7 +1,7 @@
 // The first-person gun and arms: their own scene and camera (so the gun never clips through walls),
 // with bob, kick, reload dip, weapon swap, sprint lean, slide tilt and the knife slash.
 import * as THREE from 'three';
-import type { Weapon, WeaponId } from '@blockshot/shared';
+import { WEAPON_HANDLING, type Weapon, type WeaponId } from '@blockshot/shared';
 import { buildArms, buildGun, type GunModel } from '../render/models';
 
 const VM_FOV = 60;
@@ -24,7 +24,6 @@ const KICK_RX = 0.12;
 const HEAVY_RECOIL = 0.03;
 const RELOAD_DIP_Y = 0.16;
 const RELOAD_DIP_RX = 0.7;
-const SWAP_MS = 250;
 const SWAP_DROP = 0.25;
 const SLIDE_RX = 0.08;
 const SLIDE_RZ = 0.25;
@@ -99,7 +98,7 @@ export class ViewModel {
       y -= dip * RELOAD_DIP_Y;
       rx -= dip * RELOAD_DIP_RX;
     }
-    if (now < f.swapUntil) y -= ((f.swapUntil - now) / SWAP_MS) * SWAP_DROP;
+    if (now < f.swapUntil) y -= ((f.swapUntil - now) / WEAPON_HANDLING.swapMs) * SWAP_DROP;
     if (f.sliding) rx += SLIDE_RX;
     // Sprinting lowers and tilts the gun
     x -= sp * SPRINT_X;

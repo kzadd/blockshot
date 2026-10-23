@@ -10,3 +10,4 @@ export * from './net/constants';
 export * from './net/events';
 export * from './net/schemas';
 export * from './movement/movement';
+export * from './weapons/handling';

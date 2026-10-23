@@ -31,6 +31,7 @@ export interface HudState {
   locked: boolean;
   hp: number;
   maxHp: number;
+  // TODO(review): posible código muerto: published since the original version, no screen reads it
   characterId: CharacterId | undefined;
   charName: string | undefined;
   /** 0..1, null when stamina is disabled */
@@ -54,18 +55,22 @@ export interface HudState {
   scoped: boolean;
   /** ms of spawn protection left */
   protect: number;
+  // TODO(review): posible código muerto: published since the original version, no screen reads it (hitMark is what is used)
   hit: boolean;
   /** the hit marker is on screen */
   hitMark: boolean;
+  // TODO(review): posible código muerto: published since the original version, no screen reads it
   hitHead: boolean;
   /** 1 → 0 after taking damage */
   damage: number;
   respawnIn: number;
+  // TODO(review): posible código muerto: the death screen takes the killer from the kill event instead
   killerName: string;
   players: HudPlayer[];
   spread: number;
   aim: number;
   dmgDirs: DamageMark[];
+  // TODO(review): posible código muerto: the HUD receives the mode as a prop
   mode: ModeId;
   myTeam: Team;
   hitKey: number;

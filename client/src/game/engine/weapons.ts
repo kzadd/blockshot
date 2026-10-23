@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import {
   VIEW_DELAY_MS,
   WEAPONS,
+  WEAPON_HANDLING,
   castShot,
   type Collider,
   type HitTarget,
@@ -17,30 +18,7 @@ import type { EventBus } from './events';
 import type { InputController } from './input';
 import { damp, spreadDir } from './util';
 
-const SWAP_MS = 250;
-/** Scope only counts once the rifle is almost up. */
-const SCOPE_READY = 0.85;
-const DEFAULT_ADS_SPEED = 16;
-/** Recoil starts coming back this long after the last shot. */
-const RECOIL_RECOVER_DELAY_MS = 90;
-const RECOIL_RECOVER_BASE = 0.25;
-const RECOIL_RECOVER_RATE = 6;
-const PITCH_LIMIT = 1.55;
-/** Aiming reduces recoil by up to this fraction. */
-const ADS_RECOIL_CUT = 0.35;
-const RECOIL_JITTER = 0.4;
-const RECOIL_YAW = 0.3;
-/** Bloom recovers this long after the last shot, at this rate (1/s). */
-const BLOOM_RECOVER_DELAY_MS = 140;
-const BLOOM_RECOVER_RATE = 7;
-// Spread factors (hip fire defaults, overridden while aiming by the weapon's own values)
-const HIP_MOVE_SPREAD = 0.6;
-const HIP_AIR_SPREAD = 1.8;
-const MOVE_SPREAD_FULL_SPEED = 8;
-const CROUCH_SPREAD = 0.7;
-const SPRINT_SPREAD = 1.5;
-/** While aiming, bloom opens half as much. */
-const ADS_BLOOM_CUT = 0.5;
+const H = WEAPON_HANDLING;
 /** Hip-fire tracers leave the gun on the right; aiming, from the centre. */
 const MUZZLE_HIP: Vec3 = [0.22, -0.16, -0.7];
 const MUZZLE_AIM_X = 0;
@@ -139,7 +117,7 @@ export class WeaponController {
     this.current().reloadEnd = 0;
     this.prevSlot = this.slot;
     this.slot = s;
-    this.swapUntil = now + SWAP_MS;
+    this.swapUntil = now + H.swapMs;
     this.bloom = 0;
     this.input.aiming = false;
     this.onGunChanged();
@@ -162,13 +140,13 @@ export class WeaponController {
 
   scoped(): boolean {
     const w = this.weapon();
-    return !!w.scope && this.aimLerp > SCOPE_READY && !this.current().reloadEnd;
+    return !!w.scope && this.aimLerp > H.scopeReady && !this.current().reloadEnd;
   }
 
   /** The view comes back down by itself after shooting (unless you already pulled it down). */
   recoverRecoil(dt: number, now: number): void {
-    if (this.recoil <= 0 || now - (this.lastShot[this.slot] ?? 0) < RECOIL_RECOVER_DELAY_MS) return;
-    const back = Math.min(this.recoil, dt * (RECOIL_RECOVER_BASE + this.recoil * RECOIL_RECOVER_RATE));
+    if (this.recoil <= 0 || now - (this.lastShot[this.slot] ?? 0) < H.recoil.recoverDelayMs) return;
+    const back = Math.min(this.recoil, dt * (H.recoil.recoverBase + this.recoil * H.recoil.recoverRate));
     this.input.pitch -= back;
     this.recoil -= back;
   }
@@ -180,10 +158,10 @@ export class WeaponController {
   /** Aiming is not instant: the sight comes up at the weapon's adsSpeed (bolt, reload and swap lower it). */
   updateAim(dt: number, now: number): void {
     const w = this.weapon();
-    const bolt = w.bolt && now - (this.lastShot[this.slot] ?? 0) < (w.boltTime ?? w.fireRate * SCOPE_READY);
+    const bolt = w.bolt && now - (this.lastShot[this.slot] ?? 0) < (w.boltTime ?? w.fireRate * H.scopeReady);
     const busy = this.current().reloadEnd || now < this.swapUntil || bolt;
     this.aimLerp +=
-      ((this.input.aiming && !busy && !w.melee ? 1 : 0) - this.aimLerp) * damp(w.adsSpeed ?? DEFAULT_ADS_SPEED, dt);
+      ((this.input.aiming && !busy && !w.melee ? 1 : 0) - this.aimLerp) * damp(w.adsSpeed ?? H.defaultAdsSpeed, dt);
   }
 
   update(now: number, dt: number, move: MoveState): void {
@@ -198,8 +176,8 @@ export class WeaponController {
     this.input.clicked = false;
     this.recoverRecoil(dt, now);
     // Burst spread comes down as soon as you stop firing
-    if (now - (this.lastShot[this.slot] ?? 0) > BLOOM_RECOVER_DELAY_MS)
-      this.bloom *= Math.exp(-BLOOM_RECOVER_RATE * dt);
+    if (now - (this.lastShot[this.slot] ?? 0) > H.bloom.recoverDelayMs)
+      this.bloom *= Math.exp(-H.bloom.recoverRate * dt);
     this.kick = Math.max(0, this.kick - dt * KICK_RECOVER);
   }
 
@@ -218,13 +196,13 @@ export class WeaponController {
     // With the scope on screen the shot goes where you look (no need to wait for it to finish rising)
     const t = this.scoped() ? 1 : this.aimLerp * this.aimLerp * (3 - 2 * this.aimLerp);
     // Base (hip → aim) plus what consecutive fire opened (half as much while aiming)
-    let sp = w.spread + (w.adsSpread - w.spread) * t + this.bloom * (1 - ADS_BLOOM_CUT * t);
-    const moveSpread = HIP_MOVE_SPREAD + ((w.moveSpread ?? HIP_MOVE_SPREAD) - HIP_MOVE_SPREAD) * t;
-    const airSpread = HIP_AIR_SPREAD + ((w.airSpread ?? HIP_AIR_SPREAD) - HIP_AIR_SPREAD) * t;
-    sp *= 1 + Math.min(hs / MOVE_SPREAD_FULL_SPEED, 1) * moveSpread;
+    let sp = w.spread + (w.adsSpread - w.spread) * t + this.bloom * (1 - H.bloom.adsCut * t);
+    const moveSpread = H.spread.move + ((w.moveSpread ?? H.spread.move) - H.spread.move) * t;
+    const airSpread = H.spread.air + ((w.airSpread ?? H.spread.air) - H.spread.air) * t;
+    sp *= 1 + Math.min(hs / H.spread.moveFullSpeed, 1) * moveSpread;
     if (!move.grounded) sp *= airSpread;
-    else if (move.crouching && !move.sliding) sp *= CROUCH_SPREAD;
-    if (move.sprinting) sp *= SPRINT_SPREAD;
+    else if (move.crouching && !move.sliding) sp *= H.spread.crouch;
+    if (move.sprinting) sp *= H.spread.sprint;
     return sp;
   }
 
@@ -270,10 +248,10 @@ export class WeaponController {
 
     // Aiming, recoil is smaller
     const kickUp =
-      w.recoil * (1 - RECOIL_JITTER / 2 + Math.random() * RECOIL_JITTER) * (1 - ADS_RECOIL_CUT * this.aimLerp);
-    this.input.pitch = Math.min(PITCH_LIMIT, this.input.pitch + kickUp);
+      w.recoil * (1 - H.recoil.jitter / 2 + Math.random() * H.recoil.jitter) * (1 - H.recoil.adsCut * this.aimLerp);
+    this.input.pitch = Math.min(H.recoil.pitchLimit, this.input.pitch + kickUp);
     this.recoil += kickUp;
-    this.input.yaw += (Math.random() - 0.5) * w.recoil * RECOIL_YAW;
+    this.input.yaw += (Math.random() - 0.5) * w.recoil * H.recoil.yaw;
     this.kick = 1;
     this.flashTime = now;
     this.bus.emit('shot', { weapon: w.sound, volume: 1 });

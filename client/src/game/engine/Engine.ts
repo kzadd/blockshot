@@ -8,6 +8,7 @@ import {
   INFECT,
   PLAYER,
   WEAPONS,
+  WEAPON_HANDLING,
   getColliders,
   gunLadder,
   isTeamMode,
@@ -59,7 +60,6 @@ const MS_PER_S = 1000;
 const SPAWN_RETRY_MS = 1000;
 /** After a match restarts the player respawns almost at once. */
 const RESTART_RESPAWN_MS = 800;
-const SWAP_MS = 250;
 const DAMAGE_DIR_MS = 1200;
 const DAMAGE_FLASH_MS = 600;
 const SOUND_MARK_MS = 1000;
@@ -303,7 +303,7 @@ export class Engine implements MinimapSource {
       if (d.team !== undefined) this.myTeam = d.team;
       if (this.alive) {
         this.equip();
-        this.weapons.swapUntil = performance.now() + SWAP_MS;
+        this.weapons.swapUntil = performance.now() + WEAPON_HANDLING.swapMs;
       }
       if (up) this.bus.emit('streak');
     });

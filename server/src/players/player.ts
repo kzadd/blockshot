@@ -59,6 +59,7 @@ export interface Player {
   // Timers (ms since epoch; 0 = never)
   lastDamage: number;
   deathTime: number;
+  // TODO(review): posible código muerto: set on every spawn since the original version, never read
   spawnTime: number;
   protUntil: number;
   teamAt: number;

@@ -53,6 +53,7 @@ export const PICKUP_MAX_DY = 2.5;
  */
 export const INFECT = { pickDelay: 10000, speed: 1.15, hp: 1.3 };
 
+// TODO(review): posible código muerto: `color` is never read (team colours come from the client palette, which follows the colourblind mode)
 export const TEAMS: Record<SideTeam, { name: string; color: string }> = {
   1: { name: 'Rojo', color: '#ff5a4d' },
   2: { name: 'Azul', color: '#4da3ff' },

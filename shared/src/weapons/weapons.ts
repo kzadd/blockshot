@@ -218,9 +218,6 @@ export const WEAPONS: Record<WeaponId, Weapon> = {
   },
 };
 
-export const WEAPON_IDS = Object.keys(WEAPONS) as WeaponId[];
-export const isWeaponId = (v: unknown): v is WeaponId => typeof v === 'string' && v in WEAPONS;
-
 /** Weapon weight in words (character select and manual). */
 export const weightName = (w: Weapon): string => (w.weight >= 1 ? 'Ligera' : w.weight >= 0.95 ? 'Media' : 'Pesada');
 

@@ -1,0 +1,21 @@
+{
+  "name": "@blockshot/server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch index.js",
+    "start": "node index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@blockshot/shared": "workspace:*",
+    "express": "^4.21.1",
+    "multicast-dns": "^7.2.5",
+    "socket.io": "^4.8.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.9.0"
+  }
+}

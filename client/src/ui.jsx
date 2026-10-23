@@ -32,7 +32,8 @@ const notify = () => {
 };
 const setKey = (code, on) => {
   if (on === pressed.has(code)) return;
-  on ? pressed.add(code) : pressed.delete(code);
+  if (on) pressed.add(code);
+  else pressed.delete(code);
   notify();
 };
 if (typeof window !== 'undefined') {
@@ -44,17 +45,34 @@ if (typeof window !== 'undefined') {
     pressed.clear();
     notify();
   });
-  window.addEventListener('wheel', () => {
-    setKey('Wheel', true);
-    setTimeout(() => setKey('Wheel', false), 120);
-  }, { passive: true });
+  window.addEventListener(
+    'wheel',
+    () => {
+      setKey('Wheel', true);
+      setTimeout(() => setKey('Wheel', false), 120);
+    },
+    { passive: true },
+  );
 }
 const CODES = {
-  Espacio: ['Space'], Shift: ['ShiftLeft', 'ShiftRight'], Ctrl: ['ControlLeft', 'ControlRight'],
-  'Clic izq.': ['Mouse0'], 'Clic der.': ['Mouse2'], Tab: ['Tab'], Esc: ['Escape'], Rueda: ['Wheel'], Enter: ['Enter'],
+  Espacio: ['Space'],
+  Shift: ['ShiftLeft', 'ShiftRight'],
+  Ctrl: ['ControlLeft', 'ControlRight'],
+  'Clic izq.': ['Mouse0'],
+  'Clic der.': ['Mouse2'],
+  Tab: ['Tab'],
+  Esc: ['Escape'],
+  Rueda: ['Wheel'],
+  Enter: ['Enter'],
 };
-const codesOf = (label) => CODES[label] || (/^\d$/.test(label) ? ['Digit' + label] : /^F\d+$/.test(label) ? [label] : ['Key' + label.toUpperCase()]);
-const usePressedVersion = () => useSyncExternalStore((fn) => (subs.add(fn), () => subs.delete(fn)), () => version);
+const codesOf = (label) =>
+  CODES[label] ||
+  (/^\d$/.test(label) ? ['Digit' + label] : /^F\d+$/.test(label) ? [label] : ['Key' + label.toUpperCase()]);
+const usePressedVersion = () =>
+  useSyncExternalStore(
+    (fn) => (subs.add(fn), () => subs.delete(fn)),
+    () => version,
+  );
 
 export function Kbd({ k }) {
   usePressedVersion();
@@ -62,7 +80,11 @@ export function Kbd({ k }) {
   return <kbd className={down ? 'down' : ''}>{k}</kbd>;
 }
 export const Keys = ({ keys }) => (
-  <span className="keys-row">{keys.map((k) => <Kbd key={k} k={k} />)}</span>
+  <span className="keys-row">
+    {keys.map((k) => (
+      <Kbd key={k} k={k} />
+    ))}
+  </span>
 );
 
 // ------------------------------------------------------------ Casilla y deslizador
@@ -71,9 +93,21 @@ export function Check({ checked, onChange, children, help }) {
     <label className="check">
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
       <span className="box">
-        <svg width="14" height="12" viewBox="0 0 14 12"><path d="M1.5 6.5l3.5 3.5 7.5-8" fill="none" stroke="#1b2a4a" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        <svg width="14" height="12" viewBox="0 0 14 12">
+          <path
+            d="M1.5 6.5l3.5 3.5 7.5-8"
+            fill="none"
+            stroke="#1b2a4a"
+            strokeWidth="2.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
       </span>
-      <span>{children}{help && <small>{help}</small>}</span>
+      <span>
+        {children}
+        {help && <small>{help}</small>}
+      </span>
     </label>
   );
 }
@@ -82,8 +116,20 @@ export function Slider({ label, value, min, max, step = 1, format = (v) => v, on
   const p = ((value - min) / (max - min)) * 100;
   return (
     <label className="slider">
-      <span className="slider-head"><span className="label">{label}</span><b>{format(value)}</b></span>
-      <input className="range" type="range" min={min} max={max} step={step} value={value} style={{ '--p': `${p}%` }} onChange={(e) => onChange(Number(e.target.value))} />
+      <span className="slider-head">
+        <span className="label">{label}</span>
+        <b>{format(value)}</b>
+      </span>
+      <input
+        className="range"
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        style={{ '--p': `${p}%` }}
+        onChange={(e) => onChange(Number(e.target.value))}
+      />
     </label>
   );
 }
@@ -118,7 +164,12 @@ export function Curtain() {
   const cells = [];
   for (let r = 0; r < 9; r++) {
     for (let c = 0; c < 16; c++) {
-      cells.push(<i key={`${run}-${r}-${c}`} style={{ background: (r + c) % 2 ? '#22355c' : '#1b2a4a', animationDelay: `${12 * (r + c)}ms` }} />);
+      cells.push(
+        <i
+          key={`${run}-${r}-${c}`}
+          style={{ background: (r + c) % 2 ? '#22355c' : '#1b2a4a', animationDelay: `${12 * (r + c)}ms` }}
+        />,
+      );
     }
   }
   return <div className="curtain">{cells}</div>;

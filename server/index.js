@@ -8,14 +8,37 @@ import { fileURLToPath } from 'node:url';
 import { Server } from 'socket.io';
 import multicastDns from 'multicast-dns';
 import {
-  CHAR_BY_ID, WEAPONS, PLAYER, MAPS, damageAt, TEAM_SWITCH_COOLDOWN, MAP_SIZES, SKINS, LAG_COMP_MAX_MS, MODES, MODE_BY_ID, isTeamMode, FLAG, loadoutOf, gunLadder, TEAMS, STREAKS, SERVER_TICK_MS, MATCH_RESTART_MS, getColliders, getMap,
-  TAG, INFECT, STREAK_REWARDS, canSwitchTeam, teamName,
+  CHAR_BY_ID,
+  WEAPONS,
+  PLAYER,
+  MAPS,
+  damageAt,
+  TEAM_SWITCH_COOLDOWN,
+  MAP_SIZES,
+  SKINS,
+  LAG_COMP_MAX_MS,
+  MODES,
+  MODE_BY_ID,
+  isTeamMode,
+  FLAG,
+  loadoutOf,
+  gunLadder,
+  TEAMS,
+  SERVER_TICK_MS,
+  MATCH_RESTART_MS,
+  getColliders,
+  getMap,
+  TAG,
+  INFECT,
+  STREAK_REWARDS,
+  canSwitchTeam,
+  teamName,
 } from '../shared/config.js';
 import { castShot, rayAABB } from '../shared/physics.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
-const DIST = path.resolve(__dirname, '../dist');
+const DIST = path.resolve(__dirname, '../client/dist');
 
 // ---------------------------------------------------------------- HTTP
 const app = express();
@@ -26,7 +49,9 @@ if (fs.existsSync(DIST)) {
   app.use((req, res) => res.sendFile(path.join(DIST, 'index.html')));
 } else {
   app.get('/', (req, res) =>
-    res.send('<h2>Cliente sin compilar</h2><p>Ejecuta <code>npm run clase</code>, o usa <code>npm run dev</code> y entra por el puerto 5173.</p>'),
+    res.send(
+      '<h2>Cliente sin compilar</h2><p>Ejecuta <code>npm run clase</code>, o usa <code>npm run dev</code> y entra por el puerto 5173.</p>',
+    ),
   );
 }
 
@@ -43,9 +68,19 @@ const isVec3 = (a) => Array.isArray(a) && a.length === 3 && finite(...a);
 const r2 = (n) => Math.round(n * 100) / 100;
 
 const summary = (r) => ({
-  id: r.id, name: r.name, players: r.players.size, max: r.max, locked: !!r.passHash, host: r.hostName,
-  map: r.map.name, size: r.map.sizeName, mode: MODES.find((m) => m.id === r.mode).name,
-  mapId: r.map.id, sizeId: r.map.size, modeId: r.mode, limit: r.scoreLimit,
+  id: r.id,
+  name: r.name,
+  players: r.players.size,
+  max: r.max,
+  locked: !!r.passHash,
+  host: r.hostName,
+  map: r.map.name,
+  size: r.map.sizeName,
+  mode: MODES.find((m) => m.id === r.mode).name,
+  mapId: r.map.id,
+  sizeId: r.map.size,
+  modeId: r.mode,
+  limit: r.scoreLimit,
 });
 const isTeams = (room) => isTeamMode(room.mode);
 const sameTeam = (room, a, b) => isTeams(room) && a.team === b.team;
@@ -111,7 +146,10 @@ function record(p, now) {
 function smallerTeam(room) {
   let red = 0;
   let blue = 0;
-  for (const p of room.players.values()) p.team === 1 ? red++ : p.team === 2 && blue++;
+  for (const p of room.players.values()) {
+    if (p.team === 1) red++;
+    else if (p.team === 2) blue++;
+  }
   return red <= blue ? 1 : 2;
 }
 
@@ -121,29 +159,96 @@ function spawnPlayer(socket, room, p, ch, skin) {
   const [x, y, z, ry] = pickSpawn(room, p);
   const hp = Math.round(ch.hp * (isInfected(room, p) ? INFECT.hp : 1));
   Object.assign(p, {
-    characterId: ch.id, skin: SKINS.some((k) => k.id === skin) ? skin : 'base', alive: true, hp, maxHp: hp, armor: 0, x, y, z,
-    ry, rx: 0, sl: 0, cr: 0, spawnTime: now, protUntil: now + PLAYER.spawnProtection, lastState: now, lastDamage: 0, hist: [],
+    characterId: ch.id,
+    skin: SKINS.some((k) => k.id === skin) ? skin : 'base',
+    alive: true,
+    hp,
+    maxHp: hp,
+    armor: 0,
+    x,
+    y,
+    z,
+    ry,
+    rx: 0,
+    sl: 0,
+    cr: 0,
+    spawnTime: now,
+    protUntil: now + PLAYER.spawnProtection,
+    lastState: now,
+    lastDamage: 0,
+    hist: [],
   });
   equip(room, p);
   record(p, now);
-  socket.emit('player:spawned', { x, y, z, ry: p.ry, characterId: ch.id, skin: p.skin, hp, level: p.level, team: p.team });
+  socket.emit('player:spawned', {
+    x,
+    y,
+    z,
+    ry: p.ry,
+    characterId: ch.id,
+    skin: p.skin,
+    hp,
+    level: p.level,
+    team: p.team,
+  });
 }
 
 function joinRoom(socket, room, nickname, cb) {
   const p = {
-    id: socket.id, name: nickname, characterId: null, alive: false, hp: 0, maxHp: 100,
-    x: 0, y: 0, z: 0, ry: 0, rx: 0, slot: 0, sl: 0, cr: 0, skin: 'base', kills: 0, deaths: 0,
-    ammo: [], lastShot: [0, 0], lastDamage: 0, deathTime: 0, spawnTime: 0, protUntil: 0, lastState: 0,
-    team: room.mode === 'infect' ? (room.infect.started ? 2 : 1) : isTeams(room) ? smallerTeam(room) : 0, streak: 0, ping: 0, hist: [],
-    bestStreak: 0, heads: 0, shots: 0, hits: 0, caps: 0, level: 0, loadout: [], armor: 0, radarUntil: 0,
+    id: socket.id,
+    name: nickname,
+    characterId: null,
+    alive: false,
+    hp: 0,
+    maxHp: 100,
+    x: 0,
+    y: 0,
+    z: 0,
+    ry: 0,
+    rx: 0,
+    slot: 0,
+    sl: 0,
+    cr: 0,
+    skin: 'base',
+    kills: 0,
+    deaths: 0,
+    ammo: [],
+    lastShot: [0, 0],
+    lastDamage: 0,
+    deathTime: 0,
+    spawnTime: 0,
+    protUntil: 0,
+    lastState: 0,
+    team: room.mode === 'infect' ? (room.infect.started ? 2 : 1) : isTeams(room) ? smallerTeam(room) : 0,
+    streak: 0,
+    ping: 0,
+    hist: [],
+    bestStreak: 0,
+    heads: 0,
+    shots: 0,
+    hits: 0,
+    caps: 0,
+    level: 0,
+    loadout: [],
+    armor: 0,
+    radarUntil: 0,
   };
   room.players.set(socket.id, p);
   socket.leave('lobby');
   socket.join(room.id);
   socket.data.roomId = room.id;
   cb({
-    ok: true, you: socket.id,
-    room: { id: room.id, name: room.name, scoreLimit: room.scoreLimit, mapId: room.map.id, size: room.map.size, mode: room.mode, max: room.max },
+    ok: true,
+    you: socket.id,
+    room: {
+      id: room.id,
+      name: room.name,
+      scoreLimit: room.scoreLimit,
+      mapId: room.map.id,
+      size: room.map.size,
+      mode: room.mode,
+      max: room.max,
+    },
   });
   const team = p.team ? ` · ${teamName(room.mode, p.team)}` : '';
   socket.to(room.id).emit('notice', `${nickname} entró en la sala${team}`);
@@ -178,7 +283,11 @@ function bestPlays(room) {
   const shooters = ps.filter((p) => p.shots >= 10);
   if (shooters.length) {
     const ac = shooters.reduce((a, b) => (b.hits / b.shots > a.hits / a.shots ? b : a));
-    out.push({ t: 'Precisión', v: `${Math.round((ac.hits / ac.shots) * 100)} %`, n: `${ac.name} · ${ac.hits} de ${ac.shots}` });
+    out.push({
+      t: 'Precisión',
+      v: `${Math.round((ac.hits / ac.shots) * 100)} %`,
+      n: `${ac.name} · ${ac.hits} de ${ac.shots}`,
+    });
   }
   return out;
 }
@@ -257,7 +366,13 @@ function endMatch(room, winnerName, winnerTeam = 0) {
   const scores = [...room.players.values()]
     .map((p) => ({ name: p.name, kills: p.kills, deaths: p.deaths, team: p.team }))
     .sort((a, b) => b.kills - a.kills);
-  io.to(room.id).emit('match:end', { winner: winnerName, team: winnerTeam, scores, best: bestPlays(room), restartIn: MATCH_RESTART_MS });
+  io.to(room.id).emit('match:end', {
+    winner: winnerName,
+    team: winnerTeam,
+    scores,
+    best: bestPlays(room),
+    restartIn: MATCH_RESTART_MS,
+  });
   room.restartTimer = setTimeout(() => {
     room.teamScore = { 1: 0, 2: 0 };
     resetFlags(room);
@@ -307,10 +422,19 @@ function applyDamage(room, shooter, victim, dmg, head, w, socket, at3) {
   if (reward?.id === 'armor') shooter.armor = reward.amount;
   socket.emit('hitmarker', { head, kill: true, dmg: Math.round(dmg), at });
   io.to(room.id).emit('kill', {
-    killer: shooter.id, killerName: shooter.name, killerTeam: shooter.team,
-    killerChar: shooter.characterId, killerHp: Math.ceil(shooter.hp),
-    victim: victim.id, victimName: victim.name, victimTeam: victim.team,
-    weapon: w.name, head, streak: shooter.streak, ended, reward: reward?.name,
+    killer: shooter.id,
+    killerName: shooter.name,
+    killerTeam: shooter.team,
+    killerChar: shooter.characterId,
+    killerHp: Math.ceil(shooter.hp),
+    victim: victim.id,
+    victimName: victim.name,
+    victimTeam: victim.team,
+    weapon: w.name,
+    head,
+    streak: shooter.streak,
+    ended,
+    reward: reward?.name,
   });
   if (reward) io.to(room.id).emit('notice', `${shooter.name} consiguió ${reward.name} por su racha`);
   if (room.mode === 'gungame') return gunGameKill(room, shooter, victim, w);
@@ -319,7 +443,8 @@ function applyDamage(room, shooter, victim, dmg, head, w, socket, at3) {
   // En Captura la bandera las bajas no suman: solo las capturas
   if (room.mode === 'teams') {
     room.teamScore[shooter.team]++;
-    if (room.teamScore[shooter.team] >= room.scoreLimit) endMatch(room, `Equipo ${TEAMS[shooter.team].name}`, shooter.team);
+    if (room.teamScore[shooter.team] >= room.scoreLimit)
+      endMatch(room, `Equipo ${TEAMS[shooter.team].name}`, shooter.team);
   } else if (room.mode === 'ffa' && shooter.kills >= room.scoreLimit) endMatch(room, shooter.name);
 }
 
@@ -657,18 +782,43 @@ setInterval(() => {
         p.hp = Math.min(p.maxHp, p.hp + PLAYER.regenRate * dt);
       }
       players.push({
-        id: p.id, n: p.name, c: p.characterId, sk: p.skin, x: r2(p.x), y: r2(p.y), z: r2(p.z),
-        ry: r2(p.ry), rx: r2(p.rx), s: p.slot, sl: p.sl, cr: p.cr, a: p.alive ? 1 : 0,
-        h: Math.ceil(p.hp), pr: p.alive && now < p.protUntil ? 1 : 0, k: p.kills, d: p.deaths, tm: p.team, pg: p.ping, st: p.streak, cp: p.caps, lv: p.level,
-        mh: p.maxHp, ar: Math.ceil(p.armor || 0), rd: now < p.radarUntil ? 1 : 0,
+        id: p.id,
+        n: p.name,
+        c: p.characterId,
+        sk: p.skin,
+        x: r2(p.x),
+        y: r2(p.y),
+        z: r2(p.z),
+        ry: r2(p.ry),
+        rx: r2(p.rx),
+        s: p.slot,
+        sl: p.sl,
+        cr: p.cr,
+        a: p.alive ? 1 : 0,
+        h: Math.ceil(p.hp),
+        pr: p.alive && now < p.protUntil ? 1 : 0,
+        k: p.kills,
+        d: p.deaths,
+        tm: p.team,
+        pg: p.ping,
+        st: p.streak,
+        cp: p.caps,
+        lv: p.level,
+        mh: p.maxHp,
+        ar: Math.ceil(p.armor || 0),
+        rd: now < p.radarUntil ? 1 : 0,
       });
     }
     const fl = room.flags ? { 1: flagState(room.flags[1]), 2: flagState(room.flags[2]) } : null;
     const tg = room.mode === 'kc' ? room.tags.map((g) => [g.id, r2(g.x), r2(g.y), r2(g.z), g.team]) : null;
     // Infectados: st = ya hay infectado · t = ms que quedan (de partida, o hasta elegir al primero; -1 = esperando jugadores)
-    const inf = room.mode === 'infect'
-      ? { st: room.infect.started ? 1 : 0, t: room.infect.started ? room.infect.endAt - now : room.infect.pickAt ? room.infect.pickAt - now : -1 }
-      : null;
+    const inf =
+      room.mode === 'infect'
+        ? {
+            st: room.infect.started ? 1 : 0,
+            t: room.infect.started ? room.infect.endAt - now : room.infect.pickAt ? room.infect.pickAt - now : -1,
+          }
+        : null;
     io.to(room.id).volatile.emit('state', { players, ts: isTeams(room) ? room.teamScore : null, fl, tg, inf });
   }
 }, SERVER_TICK_MS);

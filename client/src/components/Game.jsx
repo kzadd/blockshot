@@ -14,11 +14,16 @@ import Manual from './Manual.jsx';
 let feedId = 0;
 
 const PAUSE_KEYS = [
-  [['W', 'A', 'S', 'D'], 'Moverse'], [['Espacio'], 'Saltar · mantén para encadenar'],
-  [['Shift'], 'Esprintar'], [['C'], 'Agacharse · deslizarse'],
-  [['Clic izq.'], 'Disparar'], [['Clic der.'], 'Apuntar'],
-  [['R'], 'Recargar'], [['1', '2', '3', 'Q'], 'Cambiar de arma (3: cuchillo)'],
-  [['Tab'], 'Marcador'], [['Esc'], 'Pausa'],
+  [['W', 'A', 'S', 'D'], 'Moverse'],
+  [['Espacio'], 'Saltar · mantén para encadenar'],
+  [['Shift'], 'Esprintar'],
+  [['C'], 'Agacharse · deslizarse'],
+  [['Clic izq.'], 'Disparar'],
+  [['Clic der.'], 'Apuntar'],
+  [['R'], 'Recargar'],
+  [['1', '2', '3', 'Q'], 'Cambiar de arma (3: cuchillo)'],
+  [['Tab'], 'Marcador'],
+  [['Esc'], 'Pausa'],
 ];
 const WIN_COLOR = { 1: 'var(--eq-rojo-txt)', 2: 'var(--eq-azul-txt)' };
 
@@ -58,12 +63,26 @@ export default function Game({ session, onLeave }) {
   const live = useRef({});
   live.current = { hud, match, menu };
 
-  const info = { name: room.name, map: map.name, size: map.sizeName, players: hud?.players?.length || 1, max: room.max || '?' };
+  const info = {
+    name: room.name,
+    map: map.name,
+    size: map.sizeName,
+    players: hud?.players?.length || 1,
+    max: room.max || '?',
+  };
 
   useEffect(() => {
-    engine.current = new Engine(mount.current, socket, you, setHud, getMap(room.mapId, room.size), room.mode, room.scoreLimit);
+    engine.current = new Engine(
+      mount.current,
+      socket,
+      you,
+      setHud,
+      getMap(room.mapId, room.size),
+      room.mode,
+      room.scoreLimit,
+    );
     return () => engine.current.destroy();
-  }, [you, room.mapId, room.size, room.mode]);
+  }, [you, room.mapId, room.size, room.mode, room.scoreLimit]);
 
   // Red de seguridad: si algo intenta cerrar la pestaña en plena partida (Ctrl+W, F5…), el navegador pregunta antes
   useEffect(() => {
@@ -77,7 +96,8 @@ export default function Game({ session, onLeave }) {
 
   // Mientras se elige personaje no se reaparece solo
   useEffect(() => {
-    if (engine.current) engine.current.autoChar = selecting || !charId ? null : { id: charId, skin: skins[charId] || 'base' };
+    if (engine.current)
+      engine.current.autoChar = selecting || !charId ? null : { id: charId, skin: skins[charId] || 'base' };
   }, [selecting, charId, skins]);
 
   // Cortinilla de bloques al aparecer / reaparecer
@@ -173,7 +193,7 @@ export default function Game({ session, onLeave }) {
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
     };
-  }, [onLeave, you]);
+  }, [onLeave, you, room.mode]);
 
   const pick = (characterId, skin) => {
     const next = { ...skins, [characterId]: skin };
@@ -226,17 +246,42 @@ export default function Game({ session, onLeave }) {
         <div className="layer stage">
           <div className="death-bg" />
           <div className="death">
-            <h2>{lastDeath ? <>Te eliminó <span className="k">{lastDeath.name}</span></> : '¡Nueva partida!'}</h2>
+            <h2>
+              {lastDeath ? (
+                <>
+                  Te eliminó <span className="k">{lastDeath.name}</span>
+                </>
+              ) : (
+                '¡Nueva partida!'
+              )}
+            </h2>
             {lastDeath && killer && (
               <div className="killer-chip">
-                <span className="chip-char" style={{ '--c': killer.color }}>{killer.name}</span>
-                <span>{lastDeath.weapon} · le quedaban <b>{lastDeath.hp}</b> de vida</span>
+                <span className="chip-char" style={{ '--c': killer.color }}>
+                  {killer.name}
+                </span>
+                <span>
+                  {lastDeath.weapon} · le quedaban <b>{lastDeath.hp}</b> de vida
+                </span>
               </div>
             )}
-            <div className="countdown"><b key={sec}>{Math.max(1, sec)}</b></div>
-            <div className="pbar fill"><i key={hud.deathKey} style={{ animationDuration: `${PLAYER.respawnDelay}ms` }} /></div>
-            {me && <div className="as">Reapareces como <span className="chip-char" style={{ '--c': me.color }}>{me.name}</span></div>}
-            <button className="btn has-key" onClick={() => setSelecting(true)}><span className="key">B</span>Cambiar personaje</button>
+            <div className="countdown">
+              <b key={sec}>{Math.max(1, sec)}</b>
+            </div>
+            <div className="pbar fill">
+              <i key={hud.deathKey} style={{ animationDuration: `${PLAYER.respawnDelay}ms` }} />
+            </div>
+            {me && (
+              <div className="as">
+                Reapareces como{' '}
+                <span className="chip-char" style={{ '--c': me.color }}>
+                  {me.name}
+                </span>
+              </div>
+            )}
+            <button className="btn has-key" onClick={() => setSelecting(true)}>
+              <span className="key">B</span>Cambiar personaje
+            </button>
           </div>
           <Feed feed={feed} you={you} mode={room.mode} />
           <RoomInfo info={info} ping={hud.ping} />
@@ -265,21 +310,32 @@ export default function Game({ session, onLeave }) {
           <div className="stage">
             <div className="pause-panel">
               <h2>Pausa</h2>
-              <p className="sub"><b>Haz clic o pulsa Esc para volver</b> · los demás siguen jugando</p>
+              <p className="sub">
+                <b>Haz clic o pulsa Esc para volver</b> · los demás siguen jugando
+              </p>
               <div className="key-grid">
                 {PAUSE_KEYS.map(([keys, what]) => (
-                  <div className="key-row" key={what}><Keys keys={keys} /><span>{what}</span></div>
+                  <div className="key-row" key={what}>
+                    <Keys keys={keys} />
+                    <span>{what}</span>
+                  </div>
                 ))}
               </div>
               <div className="actions" onClick={(e) => e.stopPropagation()}>
-                <button className="btn has-key" onClick={() => setMenu('settings')}><span className="key">O</span>Ajustes</button>
-                <button className="btn has-key" onClick={() => setMenu('manual')}><span className="key">H</span>Manual</button>
+                <button className="btn has-key" onClick={() => setMenu('settings')}>
+                  <span className="key">O</span>Ajustes
+                </button>
+                <button className="btn has-key" onClick={() => setMenu('manual')}>
+                  <span className="key">H</span>Manual
+                </button>
                 {canSwitchTeam(room.mode) && hud.myTeam && (
                   <button className="btn has-key" onClick={() => socket.emit('team:set', { team: 3 - hud.myTeam })}>
                     <span className="key">T</span>Pasar a {teamName(room.mode, 3 - hud.myTeam)}
                   </button>
                 )}
-                <button className="btn ghost danger" onClick={leave}>Salir de la sala</button>
+                <button className="btn ghost danger" onClick={leave}>
+                  Salir de la sala
+                </button>
               </div>
             </div>
           </div>
@@ -294,7 +350,9 @@ export default function Game({ session, onLeave }) {
                 <h2 style={{ color: WIN_COLOR[match.team] || 'var(--sol)' }}>¡{match.winner} gana la partida!</h2>
                 <div className="sub">
                   Nueva partida en unos segundos…
-                  <div className="pbar fill"><i key={match.at} style={{ animationDuration: `${match.restartIn}ms` }} /></div>
+                  <div className="pbar fill">
+                    <i key={match.at} style={{ animationDuration: `${match.restartIn}ms` }} />
+                  </div>
                 </div>
                 {match.best?.length > 0 && (
                   <div className="best">
@@ -310,7 +368,14 @@ export default function Game({ session, onLeave }) {
                 )}
               </div>
             )}
-            <Scoreboard players={hud.players} me={you} info={info} scoreLimit={room.scoreLimit} mode={room.mode} teamScore={hud.teamScore} />
+            <Scoreboard
+              players={hud.players}
+              me={you}
+              info={info}
+              scoreLimit={room.scoreLimit}
+              mode={room.mode}
+              teamScore={hud.teamScore}
+            />
           </div>
         </div>
       )}

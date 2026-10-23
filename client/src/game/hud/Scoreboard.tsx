@@ -5,11 +5,11 @@ import {
   isTeamMode,
   teamName,
   type ModeId,
-  type PlayerSnapshot,
   type SideTeam,
   type WeaponId,
 } from '@blockshot/shared';
 import type { RoomView } from '../roomView';
+import type { HudPlayer } from './hudState';
 import { SIDES, TEAM_TXT, teamVar } from './teamStyle';
 
 /** A streak this long is highlighted with a flame. */
@@ -18,7 +18,7 @@ const BAD_PING_MS = 120;
 
 // caps = título de la columna de puntos propios (Capturas, Placas…) o nada
 interface TableProps {
-  players: PlayerSnapshot[];
+  players: HudPlayer[];
   me: string;
   numbered?: boolean;
   caps?: string | null;
@@ -88,7 +88,7 @@ function Table({ players, me, numbered, caps, ladder }: TableProps) {
 }
 
 interface ScoreboardProps {
-  players: PlayerSnapshot[];
+  players: HudPlayer[];
   me: string;
   info: RoomView;
   scoreLimit: number;

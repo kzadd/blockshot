@@ -63,6 +63,7 @@ const DAMAGE_DIR_MS = 1200;
 const DAMAGE_FLASH_MS = 600;
 const SOUND_MARK_MS = 1000;
 const HIT_FLASH_MS = 220;
+const HIT_MARK_MS = 300;
 /** Enemy gunshots closer than this leave a mark around the crosshair. */
 const SHOT_MARK_RANGE = 45;
 /** Gunshots fade out with distance and are silent from this far (m). */
@@ -601,11 +602,23 @@ export class Engine implements MinimapSource {
       scoped: alive && this.weapons.scoped(),
       protect: alive ? Math.max(0, this.protUntil - now) : 0,
       hit: now - this.hitTime < HIT_FLASH_MS,
+      hitMark: now - this.hitTime < HIT_MARK_MS,
       hitHead: this.hitHead,
       damage: Math.max(0, 1 - (now - this.damageTime) / DAMAGE_FLASH_MS),
       respawnIn: alive || !this.deathAt ? 0 : Math.max(0, PLAYER.respawnDelay - (now - this.deathAt)),
       killerName: this.killerName,
-      players: this.players,
+      players: this.players.map(({ id, n, c, k, d, tm, pg, st: streak, cp, lv }) => ({
+        id,
+        n,
+        c,
+        k,
+        d,
+        tm,
+        pg,
+        st: streak,
+        cp,
+        lv,
+      })),
       spread: w ? this.weapons.spread(w, st) + this.weapons.kick * 0.02 : 0,
       aim: this.weapons.aimLerp,
       dmgDirs: this.damageDirections(now),

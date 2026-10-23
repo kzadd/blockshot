@@ -13,7 +13,8 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "socket.io-client": "^4.8.0",
-    "three": "^0.169.0"
+    "three": "^0.169.0",
+    "zustand": "^5.0.16"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",

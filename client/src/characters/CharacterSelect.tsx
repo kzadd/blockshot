@@ -10,12 +10,12 @@ import {
   weightName,
   type CharacterId,
   type ModeId,
-  type PlayerSnapshot,
   type SideTeam,
   type SkinId,
   type Team,
   type WeaponId,
 } from '@blockshot/shared';
+import type { HudPlayer } from '../game/hud/hudState';
 import type { RoomView } from '../game/roomView';
 import { SIDES, teamVar } from '../game/hud/teamStyle';
 import CharacterPreview from './CharacterPreview';
@@ -69,7 +69,7 @@ function WeaponCard({ id, slot }: { id: WeaponId; slot: string }) {
 // Team modes: pick a team (with how many players each has)
 interface TeamPickerProps {
   myTeam: Team;
-  players?: PlayerSnapshot[];
+  players?: HudPlayer[];
   onTeam: (t: SideTeam) => void;
 }
 function TeamPicker({ myTeam, players = [], onTeam }: TeamPickerProps) {
@@ -107,7 +107,7 @@ interface CharacterSelectProps {
   onLeave: () => void;
   mode: ModeId;
   myTeam: Team;
-  players: PlayerSnapshot[];
+  players: HudPlayer[];
   onTeam: (t: SideTeam) => void;
 }
 

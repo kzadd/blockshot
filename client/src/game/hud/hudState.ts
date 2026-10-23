@@ -21,6 +21,9 @@ export interface SoundMark extends ScreenMark {
   color: string;
 }
 
+/** A player as the HUD sees it: no positions (they change every tick and the HUD does not need them). */
+export type HudPlayer = Pick<PlayerSnapshot, 'id' | 'n' | 'c' | 'k' | 'd' | 'tm' | 'pg' | 'st' | 'cp' | 'lv'>;
+
 /** Everything the HUD shows, published by the engine a few times per second. */
 export interface HudState {
   alive: boolean;
@@ -52,12 +55,14 @@ export interface HudState {
   /** ms of spawn protection left */
   protect: number;
   hit: boolean;
+  /** the hit marker is on screen */
+  hitMark: boolean;
   hitHead: boolean;
   /** 1 → 0 after taking damage */
   damage: number;
   respawnIn: number;
   killerName: string;
-  players: PlayerSnapshot[];
+  players: HudPlayer[];
   spread: number;
   aim: number;
   dmgDirs: DamageMark[];

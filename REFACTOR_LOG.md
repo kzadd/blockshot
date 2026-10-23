@@ -284,3 +284,33 @@ eventos) y `audio/audioEvents.ts`.
 - Test e2e de protección de reaparición: andar hasta el punto de tiro tarda más que los 4 s de protección, así que el
   e2e comprueba el lado del protocolo (`pr` y que disparar la quita) y el bloqueo de daño pasa a test unitario (paso 10).
 - `Infinity` en los temporizadores se cambia por 1e6: JSON lo convierte en `null` y rompía el ack.
+
+## 6. Game loop fuera de React + HUD con Zustand
+
+**Game loop:** desde el paso 5 vive en `Engine.ts` (`requestAnimationFrame` propio, simulación a paso fijo); React no
+participa en el frame.
+
+**Antes:** el motor llamaba a `setHud(objeto nuevo)` 15 veces por segundo y se re-renderizaba **todo** el árbol de la
+partida (HUD, minimapa, marcador…).
+
+**Ahora:**
+
+- `game/hud/hudStore.ts` (Zustand): `publishHud()` fusiona el estado nuevo conservando la referencia anterior de cada
+  campo cuyo contenido no cambió (y el objeto entero si no cambió nada). Si nada cambió, no notifica.
+- `useHud(selector)` (con `useShallow`): cada pieza del HUD se suscribe solo a sus campos. `HUD.tsx` se divide en
+  `Health`, `Ammo`, `TopCenter`, `Vignette`, `AimCrosshair`, `CenterMarks`, `CarryingFlag`, `SpawnProtection`, `RoomInfo`.
+- `Game.tsx` solo selecciona lo que decide qué pantalla se ve (vivo, en pausa, equipo…). Las pantallas pasan a
+  `game/screens/`: `DeathScreen`, `PauseMenu`, `ScoresLayer` (marcador y fin de partida), `CharacterScreen`.
+- El HUD recibe `HudPlayer` (sin posiciones, que cambian cada tick y no le interesan).
+- El killfeed solo cambia de estado cuando una línea empieza a desvanecerse o desaparece (antes cada 300 ms).
+- `hitMark` explícito: antes el marcador de impacto desaparecía porque todo se re-renderizaba 15 veces por segundo.
+
+**Medido en el navegador** (commits de React por segundo, con un hook falso de DevTools):
+
+|                          | Quieto | Corriendo |
+| ------------------------ | ------ | --------- |
+| Antes (commit `8feff6a`) | 11     | 12        |
+| Ahora                    | 0,7    | 8,3       |
+
+Y cada commit de ahora toca solo el componente afectado (por ejemplo la mira, cuya dispersión cambia al correr), no
+toda la pantalla. 3 tests unitarios del store.

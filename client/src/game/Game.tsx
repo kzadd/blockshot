@@ -13,6 +13,7 @@ import {
 import type { Session } from '../app/App';
 import type { SkinChoice } from '../characters/CharacterSelect';
 import Manual from '../manual/Manual';
+import { markGameLost } from '../network/connection';
 import { socket } from '../network/socket';
 import Settings from '../settings/SettingsDialog';
 import { useSettings } from '../settings/settingsStore';
@@ -169,7 +170,11 @@ export default function Game({ session, onLeave }: { session: Session; onLeave: 
       setMatch(null);
       setLastDeath(null);
     };
-    const onDisc = () => onLeave();
+    // Connection lost mid-game: back to the lobby, which explains it and reconnects
+    const onDisc = () => {
+      markGameLost();
+      onLeave();
+    };
     socket.on('kill', onKill);
     socket.on('notice', onNotice);
     socket.on('match:end', onEnd);

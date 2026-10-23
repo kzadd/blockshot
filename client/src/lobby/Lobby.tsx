@@ -16,6 +16,7 @@ import type { Session } from '../app/App';
 import { sfx } from '../game/audio/sound';
 import { MODE_UI } from '../game/modeUi';
 import Manual from '../manual/Manual';
+import { clearGameLost, useConnection } from '../network/connection';
 import { socket } from '../network/socket';
 import Settings from '../settings/SettingsDialog';
 import { Slider } from '../ui/ui';
@@ -49,7 +50,8 @@ export default function Lobby({ onJoined }: { onJoined: (s: Session) => void }) 
   const [nick, setNick] = useState(loadNick);
   const [nickError, setNickError] = useState(false);
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
-  const [connected, setConnected] = useState(socket.connected);
+  const connected = useConnection((c) => c.status === 'connected');
+  const lostGame = useConnection((c) => c.lostGame);
   const [offline, setOffline] = useState(false); // connection error notice
   const [form, setForm] = useState<RoomForm>({
     name: '',
@@ -69,26 +71,19 @@ export default function Lobby({ onJoined }: { onJoined: (s: Session) => void }) 
 
   useEffect(() => {
     const onRooms = (r: RoomSummary[]) => setRooms(r);
-    const onConn = () => {
-      setConnected(true);
-      setOffline(false);
-      socket.emit('rooms:list', onRooms);
-    };
-    const onDisc = () => setConnected(false);
     socket.on('rooms', onRooms);
-    socket.on('connect', onConn);
-    socket.on('disconnect', onDisc);
-    if (socket.connected) socket.emit('rooms:list', onRooms);
+    if (connected) socket.emit('rooms:list', onRooms); // also on every reconnection
     return () => {
       socket.off('rooms', onRooms);
-      socket.off('connect', onConn);
-      socket.off('disconnect', onDisc);
     };
-  }, []);
+  }, [connected]);
 
   // If there is no connection after a few seconds, show a notice with «Reintentar»
   useEffect(() => {
-    if (connected) return undefined;
+    if (connected) {
+      setOffline(false);
+      return undefined;
+    }
     const t = setTimeout(() => setOffline(true), OFFLINE_NOTICE_MS);
     return () => clearTimeout(t);
   }, [connected]);
@@ -419,6 +414,15 @@ export default function Lobby({ onJoined }: { onJoined: (s: Session) => void }) 
           <button className="btn sm" onClick={() => socket.connect()}>
             Reintentar
           </button>
+        </div>
+      )}
+      {lostGame && connected && !toast && (
+        <div className="toast" role="alert" onClick={clearGameLost}>
+          <span className="bang">!</span>
+          <span>
+            <b>Se perdió la conexión con la sala</b>
+            <small>Ya estás conectado de nuevo: vuelve a entrar · Toca para cerrar</small>
+          </span>
         </div>
       )}
       {toast && connected && (

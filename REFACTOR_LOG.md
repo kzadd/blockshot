@@ -314,3 +314,26 @@ partida (HUD, minimapa, marcador…).
 
 Y cada commit de ahora toca solo el componente afectado (por ejemplo la mira, cuya dispersión cambia al correr), no
 toda la pantalla. 3 tests unitarios del store.
+
+## 7. Patrones: Strategy, Command, Object Pool, Observer
+
+La mayor parte se aplicó donde tocaba al reescribir cada pieza; aquí se resume y se completa:
+
+| Patrón                       | Dónde                                                                                                 | Qué problema resuelve                                                                                                         |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| **Strategy (modos)**         | `server/src/modes/` (`GameMode`, una fábrica por modo)                                                | las reglas de cada modo estaban en `if (room.mode === …)` repartidos por el servidor                                          |
+| **Strategy (armas)**         | `server/src/combat/weaponBehavior.ts` (`hitscan`, `melee`)                                            | cuchillo: asistencia de golpe y puñalada sin ramas en el código de disparo                                                    |
+| **Strategy de presentación** | `client/src/game/modeUi.ts` (tabla por modo)                                                          | textos del lobby, objetivo del marcador, columna de puntos y barra superior; antes eran cadenas de ternarios en 3 componentes |
+| **Command**                  | `MoveInput` (`shared/movement`), `InputController.command()`                                          | el cliente manda intenciones por paso, no posiciones; el servidor las reproduce                                               |
+| **Object Pool**              | `client/.../engine/pool.ts` + `effects.ts`                                                            | cada disparo creaba malla + material (y un canvas por número de daño)                                                         |
+| **Observer**                 | `client/.../engine/events.ts` (`EventBus`) + `audio/audioEvents.ts`; `hudStore` (Zustand) para el HUD | el motor ya no llama a `sfx.*` ni a `setHud`; audio y HUD se suscriben                                                        |
+| **Game Loop**                | `server/src/game/loop.ts` (paso fijo) y `Engine.loop` (paso fijo + render interpolado)                | movimiento independiente de los FPS y del temporizador de Node                                                                |
+
+**No aplicado (a propósito):**
+
+- Strategy de armas en el cliente: solo hay una rama (`melee` → tajo, si no → disparo) y la lógica autoritativa ya
+  usa la estrategia del servidor. Una jerarquía más no aporta nada (YAGNI).
+- ECS: la partida tiene pocos tipos de entidades (jugador local, remotos, banderas, placas, efectos) y cada uno ya
+  tiene su módulo; un ECS no resuelve ningún problema concreto de este código.
+
+Tests: 2 nuevos de `modeUi` (cada modo tiene presentación y se mantienen los textos originales).

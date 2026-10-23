@@ -8,6 +8,7 @@ import {
   type SideTeam,
   type WeaponId,
 } from '@blockshot/shared';
+import { MODE_UI } from '../modeUi';
 import type { RoomView } from '../roomView';
 import type { HudPlayer } from './hudState';
 import { SIDES, TEAM_TXT, teamVar } from './teamStyle';
@@ -97,22 +98,12 @@ interface ScoreboardProps {
 }
 
 export default function Scoreboard({ players, me, info, scoreLimit, mode, teamScore }: ScoreboardProps) {
-  const ladder = mode === 'gungame' ? gunLadder(scoreLimit) : null;
+  const ladder = MODE_UI[mode].top === 'ladder' ? gunLadder(scoreLimit) : null;
   const sorted = [...players].sort((a, b) => (ladder ? b.lv - a.lv : 0) || b.k - a.k || a.d - b.d);
   const teams = isTeamMode(mode);
-  const infect = mode === 'infect';
-  const caps = mode === 'ctf' ? 'Capturas' : mode === 'kc' ? 'Placas' : null;
-  const goal = ladder
-    ? `gana quien elimine con el cuchillo (${ladder.length} armas)`
-    : mode === 'ctf'
-      ? `gana el primer equipo en hacer ${scoreLimit} capturas`
-      : mode === 'kc'
-        ? `gana el primer equipo en recoger ${scoreLimit} placas`
-        : infect
-          ? `los supervivientes ganan si aguantan ${scoreLimit} min`
-          : teams
-            ? `gana el primer equipo en llegar a ${scoreLimit} bajas`
-            : `gana quien llegue a ${scoreLimit} bajas`;
+  const infect = MODE_UI[mode].top === 'infect';
+  const caps = MODE_UI[mode].points;
+  const goal = MODE_UI[mode].goal(scoreLimit);
   return (
     <div className="scoreboard">
       <div className="sb-head">

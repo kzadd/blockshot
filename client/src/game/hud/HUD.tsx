@@ -14,6 +14,7 @@ import {
 import Crosshair from '../../settings/Crosshair';
 import { useSettings } from '../../settings/settingsStore';
 import { hpColor } from '../render/models';
+import { MODE_UI } from '../modeUi';
 import type { RoomView } from '../roomView';
 import type { HudPlayer } from './hudState';
 import { useHud } from './hudStore';
@@ -290,7 +291,8 @@ function TopCenter({ mode, scoreLimit, you }: { mode: ModeId; scoreLimit: number
   }));
   if (!h) return null;
   const players = h.players;
-  if (mode === 'infect') {
+  const top = MODE_UI[mode].top;
+  if (top === 'infect') {
     // Infected: how many are left on each side and the time left (or until the first infected)
     const count = (t: Team) => players.filter((p) => p.tm === t).length;
     const inf = h.infect;
@@ -317,7 +319,7 @@ function TopCenter({ mode, scoreLimit, you }: { mode: ModeId; scoreLimit: number
     );
   }
   const teamScore = h.teamScore;
-  if (isTeamMode(mode) && teamScore) {
+  if (top === 'teams' && teamScore) {
     return (
       <div className="team-score">
         {SIDES.map((t) => (
@@ -340,7 +342,7 @@ function TopCenter({ mode, scoreLimit, you }: { mode: ModeId; scoreLimit: number
       </div>
     );
   }
-  if (mode === 'gungame') {
+  if (top === 'ladder') {
     // Gun game: who is highest on the ladder
     const ladder = gunLadder(scoreLimit);
     const sorted = [...players].sort((a, b) => b.lv - a.lv || b.k - a.k);

@@ -14,6 +14,7 @@ import {
 } from '@blockshot/shared';
 import type { Session } from '../app/App';
 import { sfx } from '../game/audio/sound';
+import { MODE_UI } from '../game/modeUi';
 import Manual from '../manual/Manual';
 import { socket } from '../network/socket';
 import Settings from '../settings/SettingsDialog';
@@ -32,14 +33,6 @@ const loadNick = (): string => {
   }
 };
 
-const MODE_SUB: Record<ModeId, string> = {
-  ffa: 'Cada uno por su cuenta',
-  teams: 'Rojo contra Azul',
-  ctf: 'Roba la bandera rival',
-  gungame: 'Un arma nueva por baja',
-  kc: 'Recoge las placas de tus bajas',
-  infect: 'Huye de los del cuchillo',
-};
 const EMPTY_COLORS = ['#3a4a6c', '#ffc93c', '#3a4a6c', '#3f7fe0', '#d0533a', '#3aa65a'];
 
 interface RoomForm {
@@ -249,7 +242,7 @@ export default function Lobby({ onJoined }: { onJoined: (s: Session) => void }) 
                       onClick={() => setForm({ ...form, mode: m.id, scoreLimit: m.def })}
                     >
                       <b>{m.name}</b>
-                      <small>{MODE_SUB[m.id]}</small>
+                      <small>{MODE_UI[m.id].sub}</small>
                     </button>
                   ))}
                 </div>
@@ -259,11 +252,7 @@ export default function Lobby({ onJoined }: { onJoined: (s: Session) => void }) 
                 <div>
                   <div className="label-row">
                     <span className="label">Para ganar</span>
-                    <span className="hint">
-                      {form.mode === 'infect'
-                        ? `Aguantar ${form.scoreLimit} min`
-                        : `${form.scoreLimit} ${mode.unit}${form.mode === 'teams' || form.mode === 'kc' ? ' del equipo' : ''}`}
-                    </span>
+                    <span className="hint">{MODE_UI[form.mode].hint(form.scoreLimit)}</span>
                   </div>
                   <div className="seg">
                     {mode.limits.map((n) => (

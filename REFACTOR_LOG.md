@@ -84,3 +84,28 @@ Rama: `refactor/arquitectura` (sale de `mecanicas-krunker`, commit `9971280`).
 9. **Sin tipos ni tests**: cualquier cambio en `config.js` puede romper cliente o servidor sin aviso.
 
 ---
+
+## 1. Monorepo pnpm + tooling de calidad
+
+**Qué:** `pnpm-workspace.yaml` con tres paquetes (`@blockshot/client`, `@blockshot/server`, `@blockshot/shared`),
+scripts raíz (`dev`, `build`, `start`, `clase`, `lint`, `typecheck`, `test`, `format`), ESLint flat config
+(`@eslint/js` + `typescript-eslint` + `react-hooks` + `eslint-config-prettier`), Prettier, EditorConfig, Browserslist
+(en `client/package.json`), Husky (`pre-commit` → lint-staged, `commit-msg` → commitlint convencional) y
+`tsconfig.base.json` estricto (`strict`, `noUncheckedIndexedAccess`, `verbatimModuleSyntax`).
+
+**Archivos:** `package.json`, `pnpm-workspace.yaml`, `eslint.config.js`, `.prettierrc.json`, `.editorconfig`,
+`.gitattributes`, `commitlint.config.js`, `.husky/*`, `*/package.json`, `*/tsconfig.json`; `vite.config.js` pasa a
+`client/` (el build sale en `client/dist`, que es lo que sirve el servidor).
+
+**Decisiones:**
+
+- Versiones mayores conocidas y estables (ESLint 9, TypeScript 5.6, Vitest 2, Vite 5) en vez de las últimas: la
+  migración ya cambia bastante; no se mezcla con saltos de versión mayor.
+- `allowJs` sin `checkJs` mientras dure la migración: el typecheck pasa desde el primer paso y cada archivo se vuelve
+  estricto al pasarlo a `.ts`.
+- `no-empty` con `allowEmptyCatch`: los `catch {}` de `localStorage` son intencionados (modo privado).
+- Finales de línea LF en el repo (`.gitattributes`), formato con Prettier en un commit aparte (`style:`) para que la
+  historia de cambios reales siga siendo legible.
+- Errores de lint corregidos sin cambiar comportamiento: ternarios usados como sentencia → `if/else`; import sin usar
+  (`STREAKS` en el servidor); dependencias de `useEffect` que faltaban (`room.mode`, `room.scoreLimit`, que no cambian
+  durante una partida porque `Game` se monta con `key={room.id}`).

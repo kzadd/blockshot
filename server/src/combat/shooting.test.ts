@@ -46,6 +46,33 @@ describe('handleShoot', () => {
     expect(a).toMatchObject({ shots: 2, hits: 2, heads: 1 });
   });
 
+  // Every weapon of every character: one shot (all pellets) at 5 m deals its exact damage
+  const ARSENAL = [
+    ['soldado', 0, 'rifle'],
+    ['soldado', 1, 'pistol'],
+    ['cazador', 0, 'sniper'],
+    ['tanque', 0, 'shotgun'],
+    ['tanque', 1, 'revolver'],
+    ['rayo', 0, 'smg'],
+    ['bastion', 0, 'lmg'],
+    ['soldado', 2, 'knife'],
+  ] as const;
+  it.each(ARSENAL)('%s slot %i fires the %s', (character, slot, weaponId) => {
+    const r = makeRoom('ffa');
+    const a = r.join('A', ...A, character);
+    const w = WEAPONS[weaponId];
+    // the knife only reaches 2.6 m
+    const b = r.join('B', w.melee ? A[0] + 1.5 : 12, -2.5, 'tanque');
+    b.ry = Math.PI / 2; // facing the shooter: no backstab
+    expect(a.loadout[slot]).toBe(weaponId);
+    a.slot = slot;
+    const dir = aim(a, b.x, b.y + CHEST, b.z);
+    handleShoot(r.room, a, { o: eye(a), d: Array.from({ length: w.pellets }, () => dir), lag: 0 });
+    const dist = Math.hypot(b.x - a.x, b.y + CHEST - (a.y + PLAYER.eye), b.z - a.z);
+    const expected = w.melee ? w.damage : Math.min(150, damageAt(w, dist - 0.38) * w.pellets);
+    expect(150 - b.hp).toBeCloseTo(expected, 0);
+  });
+
   it('respects the fire rate and the magazine, and reloads', () => {
     vi.useFakeTimers();
     const { room, a, b } = duel();

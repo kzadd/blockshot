@@ -42,11 +42,18 @@ export function Feed({ feed, you, mode }) {
         if (f.type === 'streak') {
           return (
             <div key={f.key} className={`feed-item streak${out}`}>
-              🔥 <b style={{ color: color(f.team) }}>{f.name}</b> <span className="lbl">{f.label} ({f.n})</span>
+              🔥 <b style={{ color: color(f.team) }}>{f.name}</b>{' '}
+              <span className="lbl">
+                {f.label} ({f.n})
+              </span>
             </div>
           );
         }
-        return <div key={f.key} className={`feed-item notice${out}`}>{f.text}</div>;
+        return (
+          <div key={f.key} className={`feed-item notice${out}`}>
+            {f.text}
+          </div>
+        );
       })}
     </div>
   );
@@ -56,8 +63,12 @@ export function RoomInfo({ info, ping }) {
   return (
     <div className="room-info">
       <b>{info.name}</b>
-      <span>{info.map} · {info.size}</span>
-      <span>{info.players}/{info.max} jugando</span>
+      <span>
+        {info.map} · {info.size}
+      </span>
+      <span>
+        {info.players}/{info.max} jugando
+      </span>
       {ping > 0 && <span className={ping > 120 ? 'bad' : ''}>{ping} ms</span>}
     </div>
   );
@@ -76,7 +87,13 @@ function useChunks(hp, maxHp) {
     const add = [];
     for (let q = after + 1; q <= before; q++) {
       for (let i = 0; i < 4; i++) {
-        add.push({ key: `${born}-${q}-${i}`, left: ((q - 0.5) / 4) * 100, i, dx: (i - 1.5) * 9 + (Math.random() - 0.5) * 6, rot: (Math.random() - 0.5) * 360 });
+        add.push({
+          key: `${born}-${q}-${i}`,
+          left: ((q - 0.5) / 4) * 100,
+          i,
+          dx: (i - 1.5) * 9 + (Math.random() - 0.5) * 6,
+          rot: (Math.random() - 0.5) * 360,
+        });
       }
     }
     setChunks((c) => [...c, ...add]);
@@ -94,7 +111,13 @@ function Health({ hud }) {
     <div className={`hp ${low ? 'low' : ''}`}>
       <b className="hp-num">{hud.hp}</b>
       <div className="hp-side">
-        <div className="hp-labels hud-txt"><span>{hud.charName}</span><span>{hud.armor > 0 && <span className="armor-num">🛡 {hud.armor} · </span>}{hud.maxHp} máx.</span></div>
+        <div className="hp-labels hud-txt">
+          <span>{hud.charName}</span>
+          <span>
+            {hud.armor > 0 && <span className="armor-num">🛡 {hud.armor} · </span>}
+            {hud.maxHp} máx.
+          </span>
+        </div>
         <div style={{ position: 'relative' }}>
           <div className="hpbar">
             <span className="trail" style={{ width: `${pct * 100}%` }} />
@@ -102,7 +125,17 @@ function Health({ hud }) {
             <span className="marks" />
           </div>
           {chunks.map((c) => (
-            <i key={c.key} className="chunk" style={{ left: `calc(${c.left}% - 3px)`, top: 6, animationDelay: `${c.i * 30}ms`, '--dx': `${c.dx}px`, '--rot': `${c.rot}deg` }} />
+            <i
+              key={c.key}
+              className="chunk"
+              style={{
+                left: `calc(${c.left}% - 3px)`,
+                top: 6,
+                animationDelay: `${c.i * 30}ms`,
+                '--dx': `${c.dx}px`,
+                '--rot': `${c.rot}deg`,
+              }}
+            />
           ))}
         </div>
         {/* Blindaje de la racha: se gasta antes que la vida */}
@@ -113,7 +146,10 @@ function Health({ hud }) {
         )}
         {/* Estamina del sprint (Shift), solo si está activada: se apaga cuando está llena; naranja si se agotó */}
         {hud.stamina != null && (
-          <div className={`stamina ${hud.stamina < 0.99 || hud.sprinting ? 'on' : ''} ${hud.staminaLow ? 'empty' : ''}`} title="Estamina">
+          <div
+            className={`stamina ${hud.stamina < 0.99 || hud.sprinting ? 'on' : ''} ${hud.staminaLow ? 'empty' : ''}`}
+            title="Estamina"
+          >
             <i style={{ width: `${hud.stamina * 100}%` }} />
           </div>
         )}
@@ -126,21 +162,34 @@ function Ammo({ hud }) {
   const low = hud.mag > 0 && hud.mag <= hud.magSize * 0.25;
   return (
     <div className="ammo">
-      <span className="hud-txt" style={{ fontSize: 14 }}>{hud.gunLevel ? `Arma ${hud.gunLevel}/${hud.gunTotal} · ` : ''}{hud.weaponName}</span>
+      <span className="hud-txt" style={{ fontSize: 14 }}>
+        {hud.gunLevel ? `Arma ${hud.gunLevel}/${hud.gunTotal} · ` : ''}
+        {hud.weaponName}
+      </span>
       {hud.reloading ? (
         <div className="reloading">
           <b>Recargando</b>
-          <div className="pbar"><i style={{ width: `${hud.reloadPct * 100}%`, transition: 'none' }} /></div>
+          <div className="pbar">
+            <i style={{ width: `${hud.reloadPct * 100}%`, transition: 'none' }} />
+          </div>
         </div>
       ) : hud.melee ? (
-        <div className="count"><b>🔪</b></div>
+        <div className="count">
+          <b>🔪</b>
+        </div>
       ) : (
-        <div className={`count ${hud.mag === 0 ? 'empty' : low ? 'low' : ''}`}><b>{hud.mag}</b><small>/{hud.magSize}</small></div>
+        <div className={`count ${hud.mag === 0 ? 'empty' : low ? 'low' : ''}`}>
+          <b>{hud.mag}</b>
+          <small>/{hud.magSize}</small>
+        </div>
       )}
       {!hud.scoped && (
         <div className="slots">
           {hud.loadout.map((n, i) => (
-            <span key={n + i} className={hud.slot === i ? 'on' : ''}><em>{i + 1}</em>{n}</span>
+            <span key={n + i} className={hud.slot === i ? 'on' : ''}>
+              <em>{i + 1}</em>
+              {n}
+            </span>
           ))}
         </div>
       )}
@@ -162,14 +211,25 @@ function TopCenter({ hud, mode, scoreLimit, you }) {
     // Infectados: cuántos quedan de cada bando y tiempo que falta (o hasta que salga el primer infectado)
     const count = (t) => (hud.players || []).filter((p) => p.tm === t).length;
     const inf = hud.infect;
-    const status = !inf || inf.t < 0 ? 'Esperando a otro jugador…' : inf.st ? clock(inf.t) : `Infección en ${Math.ceil(inf.t / 1000)} s`;
+    const status =
+      !inf || inf.t < 0
+        ? 'Esperando a otro jugador…'
+        : inf.st
+          ? clock(inf.t)
+          : `Infección en ${Math.ceil(inf.t / 1000)} s`;
     return (
       <div className="infect-bar">
-        <span className="sv">{count(1)} {count(1) === 1 ? 'superviviente' : 'supervivientes'}{hud.myTeam === 1 ? ' · TÚ' : ''}</span>
+        <span className="sv">
+          {count(1)} {count(1) === 1 ? 'superviviente' : 'supervivientes'}
+          {hud.myTeam === 1 ? ' · TÚ' : ''}
+        </span>
         <span className="sep" />
         <span className="clock">{status}</span>
         <span className="sep" />
-        <span className="iz">{count(2)} {count(2) === 1 ? 'infectado' : 'infectados'}{hud.myTeam === 2 ? ' · TÚ' : ''}</span>
+        <span className="iz">
+          {count(2)} {count(2) === 1 ? 'infectado' : 'infectados'}
+          {hud.myTeam === 2 ? ' · TÚ' : ''}
+        </span>
       </div>
     );
   }
@@ -177,10 +237,19 @@ function TopCenter({ hud, mode, scoreLimit, you }) {
     return (
       <div className="team-score">
         {[1, 2].map((t) => (
-          <div key={t} className={`ts ${hud.myTeam === t ? 'mine' : ''}`} style={{ '--t': `var(--eq-${t === 1 ? 'rojo' : 'azul'})`, '--tt': TEAM_TXT[t] }}>
-            <small>{teamName(mode, t).toUpperCase()}{hud.myTeam === t ? ' · TÚ' : ''}</small>
+          <div
+            key={t}
+            className={`ts ${hud.myTeam === t ? 'mine' : ''}`}
+            style={{ '--t': `var(--eq-${t === 1 ? 'rojo' : 'azul'})`, '--tt': TEAM_TXT[t] }}
+          >
+            <small>
+              {teamName(mode, t).toUpperCase()}
+              {hud.myTeam === t ? ' · TÚ' : ''}
+            </small>
             <b>{hud.teamScore[t]}</b>
-            <span className="bar"><i style={{ width: `${(hud.teamScore[t] / scoreLimit) * 100}%` }} /></span>
+            <span className="bar">
+              <i style={{ width: `${(hud.teamScore[t] / scoreLimit) * 100}%` }} />
+            </span>
             {hud.flags && <span className="flag-st">{flagStatus(hud.flags[t], hud.players, you)}</span>}
           </div>
         ))}
@@ -198,7 +267,9 @@ function TopCenter({ hud, mode, scoreLimit, you }) {
     const gun = (p) => `${WEAPONS[ladder[Math.min(p.lv, ladder.length - 1)]].name} (${p.lv + 1}/${ladder.length})`;
     return (
       <div className="leader">
-        <span className="first">1º {pos === 1 ? 'Tú' : top.n} · {gun(top)}</span>
+        <span className="first">
+          1º {pos === 1 ? 'Tú' : top.n} · {gun(top)}
+        </span>
         <span className="sep" />
         <span>{pos === 1 ? `Tú · ${gun(me)}` : `Tú ${pos}º · ${me ? gun(me) : ''}`}</span>
       </div>
@@ -210,10 +281,18 @@ function TopCenter({ hud, mode, scoreLimit, you }) {
   const pos = sorted.findIndex((p) => p.id === you) + 1;
   const me = sorted[pos - 1];
   // Si vas primero, a la derecha se ve quién te sigue
-  const right = pos === 1 ? (sorted[1] ? `2º ${sorted[1].n} · ${sorted[1].k}` : `Tú · ${me.k}/${scoreLimit}`) : `Tú ${pos}º · ${me?.k ?? 0}/${scoreLimit}`;
+  const right =
+    pos === 1
+      ? sorted[1]
+        ? `2º ${sorted[1].n} · ${sorted[1].k}`
+        : `Tú · ${me.k}/${scoreLimit}`
+      : `Tú ${pos}º · ${me?.k ?? 0}/${scoreLimit}`;
   return (
     <div className="leader">
-      <span className="first">1º {pos === 1 ? 'Tú' : sorted[0].n} · {sorted[0].k}{pos === 1 ? `/${scoreLimit}` : ''}</span>
+      <span className="first">
+        1º {pos === 1 ? 'Tú' : sorted[0].n} · {sorted[0].k}
+        {pos === 1 ? `/${scoreLimit}` : ''}
+      </span>
       <span className="sep" />
       <span>{right}</span>
     </div>
@@ -237,12 +316,18 @@ export default function HUD({ hud, info, engine, map, mode, scoreLimit, you, fee
 
       {alive && (
         <>
-          <div className={`vignette ${low ? 'low' : ''}`} style={low ? undefined : { opacity: Math.min(1, hud.damage * 0.8) }} />
+          <div
+            className={`vignette ${low ? 'low' : ''}`}
+            style={low ? undefined : { opacity: Math.min(1, hud.damage * 0.8) }}
+          />
           {scoped ? (
             <div className="scope">
               <div className="ring" />
-              <i className="h" /><i className="v" />
-              <i className="h thick" /><i className="h thick r" /><i className="v thick" />
+              <i className="h" />
+              <i className="v" />
+              <i className="h thick" />
+              <i className="h thick r" />
+              <i className="v thick" />
               <i className="dot" />
               <span className="scope-hint">Clic der. para salir · el resto del HUD se oculta mientras apuntas</span>
             </div>
@@ -254,34 +339,69 @@ export default function HUD({ hud, info, engine, map, mode, scoreLimit, you, fee
               </div>
               <div className="center">
                 {now - hud.hitKey < 300 && (
-                  <div key={hud.hitKey} className={`hitmark ${hud.hitRed ? 'red' : ''}`}><i /><i /><i /><i /></div>
+                  <div key={hud.hitKey} className={`hitmark ${hud.hitRed ? 'red' : ''}`}>
+                    <i />
+                    <i />
+                    <i />
+                    <i />
+                  </div>
                 )}
                 {hud.dmgDirs.map((d) => (
-                  <div key={d.key} className="dmg-dir" style={{ transform: `rotate(${d.angle}rad)`, opacity: d.life }}><i /></div>
+                  <div key={d.key} className="dmg-dir" style={{ transform: `rotate(${d.angle}rad)`, opacity: d.life }}>
+                    <i />
+                  </div>
                 ))}
                 {hud.ticks.map((t) => (
                   <div key={t.key} className="tick" style={{ transform: `rotate(${t.angle}rad)` }}>
                     {[-14, 0, 14].map((dx) => (
-                      <i key={dx} style={{ left: dx - 4, top: -168 + Math.abs(dx) * 0.2, height: dx === 0 ? 14 : 9, background: t.color }} />
+                      <i
+                        key={dx}
+                        style={{
+                          left: dx - 4,
+                          top: -168 + Math.abs(dx) * 0.2,
+                          height: dx === 0 ? 14 : 9,
+                          background: t.color,
+                        }}
+                      />
                     ))}
                   </div>
                 ))}
-                {hud.combo >= 2 && <span key={hud.comboKey} className="combo">×{hud.combo}</span>}
+                {hud.combo >= 2 && (
+                  <span key={hud.comboKey} className="combo">
+                    ×{hud.combo}
+                  </span>
+                )}
               </div>
               {banner && (
                 <div className="kill-banner" key={banner.key}>
-                  <span className="line1">Eliminaste a <span className="v">{banner.name}</span>{banner.head && <span className="h"> · cabeza</span>}</span>
-                  {banner.label && <span className="line2">🔥 {banner.label} · {banner.n} seguidas</span>}
+                  <span className="line1">
+                    Eliminaste a <span className="v">{banner.name}</span>
+                    {banner.head && <span className="h"> · cabeza</span>}
+                  </span>
+                  {banner.label && (
+                    <span className="line2">
+                      🔥 {banner.label} · {banner.n} seguidas
+                    </span>
+                  )}
                   {banner.reward && <span className="line2">🎁 {banner.reward}</span>}
                 </div>
               )}
             </>
           )}
           {hud.flags && hud.myTeam && hud.flags[3 - hud.myTeam]?.c === you && !scoped && (
-            <div className="ctf-carry">🚩 Llevas la bandera<small>{hud.flags[hud.myTeam]?.h ? 'Llévala a tu base' : 'Tu bandera no está en tu base: recupérala para capturar'}</small></div>
+            <div className="ctf-carry">
+              🚩 Llevas la bandera
+              <small>
+                {hud.flags[hud.myTeam]?.h
+                  ? 'Llévala a tu base'
+                  : 'Tu bandera no está en tu base: recupérala para capturar'}
+              </small>
+            </div>
           )}
           {hud.protect > 0 && !scoped && (
-            <div className="spawn-prot">🛡 Protegido {Math.ceil(hud.protect / 1000)} s<small>Disparar quita la protección</small></div>
+            <div className="spawn-prot">
+              🛡 Protegido {Math.ceil(hud.protect / 1000)} s<small>Disparar quita la protección</small>
+            </div>
           )}
           <Health hud={hud} />
           <Ammo hud={hud} />

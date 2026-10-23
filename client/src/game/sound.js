@@ -101,13 +101,28 @@ class Sfx {
     src.stop(t + dur + 0.02);
   }
 
-  step(vol = 1) { this.thud(380 + Math.random() * 120, 0.06, 0.16 * vol); }
-  land(vol = 1) { this.thud(260, 0.12, 0.45 * vol); }
-  slide() { this.thud(1400, 0.4, 0.12, 'bandpass'); }
-  streak() { [523, 659, 784, 1047].forEach((f, i) => this.blip(f, 0.12, 'triangle', 0.22, i * 0.07)); }
-  hurt() { this.blip(150, 0.14, 'sawtooth', 0.25); }
-  reload() { this.blip(420, 0.04, 'square', 0.12); this.blip(620, 0.04, 'square', 0.12, 0.12); }
-  jump() { this.blip(260, 0.05, 'sine', 0.08); }
+  step(vol = 1) {
+    this.thud(380 + Math.random() * 120, 0.06, 0.16 * vol);
+  }
+  land(vol = 1) {
+    this.thud(260, 0.12, 0.45 * vol);
+  }
+  slide() {
+    this.thud(1400, 0.4, 0.12, 'bandpass');
+  }
+  streak() {
+    [523, 659, 784, 1047].forEach((f, i) => this.blip(f, 0.12, 'triangle', 0.22, i * 0.07));
+  }
+  hurt() {
+    this.blip(150, 0.14, 'sawtooth', 0.25);
+  }
+  reload() {
+    this.blip(420, 0.04, 'square', 0.12);
+    this.blip(620, 0.04, 'square', 0.12, 0.12);
+  }
+  jump() {
+    this.blip(260, 0.05, 'sine', 0.08);
+  }
   // Plataforma de salto: barrido hacia arriba
   pad() {
     const ctx = this.ctx;

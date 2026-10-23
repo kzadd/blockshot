@@ -9,7 +9,9 @@ export default function MapPreview({ mapId, size, px = 120, className = 'map-pre
     const map = getMap(mapId, size);
     const c = ref.current;
     // nitidez: píxeles del dispositivo × escala de la interfaz
-    const dpr = (window.devicePixelRatio || 1) * (Number(getComputedStyle(document.documentElement).getPropertyValue('--s')) || 1);
+    const dpr =
+      (window.devicePixelRatio || 1) *
+      (Number(getComputedStyle(document.documentElement).getPropertyValue('--s')) || 1);
     c.width = c.height = px * dpr;
     const g = c.getContext('2d');
     const s = (px * dpr) / (2 * map.half + 2);

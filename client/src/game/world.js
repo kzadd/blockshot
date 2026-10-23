@@ -318,31 +318,80 @@ function tex(name) {
 
 // Aspecto de cada mapa: textura y metros que mide cada repetición. 0 = una textura por cara (cajas)
 const COMMON = {
-  crate: ['crate', 0], crate2: ['crate', 0], cont1: ['corrugated', 2.6], cont2: ['corrugated', 2.6], cont3: ['corrugated', 2.6],
-  rail: ['hazard', 1], bridge: ['planks', 2], rock: ['rock', 3], sandbag: ['sandbag', 1.4], pallet: ['planks', 1.2],
-  planter: ['concrete', 1.6], lamp: [null], cactus: [null], trunk: ['bark', 1], barrel: ['barrel', 0],
-  roof: ['planks', 2], bld1: ['windows', 4], bld2: ['windows', 4], bld3: ['windows', 4], bld4: ['windows', 4],
+  crate: ['crate', 0],
+  crate2: ['crate', 0],
+  cont1: ['corrugated', 2.6],
+  cont2: ['corrugated', 2.6],
+  cont3: ['corrugated', 2.6],
+  rail: ['hazard', 1],
+  bridge: ['planks', 2],
+  rock: ['rock', 3],
+  sandbag: ['sandbag', 1.4],
+  pallet: ['planks', 1.2],
+  planter: ['concrete', 1.6],
+  lamp: [null],
+  cactus: [null],
+  trunk: ['bark', 1],
+  barrel: ['barrel', 0],
+  roof: ['planks', 2],
+  bld1: ['windows', 4],
+  bld2: ['windows', 4],
+  bld3: ['windows', 4],
+  bld4: ['windows', 4],
 };
 const THEMES = {
   patio: {
-    floor: ['paving', 3], wall: ['brick', 2.4], wall2: ['plaster', 3], platform: ['concrete', 3], step: ['concrete', 2],
-    ground: ['grass', 4, '#6f9a4a'], sun: 0xfff1d6, sky: '#5d9fe0', scenery: town,
+    floor: ['paving', 3],
+    wall: ['brick', 2.4],
+    wall2: ['plaster', 3],
+    platform: ['concrete', 3],
+    step: ['concrete', 2],
+    ground: ['grass', 4, '#6f9a4a'],
+    sun: 0xfff1d6,
+    sky: '#5d9fe0',
+    scenery: town,
   },
   almacen: {
-    floor: ['concrete', 4], wall: ['corrugated', 3], platform: ['diamond', 2], step: ['diamond', 2],
-    ground: ['asphalt', 5, '#7d7d78'], sun: 0xffffff, sky: '#7c95b0', scenery: industrial,
+    floor: ['concrete', 4],
+    wall: ['corrugated', 3],
+    platform: ['diamond', 2],
+    step: ['diamond', 2],
+    ground: ['asphalt', 5, '#7d7d78'],
+    sun: 0xffffff,
+    sky: '#7c95b0',
+    scenery: industrial,
   },
   desfiladero: {
-    floor: ['sand', 4], wall: ['rock', 6], wall2: ['plaster', 3], platform: ['rock', 6], step: ['planks', 2],
-    ground: ['sand', 6, '#d9b98a'], sun: 0xffe0b0, sky: '#5f86c4', scenery: desert,
+    floor: ['sand', 4],
+    wall: ['rock', 6],
+    wall2: ['plaster', 3],
+    platform: ['rock', 6],
+    step: ['planks', 2],
+    ground: ['sand', 6, '#d9b98a'],
+    sun: 0xffe0b0,
+    sky: '#5f86c4',
+    scenery: desert,
   },
   polvo: {
-    floor: ['sand', 4], wall: ['plaster', 3], wall2: ['plaster', 3], platform: ['paving', 3], step: ['paving', 2],
-    ground: ['sand', 6, '#d9bf90'], sun: 0xfff0d0, sky: '#6f9fd8', scenery: desert,
+    floor: ['sand', 4],
+    wall: ['plaster', 3],
+    wall2: ['plaster', 3],
+    platform: ['paving', 3],
+    step: ['paving', 2],
+    ground: ['sand', 6, '#d9bf90'],
+    sun: 0xfff0d0,
+    sky: '#6f9fd8',
+    scenery: desert,
   },
   ciudad: {
-    floor: ['asphalt', 5], wall: ['concrete', 4], platform: ['concrete', 2], step: ['concrete', 2],
-    ground: ['asphalt', 5, '#6b6e74'], sun: 0xffffff, sky: '#5d8fd0', scenery: city,
+    floor: ['asphalt', 5],
+    wall: ['concrete', 4],
+    platform: ['concrete', 2],
+    step: ['concrete', 2],
+    ground: ['asphalt', 5, '#6b6e74'],
+    sun: 0xffffff,
+    sky: '#5d8fd0',
+    scenery: city,
   },
 };
 const CAR_COLORS = ['#c0503e', '#3d6e9e', '#e8e4dc', '#2b2f36', '#c9a13a', '#4f7a45'];
@@ -352,7 +401,14 @@ function tiledBox(w, h, d, tile) {
   const geo = new THREE.BoxGeometry(w, h, d);
   if (!tile) return geo;
   const uv = geo.attributes.uv;
-  const dims = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]];
+  const dims = [
+    [d, h],
+    [d, h],
+    [w, d],
+    [w, d],
+    [w, h],
+    [w, h],
+  ];
   for (let f = 0; f < 6; f++) {
     for (let v = 0; v < 4; v++) {
       const i = f * 4 + v;
@@ -394,7 +450,10 @@ function mat(color, texName, extra = {}) {
   const key = `${color}|${texName}|${JSON.stringify(extra)}`;
   if (!matCache.has(key)) {
     const map = texName ? tex(texName) : null;
-    matCache.set(key, new THREE.MeshLambertMaterial({ color: COLORED.has(texName) ? '#ffffff' : color, map, ...extra }));
+    matCache.set(
+      key,
+      new THREE.MeshLambertMaterial({ color: COLORED.has(texName) ? '#ffffff' : color, map, ...extra }),
+    );
   }
   return matCache.get(key);
 }
@@ -413,7 +472,17 @@ function addTree(batch, x, y, z, s, rand, leafColor = '#4f8f3e') {
   const top = y + 2.6 * s;
   batch.add(BOX, leaves, x, top + 0.6 * s, z, rand() * 3, 2.3 * s, 1.6 * s, 2.3 * s);
   batch.add(BOX, leaves, x + 0.4 * s, top + 1.5 * s, z - 0.2 * s, rand() * 3, 1.6 * s, 1.1 * s, 1.6 * s);
-  batch.add(BOX, mat(leafColor, 'leaves', { color: new THREE.Color(leafColor).multiplyScalar(0.85) }), x - 0.5 * s, top + 0.2 * s, z + 0.5 * s, rand() * 3, 1.4 * s, 1 * s, 1.4 * s);
+  batch.add(
+    BOX,
+    mat(leafColor, 'leaves', { color: new THREE.Color(leafColor).multiplyScalar(0.85) }),
+    x - 0.5 * s,
+    top + 0.2 * s,
+    z + 0.5 * s,
+    rand() * 3,
+    1.4 * s,
+    1 * s,
+    1.4 * s,
+  );
 }
 
 function addProp(batch, b, colors, rand, i) {
@@ -455,13 +524,34 @@ function addProp(batch, b, colors, rand, i) {
         }
         // faros
         const [fx, fz] = alongX ? [s * (b.w / 2), b.d * 0.3] : [b.w * 0.3, s * (b.d / 2)];
-        for (const q of [1, -1]) batch.add(BOX, glow(s > 0 ? '#fff6d6' : '#ff4d4d'), cx + (alongX ? fx : q * fx), b.y + 0.65, cz + (alongX ? q * fz : fz), 0, alongX ? 0.04 : 0.3, 0.16, alongX ? 0.3 : 0.04);
+        for (const q of [1, -1])
+          batch.add(
+            BOX,
+            glow(s > 0 ? '#fff6d6' : '#ff4d4d'),
+            cx + (alongX ? fx : q * fx),
+            b.y + 0.65,
+            cz + (alongX ? q * fz : fz),
+            0,
+            alongX ? 0.04 : 0.3,
+            0.16,
+            alongX ? 0.3 : 0.04,
+          );
       }
       return true;
     }
     case 'carTop': {
       batch.add(BOX, mat('#22303d', null), cx, cy - 0.05, cz, 0, b.w, b.h - 0.1, b.d);
-      batch.add(BOX, mat(CAR_COLORS[i % CAR_COLORS.length], 'barrel'), cx, b.y + b.h - 0.05, cz, 0, b.w + 0.04, 0.1, b.d + 0.04);
+      batch.add(
+        BOX,
+        mat(CAR_COLORS[i % CAR_COLORS.length], 'barrel'),
+        cx,
+        b.y + b.h - 0.05,
+        cz,
+        0,
+        b.w + 0.04,
+        0.1,
+        b.d + 0.04,
+      );
       return true;
     }
     case 'cactus': {
@@ -493,20 +583,34 @@ function addSky(scene, map, theme) {
     colors.push(c.r, c.g, c.b);
   }
   geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  const sky = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false }));
+  const sky = new THREE.Mesh(
+    geo,
+    new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false }),
+  );
   sky.renderOrder = -1;
   scene.add(sky);
 
   // Sol
-  const sun = new THREE.Mesh(new THREE.CircleGeometry(R * 0.04, 24), new THREE.MeshBasicMaterial({ color: 0xfff6dc, fog: false }));
-  sun.position.set(0.45, 0.75, 0.3).normalize().multiplyScalar(R * 0.9);
+  const sun = new THREE.Mesh(
+    new THREE.CircleGeometry(R * 0.04, 24),
+    new THREE.MeshBasicMaterial({ color: 0xfff6dc, fog: false }),
+  );
+  sun.position
+    .set(0.45, 0.75, 0.3)
+    .normalize()
+    .multiplyScalar(R * 0.9);
   sun.lookAt(0, 0, 0);
   scene.add(sun);
 
   // Nubes de bloques
   const rand = rng(map.half * 31 + map.id.length);
   const batch = new Batch();
-  const cloud = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.45, fog: false });
+  const cloud = new THREE.MeshLambertMaterial({
+    color: 0xffffff,
+    emissive: 0xffffff,
+    emissiveIntensity: 0.45,
+    fog: false,
+  });
   for (let i = 0; i < 16; i++) {
     const a = rand() * Math.PI * 2;
     const r = map.half * (1 + rand() * 3);
@@ -515,7 +619,17 @@ function addSky(scene, map, theme) {
     const y = 45 + rand() * 30;
     const n = 3 + Math.floor(rand() * 4);
     for (let k = 0; k < n; k++) {
-      batch.add(BOX, cloud, x + (rand() - 0.5) * 18, y + rand() * 3, z + (rand() - 0.5) * 10, 0, 8 + rand() * 10, 2.5 + rand() * 2, 6 + rand() * 6);
+      batch.add(
+        BOX,
+        cloud,
+        x + (rand() - 0.5) * 18,
+        y + rand() * 3,
+        z + (rand() - 0.5) * 10,
+        0,
+        8 + rand() * 10,
+        2.5 + rand() * 2,
+        6 + rand() * 6,
+      );
     }
   }
   batch.build(scene);
@@ -592,7 +706,17 @@ function desert(batch, map, rand) {
     const d = 18 + rand() * 30;
     const h = 12 + rand() * 30;
     batch.add(tiledBoxCached(8), mat(rockCols[i % rockCols.length], 'rock'), x, h / 2, z, rand() * 3, w, h, d);
-    batch.add(tiledBoxCached(8), mat(rockCols[(i + 1) % rockCols.length], 'rock'), x, h + 2, z, rand() * 3, w * 0.7, 4, d * 0.7);
+    batch.add(
+      tiledBoxCached(8),
+      mat(rockCols[(i + 1) % rockCols.length], 'rock'),
+      x,
+      h + 2,
+      z,
+      rand() * 3,
+      w * 0.7,
+      4,
+      d * 0.7,
+    );
   }
   for (let i = 0; i < 40; i++) {
     const [x, z] = outside(rand, H, 2, 50);
@@ -663,7 +787,8 @@ export function buildWorld(scene, map) {
       continue;
     }
     // Edificios: azotea con remate de hormigón
-    if (b.c.startsWith('bld')) props.add(BOX, mat('#7d7f84', 'concrete'), b.x, b.y + b.h + 0.15, b.z, 0, b.w + 0.3, 0.3, b.d + 0.3);
+    if (b.c.startsWith('bld'))
+      props.add(BOX, mat('#7d7f84', 'concrete'), b.x, b.y + b.h + 0.15, b.z, 0, b.w + 0.3, 0.3, b.d + 0.3);
     const [texName, tile] = theme[b.c] || COMMON[b.c] || theme.wall;
     arena.add(tiledBox(b.w, b.h, b.d, tile), mat(map.colors[b.c] || map.colors.wall, texName), b.x, b.y + b.h / 2, b.z);
   }

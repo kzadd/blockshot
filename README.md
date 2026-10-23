@@ -32,7 +32,7 @@ Si hay dos servidores en la misma red, cambia el nombre: `NOMBRE=aula2 npm run c
 `$env:NOMBRE="aula2"; npm run clase`). Para comprobar la conexión sin cargar el juego: `http://blockshot.local:3000/ping`. Tú también puedes jugar desde tu propio navegador.
 
 **Si nadie consigue entrar:** casi siempre es el cortafuegos. En Windows, la primera vez que arranca Node aparece
-un aviso: marca *Redes privadas* y acepta. Si no salió, añade una regla de entrada para el puerto TCP 3000.
+un aviso: marca _Redes privadas_ y acepta. Si no salió, añade una regla de entrada para el puerto TCP 3000.
 Algunas wifis de centros educativos aíslan a los clientes entre sí; en ese caso usa un punto de acceso propio
 (un router o el móvil compartiendo red).
 
@@ -71,24 +71,24 @@ desde la red en el puerto 5173).
    - **Infectados:** con 2 jugadores empieza una cuenta atrás de 10 s y uno se convierte en infectado (solo cuchillo,
      +30 % de vida y +15 % de velocidad). Cada superviviente que cae se infecta. Ganan los infectados si no queda nadie;
      los supervivientes, si aguantan los minutos elegidos (2, 3 o 5).
-   La partida se reinicia sola a los 8 s. Todos los personajes llevan cuchillo (tecla **3**); por la espalda mata de un golpe.
+     La partida se reinicia sola a los 8 s. Todos los personajes llevan cuchillo (tecla **3**); por la espalda mata de un golpe.
 
-| Tecla | Acción |
-|---|---|
-| WASD | Moverse |
-| Espacio | Saltar (mantén pulsado para encadenar saltos: bunny hop) |
-| C / Ctrl | Agacharse (más preciso y más bajo). Corriendo: deslizarse (desliza + salta = mucha velocidad) |
-| Shift | Esprintar hacia delante |
-| Clic izquierdo | Disparar |
-| Clic derecho | Apuntar: más zoom y precisión, pero te mueves más despacio (mira telescópica con el francotirador) |
-| R | Recargar |
-| 1 / 2 / Q / rueda | Cambiar de arma |
-| Tab | Marcador |
-| B | Cambiar de personaje (solo estando muerto) |
-| T | Cambiar de equipo (por equipos; espera 5 s entre cambios y no vale en pleno combate) |
-| O | Ajustes: mira (6 estilos, color, tamaño…), sensibilidad, campo de visión y volumen |
-| H / F1 | Manual del juego (controles, personajes, armas y trucos) |
-| Esc | Pausa (soltar el ratón); otro Esc vuelve al juego |
+| Tecla             | Acción                                                                                             |
+| ----------------- | -------------------------------------------------------------------------------------------------- |
+| WASD              | Moverse                                                                                            |
+| Espacio           | Saltar (mantén pulsado para encadenar saltos: bunny hop)                                           |
+| C / Ctrl          | Agacharse (más preciso y más bajo). Corriendo: deslizarse (desliza + salta = mucha velocidad)      |
+| Shift             | Esprintar hacia delante                                                                            |
+| Clic izquierdo    | Disparar                                                                                           |
+| Clic derecho      | Apuntar: más zoom y precisión, pero te mueves más despacio (mira telescópica con el francotirador) |
+| R                 | Recargar                                                                                           |
+| 1 / 2 / Q / rueda | Cambiar de arma                                                                                    |
+| Tab               | Marcador                                                                                           |
+| B                 | Cambiar de personaje (solo estando muerto)                                                         |
+| T                 | Cambiar de equipo (por equipos; espera 5 s entre cambios y no vale en pleno combate)               |
+| O                 | Ajustes: mira (6 estilos, color, tamaño…), sensibilidad, campo de visión y volumen                 |
+| H / F1            | Manual del juego (controles, personajes, armas y trucos)                                           |
+| Esc               | Pausa (soltar el ratón); otro Esc vuelve al juego                                                  |
 
 **Ctrl+W no cierra el juego:** al pulsar "Jugar" el juego pasa siempre a pantalla completa y bloquea los atajos
 del navegador (Chrome y Edge). En Firefox, o si se sale de pantalla completa, el navegador pregunta antes de cerrar
@@ -122,13 +122,13 @@ del daño y el **ping** arriba. En el marcador (Tab) se ven bajas, muertes, rach
 
 Más vida = más lento. La velocidad (m/s) es con la principal / con la secundaria en la mano.
 
-| Personaje | Vida | Velocidad | Principal | Secundaria |
-|---|---|---|---|---|
-| Rayo | 85 | 10.4 / 10.7 | Subfusil | Pistola |
-| Cazador | 90 | 7.2 / 7.8 | Francotirador | Pistola |
-| Soldado | 100 | 7.1 / 7.5 | Rifle de asalto | Pistola |
-| Bastión | 120 | 6.6 / 7.3 | Ametralladora | Revólver |
-| Tanque | 150 | 6.5 / 6.8 | Escopeta | Revólver |
+| Personaje | Vida | Velocidad   | Principal       | Secundaria |
+| --------- | ---- | ----------- | --------------- | ---------- |
+| Rayo      | 85   | 10.4 / 10.7 | Subfusil        | Pistola    |
+| Cazador   | 90   | 7.2 / 7.8   | Francotirador   | Pistola    |
+| Soldado   | 100  | 7.1 / 7.5   | Rifle de asalto | Pistola    |
+| Bastión   | 120  | 6.6 / 7.3   | Ametralladora   | Revólver   |
+| Tanque    | 150  | 6.5 / 6.8   | Escopeta        | Revólver   |
 
 ## Estructura
 

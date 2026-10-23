@@ -53,14 +53,18 @@ export default function CharacterPreview({ charId, skin }) {
     const ro = new ResizeObserver(resize);
     ro.observe(el);
 
-    const down = (e) => { v.drag = e.clientX; };
+    const down = (e) => {
+      v.drag = e.clientX;
+    };
     const move = (e) => {
       if (v.drag === null) return;
       v.angle += (e.clientX - v.drag) * 0.012;
       v.drag = e.clientX;
       v.idle = performance.now();
     };
-    const up = () => { v.drag = null; };
+    const up = () => {
+      v.drag = null;
+    };
     el.addEventListener('pointerdown', down);
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
@@ -94,7 +98,9 @@ export default function CharacterPreview({ charId, skin }) {
     if (!v || !ch) return;
     v.holder.clear();
     const model = buildCharacter(ch.id, skin, ch.color);
-    model.group.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    model.group.traverse((o) => {
+      if (o.isMesh) o.castShadow = true;
+    });
     const gun = buildGun(ch.primary, false, ch.color);
     gun.scale.setScalar(1.3);
     model.hand.add(gun);

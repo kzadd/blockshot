@@ -106,45 +106,180 @@ export const PLAYER = {
 // bloom = cuánto se abre la dispersión con cada disparo seguido (hasta bloomMax); el primer tiro va al centro
 export const WEAPONS = {
   rifle: {
-    name: 'Rifle de asalto', damage: 24, headMult: 1.6, fireRate: 100, mag: 30, reload: 2000,
-    auto: true, spread: 0.012, adsSpread: 0.002, pellets: 1, range: 200, recoil: 0.008, zoom: 1.6, sound: 'rifle',
-    weight: 0.97, adsSpeed: 12, adsMove: 0.6, falloff: [35, 90, 0.7], bloom: 0.0022, bloomMax: 0.018,
+    name: 'Rifle de asalto',
+    damage: 24,
+    headMult: 1.6,
+    fireRate: 100,
+    mag: 30,
+    reload: 2000,
+    auto: true,
+    spread: 0.012,
+    adsSpread: 0.002,
+    pellets: 1,
+    range: 200,
+    recoil: 0.008,
+    zoom: 1.6,
+    sound: 'rifle',
+    weight: 0.97,
+    adsSpeed: 12,
+    adsMove: 0.6,
+    falloff: [35, 90, 0.7],
+    bloom: 0.0022,
+    bloomMax: 0.018,
   },
   sniper: {
-    name: 'Francotirador', damage: 120, headMult: 2, fireRate: 1100, boltTime: 550, mag: 5, reload: 2700,
-    auto: false, spread: 0.12, adsSpread: 0.0008, pellets: 1, range: 400, recoil: 0.07, zoom: 5, scope: true, sound: 'sniper',
-    weight: 0.95, adsSpeed: 20, adsMove: 0.55, moveSpread: 3, airSpread: 4, bolt: true,
+    name: 'Francotirador',
+    damage: 120,
+    headMult: 2,
+    fireRate: 1100,
+    boltTime: 550,
+    mag: 5,
+    reload: 2700,
+    auto: false,
+    spread: 0.12,
+    adsSpread: 0.0008,
+    pellets: 1,
+    range: 400,
+    recoil: 0.07,
+    zoom: 5,
+    scope: true,
+    sound: 'sniper',
+    weight: 0.95,
+    adsSpeed: 20,
+    adsMove: 0.55,
+    moveSpread: 3,
+    airSpread: 4,
+    bolt: true,
   },
   shotgun: {
-    name: 'Escopeta', damage: 13, headMult: 1.3, fireRate: 850, mag: 6, reload: 2400,
-    auto: false, spread: 0.075, adsSpread: 0.06, pellets: 10, range: 32, recoil: 0.05, zoom: 1.25, sound: 'shotgun',
-    weight: 0.95, adsSpeed: 14, adsMove: 0.65, falloff: [8, 30, 0.35],
+    name: 'Escopeta',
+    damage: 13,
+    headMult: 1.3,
+    fireRate: 850,
+    mag: 6,
+    reload: 2400,
+    auto: false,
+    spread: 0.075,
+    adsSpread: 0.06,
+    pellets: 10,
+    range: 32,
+    recoil: 0.05,
+    zoom: 1.25,
+    sound: 'shotgun',
+    weight: 0.95,
+    adsSpeed: 14,
+    adsMove: 0.65,
+    falloff: [8, 30, 0.35],
   },
   smg: {
-    name: 'Subfusil', damage: 16, headMult: 1.5, fireRate: 68, mag: 35, reload: 1600,
-    auto: true, spread: 0.018, adsSpread: 0.007, pellets: 1, range: 90, recoil: 0.0055, zoom: 1.4, sound: 'smg',
-    weight: 1, adsSpeed: 20, adsMove: 0.75, falloff: [15, 45, 0.6], bloom: 0.0016, bloomMax: 0.018,
+    name: 'Subfusil',
+    damage: 16,
+    headMult: 1.5,
+    fireRate: 68,
+    mag: 35,
+    reload: 1600,
+    auto: true,
+    spread: 0.018,
+    adsSpread: 0.007,
+    pellets: 1,
+    range: 90,
+    recoil: 0.0055,
+    zoom: 1.4,
+    sound: 'smg',
+    weight: 1,
+    adsSpeed: 20,
+    adsMove: 0.75,
+    falloff: [15, 45, 0.6],
+    bloom: 0.0016,
+    bloomMax: 0.018,
   },
   lmg: {
-    name: 'Ametralladora', damage: 21, headMult: 1.5, fireRate: 115, mag: 80, reload: 4200,
-    auto: true, spread: 0.018, adsSpread: 0.005, pellets: 1, range: 160, recoil: 0.0075, zoom: 1.5, sound: 'lmg',
-    weight: 0.9, adsSpeed: 9, adsMove: 0.55, falloff: [40, 110, 0.7], bloom: 0.0015, bloomMax: 0.02,
+    name: 'Ametralladora',
+    damage: 21,
+    headMult: 1.5,
+    fireRate: 115,
+    mag: 80,
+    reload: 4200,
+    auto: true,
+    spread: 0.018,
+    adsSpread: 0.005,
+    pellets: 1,
+    range: 160,
+    recoil: 0.0075,
+    zoom: 1.5,
+    sound: 'lmg',
+    weight: 0.9,
+    adsSpeed: 9,
+    adsMove: 0.55,
+    falloff: [40, 110, 0.7],
+    bloom: 0.0015,
+    bloomMax: 0.02,
   },
   pistol: {
-    name: 'Pistola', damage: 25, headMult: 1.6, fireRate: 220, mag: 12, reload: 1300,
-    auto: false, spread: 0.008, adsSpread: 0.0025, pellets: 1, range: 100, recoil: 0.018, zoom: 1.35, sound: 'pistol',
-    weight: 1.03, adsSpeed: 20, adsMove: 0.8, falloff: [20, 60, 0.65], bloom: 0.003, bloomMax: 0.012,
+    name: 'Pistola',
+    damage: 25,
+    headMult: 1.6,
+    fireRate: 220,
+    mag: 12,
+    reload: 1300,
+    auto: false,
+    spread: 0.008,
+    adsSpread: 0.0025,
+    pellets: 1,
+    range: 100,
+    recoil: 0.018,
+    zoom: 1.35,
+    sound: 'pistol',
+    weight: 1.03,
+    adsSpeed: 20,
+    adsMove: 0.8,
+    falloff: [20, 60, 0.65],
+    bloom: 0.003,
+    bloomMax: 0.012,
   },
   revolver: {
-    name: 'Revólver', damage: 50, headMult: 1.8, fireRate: 600, mag: 6, reload: 2200,
-    auto: false, spread: 0.008, adsSpread: 0.0018, pellets: 1, range: 120, recoil: 0.04, zoom: 1.5, sound: 'revolver',
-    weight: 1, adsSpeed: 14, adsMove: 0.7, falloff: [25, 70, 0.7], bloom: 0.005, bloomMax: 0.014,
+    name: 'Revólver',
+    damage: 50,
+    headMult: 1.8,
+    fireRate: 600,
+    mag: 6,
+    reload: 2200,
+    auto: false,
+    spread: 0.008,
+    adsSpread: 0.0018,
+    pellets: 1,
+    range: 120,
+    recoil: 0.04,
+    zoom: 1.5,
+    sound: 'revolver',
+    weight: 1,
+    adsSpeed: 14,
+    adsMove: 0.7,
+    falloff: [25, 70, 0.7],
+    bloom: 0.005,
+    bloomMax: 0.014,
   },
   // Cuerpo a cuerpo: todos lo llevan (tecla 3). Por la espalda mata de un golpe
   knife: {
-    name: 'Cuchillo', damage: 55, headMult: 1.2, fireRate: 480, mag: 1, reload: 0,
-    auto: true, spread: 0, adsSpread: 0, pellets: 1, range: 2.6, recoil: 0, zoom: 1, sound: 'knife',
-    weight: 1.12, adsSpeed: 20, adsMove: 1, melee: true, backstab: 200,
+    name: 'Cuchillo',
+    damage: 55,
+    headMult: 1.2,
+    fireRate: 480,
+    mag: 1,
+    reload: 0,
+    auto: true,
+    spread: 0,
+    adsSpread: 0,
+    pellets: 1,
+    range: 2.6,
+    recoil: 0,
+    zoom: 1,
+    sound: 'knife',
+    weight: 1.12,
+    adsSpeed: 20,
+    adsMove: 1,
+    melee: true,
+    backstab: 200,
   },
 };
 
@@ -174,29 +309,59 @@ export function damageAt(w, dist) {
 
 export const CHARACTERS = [
   {
-    id: 'soldado', name: 'Soldado', color: '#3f7fe0', hp: 100, speed: 7.3,
-    primary: 'rifle', secondary: 'pistol',
-    role: 'Equilibrado', desc: 'Equilibrado. Rinde a cualquier distancia y perdona los fallos.',
+    id: 'soldado',
+    name: 'Soldado',
+    color: '#3f7fe0',
+    hp: 100,
+    speed: 7.3,
+    primary: 'rifle',
+    secondary: 'pistol',
+    role: 'Equilibrado',
+    desc: 'Equilibrado. Rinde a cualquier distancia y perdona los fallos.',
   },
   {
-    id: 'cazador', name: 'Cazador', color: '#3aa65a', hp: 90, speed: 7.6,
-    primary: 'sniper', secondary: 'pistol',
-    role: 'Larga distancia', desc: 'Un tiro al cuerpo tumba a todos menos al Tanque (a él, a la cabeza). Busca altura.',
+    id: 'cazador',
+    name: 'Cazador',
+    color: '#3aa65a',
+    hp: 90,
+    speed: 7.6,
+    primary: 'sniper',
+    secondary: 'pistol',
+    role: 'Larga distancia',
+    desc: 'Un tiro al cuerpo tumba a todos menos al Tanque (a él, a la cabeza). Busca altura.',
   },
   {
-    id: 'tanque', name: 'Tanque', color: '#d0533a', hp: 150, speed: 6.8,
-    primary: 'shotgun', secondary: 'revolver',
-    role: 'Cuerpo a cuerpo', desc: 'Mucha vida y escopeta. Letal de cerca, lento de lejos.',
+    id: 'tanque',
+    name: 'Tanque',
+    color: '#d0533a',
+    hp: 150,
+    speed: 6.8,
+    primary: 'shotgun',
+    secondary: 'revolver',
+    role: 'Cuerpo a cuerpo',
+    desc: 'Mucha vida y escopeta. Letal de cerca, lento de lejos.',
   },
   {
-    id: 'rayo', name: 'Rayo', color: '#e8b923', hp: 85, speed: 10.4,
-    primary: 'smg', secondary: 'pistol',
-    role: 'Velocidad', desc: 'El más rápido. Entra, dispara y sal antes de que te vean.',
+    id: 'rayo',
+    name: 'Rayo',
+    color: '#e8b923',
+    hp: 85,
+    speed: 10.4,
+    primary: 'smg',
+    secondary: 'pistol',
+    role: 'Velocidad',
+    desc: 'El más rápido. Entra, dispara y sal antes de que te vean.',
   },
   {
-    id: 'bastion', name: 'Bastión', color: '#8a5cd6', hp: 120, speed: 7.3,
-    primary: 'lmg', secondary: 'revolver',
-    role: 'Supresión', desc: 'Cargador de 80 balas. Aguanta una esquina él solo.',
+    id: 'bastion',
+    name: 'Bastión',
+    color: '#8a5cd6',
+    hp: 120,
+    speed: 7.3,
+    primary: 'lmg',
+    secondary: 'revolver',
+    role: 'Supresión',
+    desc: 'Cargador de 80 balas. Aguanta una esquina él solo.',
   },
 ];
 
@@ -224,19 +389,40 @@ export const SKINS = [
 
 // Partes de cada objeto: [dx, dy, dz, ancho, alto, fondo, tipo]
 const BARREL = [[0, 0, 0, 0.85, 1.1, 0.85, 'barrel']];
-const TREE = [[0, 0, 0, 1.6, 0.7, 1.6, 'planter'], [0, 0.7, 0, 0.35, 2.6, 0.35, 'trunk']];
+const TREE = [
+  [0, 0, 0, 1.6, 0.7, 1.6, 'planter'],
+  [0, 0.7, 0, 0.35, 2.6, 0.35, 'trunk'],
+];
 const LAMP = [[0, 0, 0, 0.25, 4.2, 0.25, 'lamp']];
 const CACTUS = [[0, 0, 0, 0.45, 2.3, 0.45, 'cactus']];
 const sandbags = (w, d) => [[0, 0, 0, w, 0.95, d, 'sandbag']];
-const PALLET = [[0, 0, 0, 1.2, 0.15, 1.2, 'pallet'], [0, 0.15, 0, 1, 1, 1, 'crate']];
+const PALLET = [
+  [0, 0, 0, 1.2, 0.15, 1.2, 'pallet'],
+  [0, 0.15, 0, 1, 1, 1, 'crate'],
+];
 // Colores de los objetos (minimapa y vista previa; el 3D los usa como tinte)
 const PROP_COLORS = {
-  barrel: '#3d6e9e', planter: '#9a8f80', trunk: '#6b4a2b', lamp: '#3a3f47',
-  sandbag: '#b8a57a', pad: '#3ee08a', pallet: '#a8834f', cactus: '#4f8a45', car: '#c0503e', carTop: '#2b3a4a',
+  barrel: '#3d6e9e',
+  planter: '#9a8f80',
+  trunk: '#6b4a2b',
+  lamp: '#3a3f47',
+  sandbag: '#b8a57a',
+  pad: '#3ee08a',
+  pallet: '#a8834f',
+  cactus: '#4f8a45',
+  car: '#c0503e',
+  carTop: '#2b3a4a',
 };
-const car = (alongX) => (alongX
-  ? [[0, 0, 0, 4.2, 1, 1.9, 'car'], [0.3, 1, 0, 2.2, 0.75, 1.7, 'carTop']]
-  : [[0, 0, 0, 1.9, 1, 4.2, 'car'], [0, 1, 0.3, 1.7, 0.75, 2.2, 'carTop']]);
+const car = (alongX) =>
+  alongX
+    ? [
+        [0, 0, 0, 4.2, 1, 1.9, 'car'],
+        [0.3, 1, 0, 2.2, 0.75, 1.7, 'carTop'],
+      ]
+    : [
+        [0, 0, 0, 1.9, 1, 4.2, 'car'],
+        [0, 1, 0.3, 1.7, 0.75, 2.2, 'carTop'],
+      ];
 export const MAP_SIZES = {
   s: { id: 's', name: 'Pequeño', half: 26, players: 6 },
   m: { id: 'm', name: 'Mediano', half: 40, players: 12 },
@@ -258,7 +444,7 @@ const seedOf = (s) => [...s].reduce((h, ch) => Math.imul(h ^ ch.charCodeAt(0), 1
 function stairs(B, x, z, axis, dir, steps, width, c = 'step') {
   for (let i = 1; i <= steps; i++) {
     const len = steps + 1 - i;
-    const off = -dir * len / 2;
+    const off = (-dir * len) / 2;
     if (axis === 'x') B(x + off, 0, z, len, i * 0.5, width, c);
     else B(x, 0, z + off, width, i * 0.5, len, c);
   }
@@ -304,7 +490,18 @@ function buildPatio({ B, S, P, H }) {
     }
   }
 
-  const crates = [[-10, -28], [10, 28], [-28, 10], [28, -10], [-12, -12], [12, 12], [0, -26], [0, 26], [-26, 0], [26, 0]];
+  const crates = [
+    [-10, -28],
+    [10, 28],
+    [-28, 10],
+    [28, -10],
+    [-12, -12],
+    [12, 12],
+    [0, -26],
+    [0, 26],
+    [-26, 0],
+    [26, 0],
+  ];
   for (const [x, z] of crates) B(x * k, 0, z * k, 2.4, 1.2, 2.4, 'crate');
   // Pilas de cajas (se escalan saltando)
   B(-12 * k, 0, 12 * k, 2.4, 2.4, 2.4, 'crate2');
@@ -312,7 +509,12 @@ function buildPatio({ B, S, P, H }) {
   B(12 * k, 0, -12 * k, 2.4, 2.4, 2.4, 'crate2');
   B(12 * k + 2.4, 0, -12 * k, 2.4, 1.2, 2.4, 'crate');
   if (H >= 50) {
-    for (const [x, z] of [[-0.6, -0.3], [0.6, 0.3], [0.3, -0.6], [-0.3, 0.6]]) {
+    for (const [x, z] of [
+      [-0.6, -0.3],
+      [0.6, 0.3],
+      [0.3, -0.6],
+      [-0.3, 0.6],
+    ]) {
       B(x * H, 0, z * H, 2.4, 2.4, 2.4, 'crate2');
       B(x * H + 2.4 * Math.sign(x), 0, z * H, 2.4, 1.2, 2.4, 'crate');
     }
@@ -338,8 +540,18 @@ function buildPatio({ B, S, P, H }) {
   }
 
   const spawns = [
-    [-31, -31], [31, -31], [-31, 31], [31, 31], [0, -34], [0, 34], [-34, 0], [34, 0],
-    [20, 30], [-20, -30], [30, -14], [-30, 14],
+    [-31, -31],
+    [31, -31],
+    [-31, 31],
+    [31, 31],
+    [0, -34],
+    [0, 34],
+    [-34, 0],
+    [34, 0],
+    [20, 30],
+    [-20, -30],
+    [30, -14],
+    [-30, 14],
   ];
   for (const [x, z] of spawns) S(x * k, z * k);
 }
@@ -415,7 +627,7 @@ function buildDesfiladero({ B, S, P: Prop, H, rand }) {
   const P = Math.max(10, Math.round(0.32 * H)); // el cañón va de -P a P
   const bridges = [0, 0.5 * H, -0.5 * H];
   for (const s of [1, -1]) {
-    B(s * (P + H) / 2, 0, 0, H - P, 4, 2 * H, 'platform');
+    B((s * (P + H)) / 2, 0, 0, H - P, 4, 2 * H, 'platform');
     const ups = [s * 0.25 * H, -s * 0.7 * H];
     for (const z of ups) stairs(B, s * P, z, 'x', s, 8, 3);
 
@@ -473,7 +685,8 @@ function buildDesfiladero({ B, S, P: Prop, H, rand }) {
 function buildPolvo({ B, S, P, H }) {
   const k = H / 40;
   // Rectángulo [x1,x2] × [z1,z2] de alto h, apoyado en y
-  const R = (x1, x2, z1, z2, h, c = 'wall2', y = 0) => B(((x1 + x2) / 2) * k, y, ((z1 + z2) / 2) * k, (x2 - x1) * k, h, (z2 - z1) * k, c);
+  const R = (x1, x2, z1, z2, h, c = 'wall2', y = 0) =>
+    B(((x1 + x2) / 2) * k, y, ((z1 + z2) / 2) * k, (x2 - x1) * k, h, (z2 - z1) * k, c);
   // Casas: entre ellas quedan los pasillos
   R(-22, -6, -12, -2, 7);
   R(-22, -6, 2, 12, 7);
@@ -529,8 +742,20 @@ function buildPolvo({ B, S, P, H }) {
   P(27 * k, -15 * k, sandbags(1, 3));
 
   const spawns = [
-    [0, 35], [-8, 36], [8, 36], [-16, 35], [16, 35], [0, -36], [-10, -37], [10, -37],
-    [-35, 32], [35, 32], [-35, -14], [35, -14], [26, 20], [-26, 20],
+    [0, 35],
+    [-8, 36],
+    [8, 36],
+    [-16, 35],
+    [16, 35],
+    [0, -36],
+    [-10, -37],
+    [10, -37],
+    [-35, 32],
+    [35, 32],
+    [-35, -14],
+    [35, -14],
+    [26, 20],
+    [-26, 20],
   ];
   for (const [x, z] of spawns) S(x * k, z * k);
 }
@@ -553,7 +778,13 @@ function buildCiudad({ B, S, P, H, rand }) {
       if ((i === plaza && j === plaza) || roll < 0.1) {
         // Plaza: fuente, árboles y bancos
         B(cx, 0, cz, 3, 0.8, 3, 'platform');
-        for (const [dx, dz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) P(cx + dx * (bs / 2 - 1.5), cz + dz * (bs / 2 - 1.5), TREE);
+        for (const [dx, dz] of [
+          [1, 1],
+          [1, -1],
+          [-1, 1],
+          [-1, -1],
+        ])
+          P(cx + dx * (bs / 2 - 1.5), cz + dz * (bs / 2 - 1.5), TREE);
         P(cx, cz + bs / 2 - 1, sandbags(2.4, 0.6));
         continue;
       }
@@ -598,43 +829,95 @@ function buildCiudad({ B, S, P, H, rand }) {
 
 const MAP_DEFS = {
   patio: {
-    name: 'Patio', tag: 'Equilibrado', desc: 'Torre central y habitaciones en las esquinas. Equilibrado.',
-    build: buildPatio, wallH: 8, sky: '#9fd4ff',
+    name: 'Patio',
+    tag: 'Equilibrado',
+    desc: 'Torre central y habitaciones en las esquinas. Equilibrado.',
+    build: buildPatio,
+    wallH: 8,
+    sky: '#9fd4ff',
     colors: {
-      floor: '#d6cdb8', wall: '#b0705a', wall2: '#dcc6a2', platform: '#a8a196',
-      step: '#c2bbaf', crate: '#c99a55', crate2: '#6f8f5a',
+      floor: '#d6cdb8',
+      wall: '#b0705a',
+      wall2: '#dcc6a2',
+      platform: '#a8a196',
+      step: '#c2bbaf',
+      crate: '#c99a55',
+      crate2: '#6f8f5a',
     },
   },
   almacen: {
-    name: 'Almacén', tag: 'Combate cercano', desc: 'Pasillos entre contenedores. Combate cercano y esquinas.',
-    build: buildAlmacen, wallH: 9, sky: '#c4d0dc',
+    name: 'Almacén',
+    tag: 'Combate cercano',
+    desc: 'Pasillos entre contenedores. Combate cercano y esquinas.',
+    build: buildAlmacen,
+    wallH: 9,
+    sky: '#c4d0dc',
     colors: {
-      floor: '#a8a8a0', wall: '#5d6b78', platform: '#7d8a96', step: '#9aa6b1', rail: '#e0b33a',
-      crate: '#c9944a', crate2: '#8d6a3f', cont1: '#c0503e', cont2: '#3f78b5', cont3: '#4f9a5a',
+      floor: '#a8a8a0',
+      wall: '#5d6b78',
+      platform: '#7d8a96',
+      step: '#9aa6b1',
+      rail: '#e0b33a',
+      crate: '#c9944a',
+      crate2: '#8d6a3f',
+      cont1: '#c0503e',
+      cont2: '#3f78b5',
+      cont3: '#4f9a5a',
     },
   },
   desfiladero: {
-    name: 'Desfiladero', tag: 'Francotiradores', desc: 'Cañón entre dos mesetas. Líneas largas para francotiradores.',
-    build: buildDesfiladero, wallH: 12, sky: '#ffd8a6',
+    name: 'Desfiladero',
+    tag: 'Francotiradores',
+    desc: 'Cañón entre dos mesetas. Líneas largas para francotiradores.',
+    build: buildDesfiladero,
+    wallH: 12,
+    sky: '#ffd8a6',
     colors: {
-      floor: '#e0c08f', wall: '#b0704a', wall2: '#c98a5a', platform: '#d19a64',
-      step: '#a87a4e', bridge: '#8a6440', rock: '#9b8b7a', crate: '#d4a24c',
+      floor: '#e0c08f',
+      wall: '#b0704a',
+      wall2: '#c98a5a',
+      platform: '#d19a64',
+      step: '#a87a4e',
+      bridge: '#8a6440',
+      rock: '#9b8b7a',
+      crate: '#d4a24c',
     },
   },
   polvo: {
-    name: 'Polvo', tag: 'Pasillos', desc: 'Pueblo del desierto: túnel, medio y pasillo largo hasta dos zonas.',
-    build: buildPolvo, wallH: 9, sky: '#ffe7c2',
+    name: 'Polvo',
+    tag: 'Pasillos',
+    desc: 'Pueblo del desierto: túnel, medio y pasillo largo hasta dos zonas.',
+    build: buildPolvo,
+    wallH: 9,
+    sky: '#ffe7c2',
     colors: {
-      floor: '#dcc49a', wall: '#c9a878', wall2: '#e0c9a0', roof: '#8a6a4a', platform: '#c7b08a',
-      step: '#b9a27c', crate: '#c99a55', crate2: '#8f7a52',
+      floor: '#dcc49a',
+      wall: '#c9a878',
+      wall2: '#e0c9a0',
+      roof: '#8a6a4a',
+      platform: '#c7b08a',
+      step: '#b9a27c',
+      crate: '#c99a55',
+      crate2: '#8f7a52',
     },
   },
   ciudad: {
-    name: 'Ciudad', tag: 'Calles', desc: 'Manzanas de edificios, callejones, plazas y azoteas.',
-    build: buildCiudad, wallH: 14, sky: '#a9cbe8',
+    name: 'Ciudad',
+    tag: 'Calles',
+    desc: 'Manzanas de edificios, callejones, plazas y azoteas.',
+    build: buildCiudad,
+    wallH: 14,
+    sky: '#a9cbe8',
     colors: {
-      floor: '#6b6e74', wall: '#8a8f99', bld1: '#c9b79a', bld2: '#9fb0c4', bld3: '#d8c8b0', bld4: '#b58c74',
-      platform: '#a8a196', step: '#bdb6aa', crate: '#c99a55',
+      floor: '#6b6e74',
+      wall: '#8a8f99',
+      bld1: '#c9b79a',
+      bld2: '#9fb0c4',
+      bld3: '#d8c8b0',
+      bld4: '#b58c74',
+      platform: '#a8a196',
+      step: '#bdb6aa',
+      crate: '#c99a55',
     },
   },
 };
@@ -673,15 +956,28 @@ export function groundAt(boxes, x, z) {
 // Coloca los objetos de decoración que caben: sobre el suelo, sin chocar con nada y lejos de los spawns
 function placeProps(boxes, points, props) {
   const hit = (a, b) =>
-    Math.abs(a.x - b.x) < (a.w + b.w) / 2 - 0.01 && Math.abs(a.z - b.z) < (a.d + b.d) / 2 - 0.01 &&
-    a.y < b.y + b.h - 0.01 && b.y < a.y + a.h - 0.01;
+    Math.abs(a.x - b.x) < (a.w + b.w) / 2 - 0.01 &&
+    Math.abs(a.z - b.z) < (a.d + b.d) / 2 - 0.01 &&
+    a.y < b.y + b.h - 0.01 &&
+    b.y < a.y + a.h - 0.01;
   let id = 0;
   for (const { x, z, parts } of props) {
     const y = groundAt(boxes, x, z);
-    const list = parts.map(([dx, dy, dz, w, h, d, c]) => ({ x: r2(x + dx), y: r2(y + dy), z: r2(z + dz), w, h, d, c, p: id + 1 }));
-    const blocked = list.some((b) =>
-      boxes.some((o) => o.c !== 'floor' && (hit(b, o) || (o.c === 'pad' && hit({ ...b, y: o.y }, o)))) ||
-      points.some(([sx, sz]) => Math.abs(sx - b.x) < b.w / 2 + 1.3 && Math.abs(sz - b.z) < b.d / 2 + 1.3));
+    const list = parts.map(([dx, dy, dz, w, h, d, c]) => ({
+      x: r2(x + dx),
+      y: r2(y + dy),
+      z: r2(z + dz),
+      w,
+      h,
+      d,
+      c,
+      p: id + 1,
+    }));
+    const blocked = list.some(
+      (b) =>
+        boxes.some((o) => o.c !== 'floor' && (hit(b, o) || (o.c === 'pad' && hit({ ...b, y: o.y }, o)))) ||
+        points.some(([sx, sz]) => Math.abs(sx - b.x) < b.w / 2 + 1.3 && Math.abs(sz - b.z) < b.d / 2 + 1.3),
+    );
     if (blocked) continue;
     id++;
     boxes.push(...list);
@@ -699,7 +995,8 @@ export function getMap(mapId, sizeId) {
   const H = MAP_SIZES[size].half;
   const boxes = [];
   const points = [];
-  const B = (x, y, z, w, h, d, c = 'wall') => boxes.push({ x: r2(x), y: r2(y), z: r2(z), w: r2(w), h: r2(h), d: r2(d), c });
+  const B = (x, y, z, w, h, d, c = 'wall') =>
+    boxes.push({ x: r2(x), y: r2(y), z: r2(z), w: r2(w), h: r2(h), d: r2(d), c });
   // Suelo y muros exteriores
   B(0, -1, 0, 2 * H, 1, 2 * H, 'floor');
   B(0, 0, -H - 0.5, 2 * H + 2, def.wallH, 1);
@@ -712,8 +1009,16 @@ export function getMap(mapId, sizeId) {
   placeProps(boxes, points, props);
 
   const map = {
-    id, size, name: def.name, sizeName: MAP_SIZES[size].name, half: H, bounds: H - 0.4,
-    wallH: def.wallH, sky: def.sky, colors: { ...PROP_COLORS, ...def.colors }, boxes,
+    id,
+    size,
+    name: def.name,
+    sizeName: MAP_SIZES[size].name,
+    half: H,
+    bounds: H - 0.4,
+    wallH: def.wallH,
+    sky: def.sky,
+    colors: { ...PROP_COLORS, ...def.colors },
+    boxes,
     spawns: [],
   };
   const cols = getColliders(map);

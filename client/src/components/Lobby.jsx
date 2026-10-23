@@ -31,7 +31,15 @@ export default function Lobby({ onJoined }) {
   const [rooms, setRooms] = useState([]);
   const [connected, setConnected] = useState(socket.connected);
   const [offline, setOffline] = useState(false); // aviso de error de conexión
-  const [form, setForm] = useState({ name: '', password: '', mapId: 'patio', size: 'm', mode: 'ffa', scoreLimit: MODE_BY_ID.ffa.def, max: MAP_SIZES.m.players });
+  const [form, setForm] = useState({
+    name: '',
+    password: '',
+    mapId: 'patio',
+    size: 'm',
+    mode: 'ffa',
+    scoreLimit: MODE_BY_ID.ffa.def,
+    max: MAP_SIZES.m.players,
+  });
   const [joining, setJoining] = useState(null);
   const [pass, setPass] = useState('');
   const [passError, setPassError] = useState('');
@@ -102,7 +110,8 @@ export default function Lobby({ onJoined }) {
       if (res?.ok) {
         setJoining(null);
         onJoined(res);
-      } else if (password && /contraseña/i.test(res?.error || '')) setPassError(`Contraseña incorrecta. Pídesela a ${room.host}.`);
+      } else if (password && /contraseña/i.test(res?.error || ''))
+        setPassError(`Contraseña incorrecta. Pídesela a ${room.host}.`);
       else {
         setJoining(null);
         setToast(res?.error || 'No se pudo entrar a la sala.');
@@ -137,8 +146,12 @@ export default function Lobby({ onJoined }) {
                 />
                 {nickError && <span className="name-error">Escribe tu nombre antes de entrar.</span>}
               </label>
-              <button className="btn" onClick={() => setMenu('manual')}>📖 Manual del juego</button>
-              <button className="btn" onClick={() => setMenu('settings')}>⚙️ Ajustes y mira</button>
+              <button className="btn" onClick={() => setMenu('manual')}>
+                📖 Manual del juego
+              </button>
+              <button className="btn" onClick={() => setMenu('settings')}>
+                ⚙️ Ajustes y mira
+              </button>
             </div>
           </header>
 
@@ -148,34 +161,65 @@ export default function Lobby({ onJoined }) {
               <div className="row-2">
                 <label className="field">
                   <span>Nombre de la sala</span>
-                  <input ref={roomNameRef} className="input" value={form.name} maxLength={24} placeholder={`Sala de ${nickname || 'Ricardo'}`} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                  <input
+                    ref={roomNameRef}
+                    className="input"
+                    value={form.name}
+                    maxLength={24}
+                    placeholder={`Sala de ${nickname || 'Ricardo'}`}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  />
                 </label>
                 <label className="field">
                   <span>Contraseña (opcional)</span>
                   <span className="with-icon">
                     <i>{form.password ? '🔒' : '🔓'}</i>
-                    <input className="input" value={form.password} maxLength={32} placeholder="Sin contraseña" onChange={(e) => setForm({ ...form, password: e.target.value })} />
+                    <input
+                      className="input"
+                      value={form.password}
+                      maxLength={32}
+                      placeholder="Sin contraseña"
+                      onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    />
                   </span>
                 </label>
               </div>
 
               <div>
-                <div className="label-row"><span className="label">Mapa</span><span className="hint">{mapInfo.desc}</span></div>
+                <div className="label-row">
+                  <span className="label">Mapa</span>
+                  <span className="hint">{mapInfo.desc}</span>
+                </div>
                 <div className="maps">
                   {MAPS.map((m) => (
-                    <button type="button" key={m.id} className={`map-card ${form.mapId === m.id ? 'on' : ''}`} onClick={() => setForm({ ...form, mapId: m.id })}>
+                    <button
+                      type="button"
+                      key={m.id}
+                      className={`map-card ${form.mapId === m.id ? 'on' : ''}`}
+                      onClick={() => setForm({ ...form, mapId: m.id })}
+                    >
                       <MapPreview mapId={m.id} size={form.size} px={48} className="map-thumb" />
-                      <span><b>{m.name}</b><small>{m.tag}</small></span>
+                      <span>
+                        <b>{m.name}</b>
+                        <small>{m.tag}</small>
+                      </span>
                     </button>
                   ))}
                 </div>
               </div>
 
               <div>
-                <div className="label-row"><span className="label">Modo de juego</span></div>
+                <div className="label-row">
+                  <span className="label">Modo de juego</span>
+                </div>
                 <div className="seg modes">
                   {MODES.map((m) => (
-                    <button type="button" key={m.id} className={form.mode === m.id ? 'on' : ''} onClick={() => setForm({ ...form, mode: m.id, scoreLimit: m.def })}>
+                    <button
+                      type="button"
+                      key={m.id}
+                      className={form.mode === m.id ? 'on' : ''}
+                      onClick={() => setForm({ ...form, mode: m.id, scoreLimit: m.def })}
+                    >
                       <b>{m.name}</b>
                       <small>{MODE_SUB[m.id]}</small>
                     </button>
@@ -185,10 +229,23 @@ export default function Lobby({ onJoined }) {
 
               <div className="row-2">
                 <div>
-                  <div className="label-row"><span className="label">Para ganar</span><span className="hint">{form.mode === 'infect' ? `Aguantar ${form.scoreLimit} min` : `${form.scoreLimit} ${MODE_BY_ID[form.mode].unit}${form.mode === 'teams' || form.mode === 'kc' ? ' del equipo' : ''}`}</span></div>
+                  <div className="label-row">
+                    <span className="label">Para ganar</span>
+                    <span className="hint">
+                      {form.mode === 'infect'
+                        ? `Aguantar ${form.scoreLimit} min`
+                        : `${form.scoreLimit} ${MODE_BY_ID[form.mode].unit}${form.mode === 'teams' || form.mode === 'kc' ? ' del equipo' : ''}`}
+                    </span>
+                  </div>
                   <div className="seg">
                     {MODE_BY_ID[form.mode].limits.map((n) => (
-                      <button type="button" key={n} className={form.scoreLimit === n ? 'on' : ''} onClick={() => setForm({ ...form, scoreLimit: n })} style={{ justifyItems: 'center' }}>
+                      <button
+                        type="button"
+                        key={n}
+                        className={form.scoreLimit === n ? 'on' : ''}
+                        onClick={() => setForm({ ...form, scoreLimit: n })}
+                        style={{ justifyItems: 'center' }}
+                      >
                         <b>{n}</b>
                         <small>{MODE_BY_ID[form.mode].unit}</small>
                       </button>
@@ -197,10 +254,17 @@ export default function Lobby({ onJoined }) {
                 </div>
 
                 <div>
-                  <div className="label-row"><span className="label">Tamaño</span></div>
+                  <div className="label-row">
+                    <span className="label">Tamaño</span>
+                  </div>
                   <div className="seg">
                     {Object.values(MAP_SIZES).map((z) => (
-                      <button type="button" key={z.id} className={form.size === z.id ? 'on' : ''} onClick={() => setForm({ ...form, size: z.id, max: z.players })}>
+                      <button
+                        type="button"
+                        key={z.id}
+                        className={form.size === z.id ? 'on' : ''}
+                        onClick={() => setForm({ ...form, size: z.id, max: z.players })}
+                      >
                         <b>{z.name}</b>
                         <small>{z.half * 2} m</small>
                       </button>
@@ -210,23 +274,41 @@ export default function Lobby({ onJoined }) {
               </div>
 
               <div className="create-foot">
-                <Slider label="Jugadores máximos · 2–24" value={form.max} min={2} max={24} onChange={(v) => setForm({ ...form, max: v })} />
-                <button className="btn primary lg" disabled={!connected}>Crear y entrar</button>
+                <Slider
+                  label="Jugadores máximos · 2–24"
+                  value={form.max}
+                  min={2}
+                  max={24}
+                  onChange={(v) => setForm({ ...form, max: v })}
+                />
+                <button className="btn primary lg" disabled={!connected}>
+                  Crear y entrar
+                </button>
               </div>
             </form>
 
             <section className="panel rooms">
               <div className="rooms-head">
-                <h2 className="panel-title">Salas abiertas{rooms.length > 0 && <span className="count">{rooms.length}</span>}</h2>
+                <h2 className="panel-title">
+                  Salas abiertas{rooms.length > 0 && <span className="count">{rooms.length}</span>}
+                </h2>
                 {connected ? (
-                  <span className="status"><i className="dot" /> Conectado</span>
+                  <span className="status">
+                    <i className="dot" /> Conectado
+                  </span>
                 ) : (
-                  <span className="status off"><i className="spin" /> Conectando…</span>
+                  <span className="status off">
+                    <i className="spin" /> Conectando…
+                  </span>
                 )}
               </div>
               {rooms.length === 0 ? (
                 <div className="empty">
-                  <div className="empty-icon">{EMPTY_COLORS.map((c, i) => <i key={i} style={{ background: c }} />)}</div>
+                  <div className="empty-icon">
+                    {EMPTY_COLORS.map((c, i) => (
+                      <i key={i} style={{ background: c }} />
+                    ))}
+                  </div>
                   <h3>Todavía no hay salas</h3>
                   <p>Crea la primera desde el panel de la izquierda y dile la contraseña a tu clase.</p>
                 </div>
@@ -238,14 +320,23 @@ export default function Lobby({ onJoined }) {
                       <div key={r.id} className={`room ${full ? 'full' : ''}`}>
                         <MapPreview mapId={r.mapId} size={r.sizeId} px={44} className="map-thumb" />
                         <div className="room-name">
-                          <b>{r.name}{r.locked ? ' 🔒' : ''}</b>
-                          <small>{r.map} · {r.size} · {r.mode} a {r.limit} · de {r.host}</small>
+                          <b>
+                            {r.name}
+                            {r.locked ? ' 🔒' : ''}
+                          </b>
+                          <small>
+                            {r.map} · {r.size} · {r.mode} a {r.limit} · de {r.host}
+                          </small>
                         </div>
                         <div className="room-count">
                           {r.players}/{r.max}
-                          <div className="pbar"><i style={{ width: `${(r.players / r.max) * 100}%` }} /></div>
+                          <div className="pbar">
+                            <i style={{ width: `${(r.players / r.max) * 100}%` }} />
+                          </div>
                         </div>
-                        <button className="btn sm" disabled={full} onClick={() => join(r)}>{full ? 'Llena' : 'Entrar'}</button>
+                        <button className="btn sm" disabled={full} onClick={() => join(r)}>
+                          {full ? 'Llena' : 'Entrar'}
+                        </button>
                       </div>
                     );
                   })}
@@ -269,17 +360,34 @@ export default function Lobby({ onJoined }) {
           >
             <div className="modal-head">
               <h2 style={{ fontSize: 20 }}>🔒 Sala con contraseña</h2>
-              <button type="button" className="btn ghost icon" onClick={() => setJoining(null)} aria-label="Cerrar">✕</button>
+              <button type="button" className="btn ghost icon" onClick={() => setJoining(null)} aria-label="Cerrar">
+                ✕
+              </button>
             </div>
-            <p className="meta"><b>{joining.name}</b> · de {joining.host} · {joining.players}/{joining.max}</p>
+            <p className="meta">
+              <b>{joining.name}</b> · de {joining.host} · {joining.players}/{joining.max}
+            </p>
             <label className="field">
               <span>Contraseña</span>
-              <input autoFocus type="password" className={`input ${passError ? 'error' : ''}`} value={pass} onChange={(e) => { setPass(e.target.value); setPassError(''); }} />
+              <input
+                autoFocus
+                type="password"
+                className={`input ${passError ? 'error' : ''}`}
+                value={pass}
+                onChange={(e) => {
+                  setPass(e.target.value);
+                  setPassError('');
+                }}
+              />
               {passError && <span className="field-error">{passError}</span>}
             </label>
             <div className="modal-foot">
-              <button type="button" className="btn ghost md" onClick={() => setJoining(null)}>Cancelar</button>
-              <button className="btn primary md" disabled={!pass}>Entrar</button>
+              <button type="button" className="btn ghost md" onClick={() => setJoining(null)}>
+                Cancelar
+              </button>
+              <button className="btn primary md" disabled={!pass}>
+                Entrar
+              </button>
             </div>
           </form>
         </div>
@@ -288,14 +396,22 @@ export default function Lobby({ onJoined }) {
       {offline && !connected && (
         <div className="toast" role="alert">
           <span className="bang">!</span>
-          <span><b>No se pudo conectar con el servidor</b><small>Reintentando automáticamente…</small></span>
-          <button className="btn sm" onClick={() => socket.connect()}>Reintentar</button>
+          <span>
+            <b>No se pudo conectar con el servidor</b>
+            <small>Reintentando automáticamente…</small>
+          </span>
+          <button className="btn sm" onClick={() => socket.connect()}>
+            Reintentar
+          </button>
         </div>
       )}
       {toast && connected && (
         <div className="toast" role="alert" onClick={() => setToast('')}>
           <span className="bang">!</span>
-          <span><b>{toast}</b><small>Toca para cerrar</small></span>
+          <span>
+            <b>{toast}</b>
+            <small>Toca para cerrar</small>
+          </span>
         </div>
       )}
 

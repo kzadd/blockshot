@@ -3,9 +3,24 @@ export default function Crosshair({ cfg, spread = 0, className = 'crosshair', ha
   const { style, color, size, thickness: t, gap, outline, dynamic } = cfg;
   const g = gap + (dynamic ? Math.min(36, spread * 350) : 0);
 
-  const arms = style === 't' ? [[0, 1], [-1, 0], [1, 0]] : [[0, -1], [0, 1], [-1, 0], [1, 0]];
-  const lines = ['cross', 'crossdot', 't', 'x'].includes(style) ? arms.map(([dx, dy]) => [dx * g, dy * g, dx * (g + size), dy * (g + size)]) : [];
-  const dotR = style === 'dot' ? Math.max(1.5, t * 1.25) : style === 'crossdot' || style === 'circle' ? t * 0.6 + 0.6 : 0;
+  const arms =
+    style === 't'
+      ? [
+          [0, 1],
+          [-1, 0],
+          [1, 0],
+        ]
+      : [
+          [0, -1],
+          [0, 1],
+          [-1, 0],
+          [1, 0],
+        ];
+  const lines = ['cross', 'crossdot', 't', 'x'].includes(style)
+    ? arms.map(([dx, dy]) => [dx * g, dy * g, dx * (g + size), dy * (g + size)])
+    : [];
+  const dotR =
+    style === 'dot' ? Math.max(1.5, t * 1.25) : style === 'crossdot' || style === 'circle' ? t * 0.6 + 0.6 : 0;
   const ringR = style === 'circle' ? g + size * 0.6 : 0;
 
   const layer = (stroke, extra) => (

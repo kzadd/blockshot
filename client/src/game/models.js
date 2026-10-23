@@ -27,7 +27,7 @@ function camoTexture(colors) {
   g.fillStyle = colors[0];
   g.fillRect(0, 0, 32, 32);
   let seed = 7;
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   for (let i = 0; i < 46; i++) {
     g.fillStyle = colors[1 + (i % (colors.length - 1))];
     g.fillRect(Math.floor(rnd() * 32), Math.floor(rnd() * 32), 2 + Math.floor(rnd() * 6), 2 + Math.floor(rnd() * 4));
@@ -41,15 +41,54 @@ function camoTexture(colors) {
 function skinPalette(color, skin) {
   switch (skin) {
     case 'camo':
-      return { main: '#ffffff', mainMap: ['#5b6b3a', shade(color, 0.75), '#3d4a2a', '#8c8a5a'], pants: '#46523a', gear: '#2f3526', accent: color, face: '#e0b07a', visor: '#1b2a4a' };
+      return {
+        main: '#ffffff',
+        mainMap: ['#5b6b3a', shade(color, 0.75), '#3d4a2a', '#8c8a5a'],
+        pants: '#46523a',
+        gear: '#2f3526',
+        accent: color,
+        face: '#e0b07a',
+        visor: '#1b2a4a',
+      };
     case 'noche':
-      return { main: '#1f2433', pants: '#141824', gear: '#0d1018', accent: color, face: '#c99a6a', visor: color, glow: true };
+      return {
+        main: '#1f2433',
+        pants: '#141824',
+        gear: '#0d1018',
+        accent: color,
+        face: '#c99a6a',
+        visor: color,
+        glow: true,
+      };
     case 'artico':
-      return { main: '#ffffff', mainMap: ['#eef3f8', '#c9d4e0', '#aebccc', '#dfe7ef'], pants: '#c7d1dc', gear: '#7d8b9a', accent: color, face: '#f0c08a', visor: '#2d4a70' };
+      return {
+        main: '#ffffff',
+        mainMap: ['#eef3f8', '#c9d4e0', '#aebccc', '#dfe7ef'],
+        pants: '#c7d1dc',
+        gear: '#7d8b9a',
+        accent: color,
+        face: '#f0c08a',
+        visor: '#2d4a70',
+      };
     case 'oro':
-      return { main: '#e8b923', pants: '#9c6f12', gear: '#5a3f0a', accent: color, face: '#f0c08a', visor: '#1b2a4a', shiny: true };
+      return {
+        main: '#e8b923',
+        pants: '#9c6f12',
+        gear: '#5a3f0a',
+        accent: color,
+        face: '#f0c08a',
+        visor: '#1b2a4a',
+        shiny: true,
+      };
     default:
-      return { main: color, pants: shade(color, 0.55), gear: '#2b2f36', accent: shade(color, 1.25), face: '#f0c08a', visor: '#1b2a4a' };
+      return {
+        main: color,
+        pants: shade(color, 0.55),
+        gear: '#2b2f36',
+        accent: shade(color, 1.25),
+        face: '#f0c08a',
+        visor: '#1b2a4a',
+      };
   }
 }
 
@@ -100,7 +139,12 @@ const EXTRAS = {
   // Cinta en la frente, pelo de punta y gafas en la frente
   rayo(u, m) {
     addBox(u, 0.42, 0.06, 0.42, m.accent, 0, 1.76, 0);
-    for (const [x, z] of [[-0.1, 0.05], [0.08, -0.06], [0.02, 0.12]]) addBox(u, 0.12, 0.14, 0.12, m.gear, x, 1.89, z);
+    for (const [x, z] of [
+      [-0.1, 0.05],
+      [0.08, -0.06],
+      [0.02, 0.12],
+    ])
+      addBox(u, 0.12, 0.14, 0.12, m.gear, x, 1.89, z);
     addBox(u, 0.34, 0.08, 0.05, m.visor, 0, 1.79, -0.215, false);
   },
   // Casco integral con ranura y caja de munición a la espalda
@@ -191,9 +235,18 @@ function gunMaterials(tint) {
   if (gunMatCache.has(tint)) return gunMatCache.get(tint);
   const L = (color, extra) => new THREE.MeshLambertMaterial({ color, ...extra });
   const m = {
-    o: L('#1c1f24'), m: L('#3a4048'), s: L('#8b939d'), p: L('#2a2e35'), q: L('#353a42'),
-    w: L('#8a5a2b'), x: L('#6b4320'), v: L('#4d5a3a'), y: L('#3c472d'), r: L('#141619'),
-    l: L('#d9a640', { emissive: '#3a2600' }), e: L('#c0392b'),
+    o: L('#1c1f24'),
+    m: L('#3a4048'),
+    s: L('#8b939d'),
+    p: L('#2a2e35'),
+    q: L('#353a42'),
+    w: L('#8a5a2b'),
+    x: L('#6b4320'),
+    v: L('#4d5a3a'),
+    y: L('#3c472d'),
+    r: L('#141619'),
+    l: L('#d9a640', { emissive: '#3a2600' }),
+    e: L('#c0392b'),
     c: L(tint, { emissive: tint, emissiveIntensity: 0.25 }),
     g: new THREE.MeshBasicMaterial({ color: '#7fd8ff' }),
     t: new THREE.MeshBasicMaterial({ color: '#9fe4ff', transparent: true, opacity: 0.07, depthWrite: false }),
@@ -291,7 +344,8 @@ const GUNS = {
     for (const x of [-0.016, 0.016]) box(0.012, 0.035, 0.025, x, 0.11, 0.1, 'o'); // alza
     box(0.02, 0.05, 0.14, -0.062, 0.03, -0.06, 'o'); // asa plegada al lado
     box(0.07, 0.07, 0.3, 0, 0.02, -0.35, 'm'); // camisa con agujeros
-    for (const z of [-0.26, -0.32, -0.38, -0.44]) for (const x of [-0.036, 0.036]) box(0.004, 0.025, 0.025, x, 0.02, z, 'o');
+    for (const z of [-0.26, -0.32, -0.38, -0.44])
+      for (const x of [-0.036, 0.036]) box(0.004, 0.025, 0.025, x, 0.02, z, 'o');
     cyl(0.02, 0.18, 0, 0.02, -0.58, 's');
     box(0.05, 0.05, 0.07, 0, 0.02, -0.68, 'o');
     box(0.012, 0.08, 0.015, 0, 0.09, -0.47, 'm'); // punto de mira
@@ -339,7 +393,16 @@ const GUNS = {
 
 // Altura (y del arma) que queda en el centro de la pantalla al apuntar: el punto rojo o la punta
 // del punto de mira. Al apuntar se oculta la cruz del HUD y se apunta con esto.
-const SIGHT_Y = { knife: 0.02, rifle: 0.104, sniper: 0.125, shotgun: 0.064, smg: 0.1, lmg: 0.13, pistol: 0.0655, revolver: 0.08 };
+const SIGHT_Y = {
+  knife: 0.02,
+  rifle: 0.104,
+  sniper: 0.125,
+  shotgun: 0.064,
+  smg: 0.1,
+  lmg: 0.13,
+  pistol: 0.0655,
+  revolver: 0.08,
+};
 
 export function buildGun(id, withFlash = false, tint = '#ffc93c') {
   const draw = GUNS[id] || GUNS.pistol;
@@ -361,10 +424,7 @@ export function buildGun(id, withFlash = false, tint = '#ffc93c') {
   g.userData.muzzleZ = muzzleZ;
   g.userData.sightY = SIGHT_Y[id] ?? 0.12;
   if (withFlash) {
-    const flash = new THREE.Mesh(
-      new THREE.OctahedronGeometry(0.07),
-      new THREE.MeshBasicMaterial({ color: 0xffd24a }),
-    );
+    const flash = new THREE.Mesh(new THREE.OctahedronGeometry(0.07), new THREE.MeshBasicMaterial({ color: 0xffd24a }));
     flash.position.set(0, 0.02, muzzleZ - 0.05);
     flash.visible = false;
     g.add(flash);

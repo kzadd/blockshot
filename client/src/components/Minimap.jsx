@@ -12,7 +12,9 @@ export default function Minimap({ engine, map, radar }) {
 
   useEffect(() => {
     const c = ref.current;
-    const k = (window.devicePixelRatio || 1) * (Number(getComputedStyle(document.documentElement).getPropertyValue('--s')) || 1);
+    const k =
+      (window.devicePixelRatio || 1) *
+      (Number(getComputedStyle(document.documentElement).getPropertyValue('--s')) || 1);
     c.width = c.height = SIZE * k;
     const g = c.getContext('2d');
     const world = (SIZE - PAD * 2) / (2 * map.half + 2); // px por metro
@@ -94,7 +96,7 @@ export default function Minimap({ engine, map, radar }) {
       // Captura la bandera: banderas siempre visibles (siguen a quien las lleva)
       for (const t of e.flags ? [1, 2] : []) {
         const f = e.flags[t];
-        const p = f.c === e.myId ? e.pos : e.remotes.get(f.c)?.model?.group.position ?? f;
+        const p = f.c === e.myId ? e.pos : (e.remotes.get(f.c)?.model?.group.position ?? f);
         const x = toPx(p.x);
         const y = toPx(p.z);
         g.fillStyle = '#0b1426';

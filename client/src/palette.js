@@ -10,18 +10,24 @@ export const COLORBLIND = [
 
 const PALETTES = {
   off: {
-    ally: '#5ee07a', enemy: '#ff5a4d',
-    team: { 1: '#ff5a4d', 2: '#4da3ff' }, teamTxt: { 1: '#ff7b70', 2: '#6db5ff' },
+    ally: '#5ee07a',
+    enemy: '#ff5a4d',
+    team: { 1: '#ff5a4d', 2: '#4da3ff' },
+    teamTxt: { 1: '#ff7b70', 2: '#6db5ff' },
     hp: ['#5ee07a', '#ffc93c', '#ff4d4d'],
   },
   rg: {
-    ally: '#4da3ff', enemy: '#ff9f1c',
-    team: { 1: '#ff9f1c', 2: '#4da3ff' }, teamTxt: { 1: '#ffb84d', 2: '#6db5ff' },
+    ally: '#4da3ff',
+    enemy: '#ff9f1c',
+    team: { 1: '#ff9f1c', 2: '#4da3ff' },
+    teamTxt: { 1: '#ffb84d', 2: '#6db5ff' },
     hp: ['#4da3ff', '#f7f9fc', '#ff9f1c'],
   },
   by: {
-    ally: '#3fe0d0', enemy: '#ff4d8a',
-    team: { 1: '#ff4d8a', 2: '#3fe0d0' }, teamTxt: { 1: '#ff7aa8', 2: '#6ff0e3' },
+    ally: '#3fe0d0',
+    enemy: '#ff4d8a',
+    team: { 1: '#ff4d8a', 2: '#3fe0d0' },
+    teamTxt: { 1: '#ff7aa8', 2: '#6ff0e3' },
     hp: ['#3fe0d0', '#f7f9fc', '#ff4d8a'],
   },
 };

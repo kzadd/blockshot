@@ -1,5 +1,17 @@
 import * as THREE from 'three';
-import { PLAYER, WEAPONS, CHAR_BY_ID, CLIENT_SEND_MS, FLAG, PAD, INFECT, getColliders, isTeamMode, loadoutOf, gunLadder } from '../../../shared/config.js';
+import {
+  PLAYER,
+  WEAPONS,
+  CHAR_BY_ID,
+  CLIENT_SEND_MS,
+  FLAG,
+  PAD,
+  INFECT,
+  getColliders,
+  isTeamMode,
+  loadoutOf,
+  gunLadder,
+} from '../../../shared/config.js';
 import { castShot } from '../../../shared/physics.js';
 import { buildWorld } from './world.js';
 import { buildCharacter, buildGun, buildArms, makeNameTag } from './models.js';
@@ -16,7 +28,12 @@ const VIEW_DELAY_MS = 100;
 const LOCK_KEYS = [
   ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((c) => 'Key' + c),
   ...'0123456789'.split('').map((d) => 'Digit' + d),
-  'Tab', 'Space', 'ControlLeft', 'ControlRight', 'F1', 'Escape',
+  'Tab',
+  'Space',
+  'ControlLeft',
+  'ControlRight',
+  'F1',
+  'Escape',
 ];
 const tmp = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
@@ -52,7 +69,9 @@ function flagMarker(color) {
   g.fill();
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true, sizeAttenuation: false }));
+  const s = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true, sizeAttenuation: false }),
+  );
   s.scale.set(0.045, 0.045, 1);
   s.position.y = 3;
   s.renderOrder = 6;
@@ -70,7 +89,11 @@ function spreadDir(base, s) {
   const a = Math.random() * Math.PI * 2;
   const right = new THREE.Vector3().crossVectors(base, UP).normalize();
   const up = new THREE.Vector3().crossVectors(right, base).normalize();
-  return base.clone().addScaledVector(right, Math.cos(a) * r).addScaledVector(up, Math.sin(a) * r).normalize();
+  return base
+    .clone()
+    .addScaledVector(right, Math.cos(a) * r)
+    .addScaledVector(up, Math.sin(a) * r)
+    .normalize();
 }
 
 export class Engine {
@@ -234,16 +257,28 @@ export class Engine {
     this.flagObjs = [1, 2].map((t) => {
       const color = teamColor(t);
       const group = new THREE.Group();
-      const pole = new THREE.Mesh(new THREE.BoxGeometry(0.08, 2.4, 0.08), new THREE.MeshLambertMaterial({ color: 0xdddddd }));
+      const pole = new THREE.Mesh(
+        new THREE.BoxGeometry(0.08, 2.4, 0.08),
+        new THREE.MeshLambertMaterial({ color: 0xdddddd }),
+      );
       pole.position.y = 1.2;
-      const cloth = new THREE.Mesh(new THREE.BoxGeometry(1, 0.65, 0.05), new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: 0.35 }));
+      const cloth = new THREE.Mesh(
+        new THREE.BoxGeometry(1, 0.65, 0.05),
+        new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: 0.35 }),
+      );
       cloth.geometry.translate(0.52, 0, 0);
       cloth.position.y = 2;
       group.add(pole, cloth, flagMarker(color));
       const [x, y, z] = this.map.bases[t];
       const pad = new THREE.Mesh(
         new THREE.CylinderGeometry(FLAG.radius, FLAG.radius, 0.08, 28),
-        new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: 0.25, transparent: true, opacity: 0.6 }),
+        new THREE.MeshLambertMaterial({
+          color,
+          emissive: color,
+          emissiveIntensity: 0.25,
+          transparent: true,
+          opacity: 0.6,
+        }),
       );
       pad.position.set(x, y + 0.04, z);
       group.position.set(x, y, z);
@@ -323,7 +358,10 @@ export class Engine {
         }
         if (e.button === 2) this.aiming = false;
       },
-      wheel: (e) => this.locked && this.alive && this.switchSlot((this.slot + (e.deltaY < 0 ? this.loadout.length - 1 : 1)) % this.loadout.length),
+      wheel: (e) =>
+        this.locked &&
+        this.alive &&
+        this.switchSlot((this.slot + (e.deltaY < 0 ? this.loadout.length - 1 : 1)) % this.loadout.length),
       contextmenu: (e) => e.preventDefault(),
       lockchange: () => {
         this.locked = document.pointerLockElement === el;
@@ -472,7 +510,15 @@ export class Engine {
       seen.add(p.id);
       let r = this.remotes.get(p.id);
       if (!r) {
-        r = { id: p.id, model: null, charId: null, weaponId: null, target: new THREE.Vector3(), walk: 0, wasAlive: false };
+        r = {
+          id: p.id,
+          model: null,
+          charId: null,
+          weaponId: null,
+          target: new THREE.Vector3(),
+          walk: 0,
+          wasAlive: false,
+        };
         this.remotes.set(p.id, r);
       }
       if (p.c && (r.charId !== p.c || r.skin !== p.sk || r.team !== p.tm)) this.buildRemote(r, p);
@@ -506,7 +552,10 @@ export class Engine {
       seen.add(id);
       if (this.tags.has(id)) continue;
       const color = teamColor(team);
-      const mesh = new THREE.Mesh(tagGeo, new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: 0.5 }));
+      const mesh = new THREE.Mesh(
+        tagGeo,
+        new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: 0.5 }),
+      );
       mesh.position.set(x, y + 0.6, z);
       mesh.userData = { y: y + 0.6, team };
       this.scene.add(mesh);
@@ -742,9 +791,14 @@ export class Engine {
     for (const r of this.remotes.values()) {
       // Donde se ve al rival en pantalla (el servidor lo rebobina a ese mismo instante)
       const g = r.model?.group.position;
-      if (r.alive && g && !this.isMate(r)) targets.push({ id: r.id, x: g.x, y: g.y, z: g.z, sl: r.sl, cr: r.cr, alive: true });
+      if (r.alive && g && !this.isMate(r))
+        targets.push({ id: r.id, x: g.x, y: g.y, z: g.z, sl: r.sl, cr: r.cr, alive: true });
     }
-    const muzzle = tmp.set(this.aimLerp > 0.5 ? 0 : 0.22, -0.16, -0.7).applyQuaternion(cam.quaternion).add(cam.position).clone();
+    const muzzle = tmp
+      .set(this.aimLerp > 0.5 ? 0 : 0.22, -0.16, -0.7)
+      .applyQuaternion(cam.quaternion)
+      .add(cam.position)
+      .clone();
     const dirs = [];
     for (let i = 0; i < w.pellets; i++) {
       const d = spreadDir(base, sp);
@@ -773,7 +827,11 @@ export class Engine {
     const cam = this.camera;
     const d = cam.getWorldDirection(new THREE.Vector3());
     const o = [cam.position.x, cam.position.y, cam.position.z];
-    this.socket.emit('player:shoot', { o, d: [[+d.x.toFixed(4), +d.y.toFixed(4), +d.z.toFixed(4)]], lag: Math.round(this.rtt / 2 + VIEW_DELAY_MS) });
+    this.socket.emit('player:shoot', {
+      o,
+      d: [[+d.x.toFixed(4), +d.y.toFixed(4), +d.z.toFixed(4)]],
+      lag: Math.round(this.rtt / 2 + VIEW_DELAY_MS),
+    });
     this.pendingShots.push(now);
     this.swingAt = now;
     sfx.shot(w.sound, 1);
@@ -865,7 +923,15 @@ export class Engine {
   overlaps(x, y, z, H = this.height) {
     const R = PLAYER.radius;
     for (const b of this.colliders) {
-      if (x - R < b.max[0] && x + R > b.min[0] && y < b.max[1] && y + H > b.min[1] && z - R < b.max[2] && z + R > b.min[2]) return true;
+      if (
+        x - R < b.max[0] &&
+        x + R > b.min[0] &&
+        y < b.max[1] &&
+        y + H > b.min[1] &&
+        z - R < b.max[2] &&
+        z + R > b.min[2]
+      )
+        return true;
     }
     return false;
   }
@@ -878,7 +944,15 @@ export class Engine {
     const H = this.height;
     p[ax] += d;
     for (const b of this.colliders) {
-      if (!(p.x - R < b.max[0] && p.x + R > b.min[0] && p.y < b.max[1] && p.y + H > b.min[1] && p.z - R < b.max[2] && p.z + R > b.min[2])) continue;
+      if (!(
+        p.x - R < b.max[0] &&
+        p.x + R > b.min[0] &&
+        p.y < b.max[1] &&
+        p.y + H > b.min[1] &&
+        p.z - R < b.max[2] &&
+        p.z + R > b.min[2]
+      ))
+        continue;
       if (i === 1) {
         if (d < 0) {
           p.y = b.max[1];
@@ -922,13 +996,21 @@ export class Engine {
 
     // Agacharse (C). Para ponerse de pie hace falta sitio encima de la cabeza
     if (crouchKey) this.crouching = true;
-    else if (this.crouching && !this.overlaps(this.pos.x, this.pos.y + 0.001, this.pos.z, PLAYER.height)) this.crouching = false;
+    else if (this.crouching && !this.overlaps(this.pos.x, this.pos.y + 0.001, this.pos.z, PLAYER.height))
+      this.crouching = false;
 
     // Sprint (Shift): solo hacia delante, sin apuntar ni disparar. Con useStamina gasta estamina
     const w = this.weapon();
     if (!PLAYER.useStamina) this.stamina = PLAYER.stamina;
     if (this.staminaLock && this.stamina >= PLAYER.staminaMin) this.staminaLock = false;
-    const canSprint = sprintKey && f > 0 && !this.aiming && !this.mouseDown && !this.crouching && !this.sliding && now >= this.sprintBlockUntil;
+    const canSprint =
+      sprintKey &&
+      f > 0 &&
+      !this.aiming &&
+      !this.mouseDown &&
+      !this.crouching &&
+      !this.sliding &&
+      now >= this.sprintBlockUntil;
     this.sprinting = canSprint && !this.staminaLock && this.stamina > 0 && (this.grounded || this.sprinting);
     if (this.sprinting && hs > 1 && PLAYER.useStamina) {
       this.stamina = Math.max(0, this.stamina - PLAYER.staminaDrain * dt);
@@ -942,15 +1024,17 @@ export class Engine {
     }
 
     // Las armas pesadas frenan; apuntando se va más despacio (adsMove de cada arma). Los infectados corren más
-    const walk = this.character.speed * (w.weight ?? 1) * (this.mode === 'infect' && this.myTeam === 2 ? INFECT.speed : 1);
-    const base = walk * (this.aiming ? w.adsMove ?? 0.65 : this.sprinting ? PLAYER.sprint : 1);
+    const walk =
+      this.character.speed * (w.weight ?? 1) * (this.mode === 'infect' && this.myTeam === 2 ? INFECT.speed : 1);
+    const base = walk * (this.aiming ? (w.adsMove ?? 0.65) : this.sprinting ? PLAYER.sprint : 1);
     const speed = base * (this.crouching && !this.sliding ? PLAYER.crouchSpeed : 1);
 
     if (this.grounded) {
       this.coyote = PLAYER.coyote;
       // Deslizamiento: C o Ctrl corriendo (también al aterrizar con la tecla pulsada: slide-hop).
       // Encadenando salto + slide cada deslizamiento gana un poco de velocidad (slideGain)
-      const slideReady = now - this.slideEndAt > PLAYER.slideCooldown * 1000 && (!PLAYER.useStamina || this.stamina >= PLAYER.slideCost);
+      const slideReady =
+        now - this.slideEndAt > PLAYER.slideCooldown * 1000 && (!PLAYER.useStamina || this.stamina >= PLAYER.slideCost);
       if (slideKey && (!this.crouchHeld || this.justLanded) && hs > walk * 0.6 && !this.sliding && slideReady) {
         this.sliding = true;
         this.slideTime = PLAYER.slideTime;
@@ -1068,7 +1152,10 @@ export class Engine {
       this.aimLerp += ((this.aiming && !busy && !w.melee ? 1 : 0) - this.aimLerp) * damp(w.adsSpeed ?? 16, dt);
       const running = this.sprinting && Math.hypot(this.vel.x, this.vel.z) > 1;
       this.sprintLerp += ((running ? 1 : 0) - this.sprintLerp) * damp(10, dt);
-      const fovT = this.baseFov / (1 + (w.zoom - 1) * (w.scope ? (this.scoped() ? 1 : 0) : this.aimLerp)) + (this.sliding ? 6 : 0) + this.sprintLerp * 5;
+      const fovT =
+        this.baseFov / (1 + (w.zoom - 1) * (w.scope ? (this.scoped() ? 1 : 0) : this.aimLerp)) +
+        (this.sliding ? 6 : 0) +
+        this.sprintLerp * 5;
       this.fov += (fovT - this.fov) * damp(18, dt);
     } else if (this.deathPos) {
       // Cámara de muerte: sube y mira a quien te eliminó
@@ -1175,7 +1262,12 @@ export class Engine {
     const now = performance.now();
 
     if (this.alive) this.updateMovement(dt, now);
-    else if (this.autoChar && this.deathAt && now - this.deathAt >= PLAYER.respawnDelay && now - this.spawnReqAt > 1000) {
+    else if (
+      this.autoChar &&
+      this.deathAt &&
+      now - this.deathAt >= PLAYER.respawnDelay &&
+      now - this.spawnReqAt > 1000
+    ) {
       // Reaparición automática con el personaje elegido
       this.spawnReqAt = now;
       this.socket.emit('player:spawn', { characterId: this.autoChar.id, skin: this.autoChar.skin });
@@ -1203,8 +1295,13 @@ export class Engine {
       this.sendAcc = 0;
       if (this.alive) {
         this.socket.volatile.emit('player:state', {
-          x: +this.pos.x.toFixed(3), y: +this.pos.y.toFixed(3), z: +this.pos.z.toFixed(3),
-          ry: +this.yaw.toFixed(3), rx: +this.pitch.toFixed(3), sl: this.sliding ? 1 : 0, cr: this.crouching && !this.sliding ? 1 : 0,
+          x: +this.pos.x.toFixed(3),
+          y: +this.pos.y.toFixed(3),
+          z: +this.pos.z.toFixed(3),
+          ry: +this.yaw.toFixed(3),
+          rx: +this.pitch.toFixed(3),
+          sl: this.sliding ? 1 : 0,
+          cr: this.crouching && !this.sliding ? 1 : 0,
         });
       }
     }

@@ -1,4 +1,12 @@
-import type { CharacterId, SkinId, Team, WeaponId } from '@blockshot/shared';
+import {
+  createMoveState,
+  type CharacterId,
+  type MoveInput,
+  type MoveState,
+  type SkinId,
+  type Team,
+  type WeaponId,
+} from '@blockshot/shared';
 
 export interface AmmoState {
   mag: number;
@@ -35,6 +43,16 @@ export interface Player {
   /** crouching */
   cr: number;
   slot: number;
+  /** authoritative movement state (x/y/z/sl/cr above are copied from it after each step) */
+  move: MoveState;
+  /** input commands waiting to be simulated */
+  inputs: MoveInput[];
+  /** last simulated command */
+  lastSeq: number;
+  /** simulation time this player may still use (s): absorbs jitter, blocks speed hacks */
+  simBudget: number;
+  /** spawn counter (acks carry it so the client ignores stale ones) */
+  life: number;
   loadout: WeaponId[];
   ammo: AmmoState[];
   lastShot: number[];
@@ -43,7 +61,6 @@ export interface Player {
   deathTime: number;
   spawnTime: number;
   protUntil: number;
-  lastState: number;
   teamAt: number;
   radarUntil: number;
   /** recent positions for lag compensation */
@@ -84,6 +101,11 @@ export function createPlayer(id: string, name: string, team: Team): Player {
     sl: 0,
     cr: 0,
     slot: 0,
+    move: createMoveState(0, 0, 0),
+    inputs: [],
+    lastSeq: -1,
+    simBudget: 0,
+    life: 0,
     loadout: [],
     ammo: [],
     lastShot: [0, 0],
@@ -91,7 +113,6 @@ export function createPlayer(id: string, name: string, team: Team): Player {
     deathTime: 0,
     spawnTime: 0,
     protUntil: 0,
-    lastState: 0,
     teamAt: 0,
     radarUntil: 0,
     hist: [],

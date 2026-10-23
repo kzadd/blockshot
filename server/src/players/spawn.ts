@@ -1,4 +1,4 @@
-import { PLAYER, isSkinId, type Character, type Spawn } from '@blockshot/shared';
+import { PLAYER, createMoveState, isSkinId, type Character, type Spawn } from '@blockshot/shared';
 import type { Room } from '../rooms/room';
 import { recordPosition } from './history';
 import { equip } from './loadout';
@@ -51,13 +51,16 @@ export function spawnPlayer(room: Room, p: Player, ch: Character, skin: string |
     cr: 0,
     spawnTime: now,
     protUntil: now + PLAYER.spawnProtection,
-    lastState: now,
     lastDamage: 0,
     hist: [],
+    move: createMoveState(x, y, z),
+    inputs: [],
+    simBudget: 0,
+    life: p.life + 1,
   });
   equip(room, p);
   recordPosition(p, now);
   room.channel.to(p.id, 'player:spawned', [
-    { x, y, z, ry: p.ry, characterId: ch.id, skin: p.skin, hp, level: p.level, team: p.team },
+    { x, y, z, ry: p.ry, characterId: ch.id, skin: p.skin, hp, level: p.level, team: p.team, life: p.life },
   ]);
 }

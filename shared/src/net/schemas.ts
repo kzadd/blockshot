@@ -36,14 +36,22 @@ export const SpawnSchema = v.object({
 
 export const TeamSetSchema = v.object({ team: finite });
 
-export const PlayerStateSchema = v.object({
-  x: finite,
-  y: finite,
-  z: finite,
-  ry: finite,
-  rx: finite,
-  sl: v.optional(finite),
-  cr: v.optional(finite),
+const int = v.pipe(v.number(), v.integer());
+/** At most this many commands per batch (0.5 s worth): more means a flooding or broken client. */
+export const MAX_INPUTS_PER_MESSAGE = 30;
+
+export const MoveInputSchema = v.object({
+  seq: v.pipe(int, v.minValue(0)),
+  f: v.pipe(finite, v.minValue(-1), v.maxValue(1)),
+  s: v.pipe(finite, v.minValue(-1), v.maxValue(1)),
+  yaw: finite,
+  pitch: finite,
+  b: v.pipe(int, v.minValue(0)),
+  slot: v.pipe(int, v.minValue(0)),
+});
+
+export const InputSchema = v.object({
+  c: v.pipe(v.array(MoveInputSchema), v.minLength(1), v.maxLength(MAX_INPUTS_PER_MESSAGE)),
 });
 
 export const SwitchSchema = v.object({ slot: v.pipe(v.number(), v.integer()) });
@@ -60,7 +68,7 @@ export const EmptySchema = v.optional(v.union([v.undefined(), v.null(), v.object
 export type CreateRoomInput = v.InferOutput<typeof CreateRoomSchema>;
 export type JoinRoomInput = v.InferOutput<typeof JoinRoomSchema>;
 export type SpawnInput = v.InferOutput<typeof SpawnSchema>;
-export type PlayerStateInput = v.InferOutput<typeof PlayerStateSchema>;
+export type InputBatch = v.InferOutput<typeof InputSchema>;
 export type ShootInput = v.InferOutput<typeof ShootSchema>;
 
 export { v };

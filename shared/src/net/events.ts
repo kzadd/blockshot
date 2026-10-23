@@ -3,6 +3,7 @@ import type { Vec3 } from '../core/math';
 import type { CharacterId, SkinId } from '../characters/characters';
 import type { MapId, SizeId } from '../maps/types';
 import type { ModeId, SideTeam, Team } from '../modes/modes';
+import type { MoveInput, MoveState } from '../movement/movement';
 import type { WeaponId } from '../weapons/weapons';
 
 export interface RoomSummary {
@@ -128,14 +129,17 @@ export interface StateSnapshot {
   inf: InfectSnapshot | null;
 }
 
-export interface PlayerStateMessage {
-  x: number;
-  y: number;
-  z: number;
-  ry: number;
-  rx: number;
-  sl: number;
-  cr: number;
+/** A batch of input commands (sent every CLIENT_SEND_MS, one command per FIXED_DT step). */
+export interface InputMessage {
+  c: MoveInput[];
+}
+
+/** Authoritative movement state of your own player after the last processed command. */
+export interface AckMessage {
+  seq: number;
+  s: MoveState;
+  /** spawn counter: acks from a previous life are ignored */
+  life: number;
 }
 
 export interface ShootMessage {
@@ -154,6 +158,8 @@ export interface SpawnedMessage {
   hp: number;
   level: number;
   team: Team;
+  /** spawn counter, echoed by every ack of this life */
+  life: number;
 }
 
 export interface KillEvent {
@@ -193,7 +199,7 @@ export interface ServerToClientEvents {
   notice: (text: string) => void;
   state: (s: StateSnapshot) => void;
   'player:spawned': (d: SpawnedMessage) => void;
-  'player:correct': (d: { x: number; y: number; z: number }) => void;
+  'player:ack': (d: AckMessage) => void;
   damaged: (d: { hp: number; from: [number, number] }) => void;
   hitmarker: (d: { head: boolean; kill: boolean; dmg: number; at: Vec3 }) => void;
   kill: (d: KillEvent) => void;
@@ -213,7 +219,7 @@ export interface ClientToServerEvents {
   'net:ping': (d: { rtt: number }, cb: () => void) => void;
   'player:spawn': (d: { characterId: string; skin?: string }) => void;
   'team:set': (d: { team: number }) => void;
-  'player:state': (d: PlayerStateMessage) => void;
+  'player:input': (d: InputMessage) => void;
   'player:switch': (d: { slot: number }) => void;
   'player:reload': () => void;
   'player:shoot': (d: ShootMessage) => void;

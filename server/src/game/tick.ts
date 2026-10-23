@@ -1,4 +1,5 @@
 import { PLAYER, SERVER_TICK_MS, round2, type PlayerSnapshot, type StateSnapshot } from '@blockshot/shared';
+import { sendAcks } from '../players/movement';
 import type { Player } from '../players/player';
 import { isTeamRoom } from '../players/teams';
 import type { Room } from '../rooms/room';
@@ -51,10 +52,11 @@ export function buildSnapshot(room: Room, now: number): StateSnapshot {
   };
 }
 
-/** One server tick for a room: mode rules, regeneration and the snapshot for every client. */
-export function tickRoom(room: Room, now: number): void {
+/** One snapshot tick for a room: mode rules, regeneration, the snapshot for everyone and each player's ack. */
+export function snapshotRoom(room: Room, now: number): void {
   if (!room.matchOver) room.mode.tick?.(room, now);
   const dt = SERVER_TICK_MS / MS_PER_S;
   for (const p of room.players.values()) regenerate(p, now, dt);
   room.channel.broadcastVolatile('state', [buildSnapshot(room, now)]);
+  sendAcks(room);
 }

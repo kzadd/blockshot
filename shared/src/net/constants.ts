@@ -1,5 +1,13 @@
-/** Server snapshots per second = 1000 / SERVER_TICK_MS */
+/** Server snapshots per second = 1000 / SERVER_TICK_MS (mode rules and regeneration run at this rate too) */
 export const SERVER_TICK_MS = 50;
+/** Movement is simulated this many times per snapshot (60 Hz with 50 ms snapshots). */
+export const SIM_STEPS_PER_TICK = 3;
+/** Simulation time a player may bank to absorb network jitter (s); more queued input waits. */
+export const MAX_SIM_BUDGET_S = 0.25;
+/** Commands waiting beyond this are dropped (a client sending faster than real time). */
+export const MAX_QUEUED_INPUTS = 60;
+/** The client may be ahead of the server by this much when it shoots (s): widens the origin check. */
+export const MAX_INPUT_DELAY_S = 0.25;
 /** Client state sends per second = 1000 / CLIENT_SEND_MS */
 export const CLIENT_SEND_MS = 50;
 /** How far back the server rewinds players to check a shot. */

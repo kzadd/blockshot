@@ -24,6 +24,8 @@ export interface GameMode {
   tick?(room: Room, now: number): void;
   /** restrict where a player may spawn */
   filterSpawns?(room: Room, player: Player, spawns: Spawn[]): Spawn[];
+  /** walking speed multiplier for a player (infected are faster) */
+  speedFactor?(player: Player): number;
   /** max hp multiplier for a player (infected are tougher) */
   hpFactor?(player: Player): number;
   /** reset mode state and teams when a new match starts */

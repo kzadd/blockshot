@@ -229,3 +229,58 @@ client/src/
 **Verificado:** lint, typecheck, build y 50 tests en verde; prueba en navegador (Chrome sin ventana) del lobby,
 Infectados en Almacén, plataformas de salto (5,6 m) y velocidad (9,2 m/s corriendo, 10,7 m/s con slide-hop), sin
 errores de consola.
+
+## 5. Servidor autoritativo + tick fijo + snapshots + predicción e interpolación
+
+**Antes:** el cliente movía a su jugador y mandaba su posición; el servidor solo aplicaba un anti-teletransporte
+permisivo (4 m + 40 m/s): se podía atravesar paredes o volar.
+
+**Ahora:**
+
+1. **Simulación compartida** (`shared/src/movement/movement.ts`): port fiel de `updateMovement`/`moveAxis` como
+   función pura `stepMovement(state, input, dt, ctx)`. Los tiempos absolutos del original (`now - slideEndAt`,
+   `jumpPressedAt`, `sprintBlockUntil`, `staminaAt`) pasan a contadores en segundos dentro del estado, que así es
+   determinista y serializable. Paso fijo `FIXED_DT = 1/60`.
+2. **Command pattern:** el cliente manda `player:input` con lotes de `MoveInput` (uno por paso: ejes, yaw/pitch,
+   botones en bits, arma en la mano) cada 50 ms. Disparar marca `BTN_SHOT`, que bloquea el sprint 0,4 s igual que antes.
+3. **Servidor:** bucle de paso fijo (`game/loop.ts`, acumulador sobre `performance.now`). Cada paso de 1/60 s simula
+   las órdenes en cola de cada jugador y guarda el historial de lag comp (ahora a 60 Hz, antes 20 Hz). Cada 3 pasos
+   (50 ms, como antes) reglas del modo, regeneración, snapshot y un `player:ack` por jugador con su estado autoritativo.
+   **Anti speed-hack:** cada jugador solo gasta el tiempo de simulación que de verdad pasó (más 0,25 s de margen para
+   el jitter); mandar órdenes más rápido no te hace ir más rápido (test e2e).
+4. **Predicción y reconciliación** (`client/.../localPlayer.ts`): el cliente simula cada orden al instante; al llegar
+   un ack vuelve al estado del servidor y re-simula las órdenes no confirmadas. Las diferencias se suavizan (offset que
+   decae), y las grandes (>4 m) saltan. Un contador de «vidas» descarta acks de antes de reaparecer.
+5. **Interpolación de remotos** (`remotePlayers.ts`): buffer de snapshots por jugador, dibujado `VIEW_DELAY_MS`
+   (100 ms) en el pasado entre dos snapshots. Es exactamente el retraso que la compensación de lag ya suponía.
+
+**Motor del cliente en TypeScript, dividido por responsabilidad** (`client/src/game/engine/`): `Engine.ts`
+(orquesta y bucle fuera de React), `input.ts`, `localPlayer.ts`, `remotePlayers.ts`, `weapons.ts`, `viewModel.ts`,
+`cameraRig.ts`, `objectives.ts` (banderas y placas), `effects.ts` + `pool.ts`, `netClient.ts`, `events.ts` (bus de
+eventos) y `audio/audioEvents.ts`.
+
+**Verificación de que el movimiento es el mismo:**
+
+- **Equivalencia exacta con el original:** se ejecutó el `updateMovement` original (extraído de git) a la vez que la
+  simulación nueva, con las mismas entradas en el mapa Patio real: 117 m de recorrido (andar, sprint, slide-hop,
+  strafe con bunny hop, agacharse, plataforma de salto hasta 5,7 m, choques). **Diferencia máxima: 0,000000 m.**
+- 14 tests unitarios de la simulación (velocidad, sprint, bloqueo por disparo, salto y _buffer_, paredes, escalones,
+  plataformas, slide, bunny hop, tope de velocidad, determinismo, caída fuera del mapa).
+- En el navegador: 101 acks del servidor con **corrección 0** (la predicción coincide paso a paso); dos navegadores
+  a la vez ven moverse al otro (14 m en 2 s) sin errores de consola.
+- Los 47 tests e2e siguen en verde con bots que ahora **andan de verdad** (A* sobre la rejilla del mapa en
+  `test/e2e/pathfinding.ts`), más 2 nuevos: plataformas aplicadas por el servidor y anti speed-hack.
+
+**Decisiones y cambios de comportamiento (mínimos):**
+
+- `player:state` y `player:correct` desaparecen del protocolo (ya no hay posición informada por el cliente que
+  corregir). La comprobación del origen del disparo pasa de 3 m fijos a 3 m + velocidad × 0,25 s, porque el cliente va
+  un poco por delante del servidor; antes de cada disparo se envían las órdenes pendientes.
+- El ack es fiable (no volátil): sale justo después del snapshot volátil y Socket.IO descarta un mensaje volátil
+  mientras el transporte está ocupado, así que como volátil no llegaba nunca.
+- El movimiento local ahora va a paso fijo de 60 Hz con interpolación de render, en vez de un paso por frame. En
+  pantallas de 60 Hz es idéntico; en otras evita que la física dependa de los FPS.
+- Los remotos se ven 100 ms en el pasado y suaves (antes perseguían el último snapshot con un `lerp`).
+- Test e2e de protección de reaparición: andar hasta el punto de tiro tarda más que los 4 s de protección, así que el
+  e2e comprueba el lado del protocolo (`pr` y que disparar la quita) y el bloqueo de daño pasa a test unitario (paso 10).
+- `Infinity` en los temporizadores se cambia por 1e6: JSON lo convierte en `null` y rompía el ack.

@@ -4,6 +4,7 @@ import {
   DIRECTION_LENGTH_TOLERANCE,
   FIRE_RATE_TOLERANCE,
   LAG_COMP_MAX_MS,
+  MAX_INPUT_DELAY_S,
   PLAYER,
   RELOAD_GRACE_MS,
   SHOT_ORIGIN_TOLERANCE,
@@ -51,8 +52,11 @@ export function handleShoot(room: Room, p: Player, msg: ShootInput): void {
   }
   if (a.mag <= 0 || now - (p.lastShot[p.slot] ?? 0) < w.fireRate * FIRE_RATE_TOLERANCE) return;
 
+  // The client predicts its own movement, so it can be slightly ahead of the server: allow for its speed
   const o = msg.o;
-  if (Math.hypot(o[0] - p.x, o[1] - (p.y + PLAYER.eye), o[2] - p.z) > SHOT_ORIGIN_TOLERANCE) return;
+  const speed = Math.hypot(p.move.vx, p.move.vy, p.move.vz);
+  const tolerance = SHOT_ORIGIN_TOLERANCE + speed * MAX_INPUT_DELAY_S;
+  if (Math.hypot(o[0] - p.x, o[1] - (p.y + PLAYER.eye), o[2] - p.z) > tolerance) return;
   if (msg.d.length > w.pellets) return;
   const dirs = normalized(msg.d);
   if (!dirs) return;

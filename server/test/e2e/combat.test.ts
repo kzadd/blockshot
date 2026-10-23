@@ -32,14 +32,18 @@ async function duel(mode = 'ffa', charA = 'soldado', charB = 'soldado') {
 }
 
 describe('combat', () => {
-  it('spawn protection blocks damage until the victim shoots', async () => {
-    const { a, b } = await duel();
-    await shootUntil(a, b, () => false, { tries: 4 });
-    await sleep(150);
-    expect(a.count('hitmarker')).toBe(0);
-    b.dropProtection();
-    await shootUntil(a, b, () => a.count('hitmarker') > 0, { tries: 6 });
-    expect(a.count('hitmarker')).toBeGreaterThan(0);
+  // Walking to the firing spot takes longer than the protection lasts: that damage is blocked during the
+  // protection is covered by the applyDamage unit test; here the protocol side is checked.
+  it('reports spawn protection and drops it when the player shoots', async () => {
+    const a = new Bot(server.url, 'A');
+    bots.push(a);
+    await a.create({ mapId: 'patio', size: 'm' });
+    await a.spawn();
+    await a.idle(150);
+    expect(a.me()?.pr).toBe(1);
+    a.dropProtection();
+    await a.idle(150);
+    expect(a.me()?.pr).toBe(0);
   });
 
   it('applies body and head damage with the weapon multipliers', async () => {

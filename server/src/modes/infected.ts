@@ -54,6 +54,7 @@ export function createInfected(room: Room): GameMode {
     streakRewards: false,
     initialTeam: () => (state.started ? 2 : 1),
     hpFactor: (p) => (p.team === 2 ? INFECT.hp : 1),
+    speedFactor: (p) => (p.team === 2 ? INFECT.speed : 1),
     onKill(_room, shooter, victim) {
       if (victim.team !== 1 || shooter.team !== 2) return;
       victim.team = 2;

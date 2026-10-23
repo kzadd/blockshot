@@ -5,7 +5,15 @@ import { createServer } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { io, type Socket } from 'socket.io-client';
-import { PLAYER, type ClientToServerEvents, type ServerToClientEvents, type Vec3 } from '@blockshot/shared';
+import {
+  PLAYER,
+  getMap,
+  type ClientToServerEvents,
+  type MoveInput,
+  type ServerToClientEvents,
+  type Vec3,
+} from '@blockshot/shared';
+import { NavGrid } from './pathfinding';
 import type { JoinResult, PlayerSnapshot, StateSnapshot } from '@blockshot/shared';
 
 const SERVER_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -70,6 +78,10 @@ export class Bot {
   state: StateSnapshot | null = null;
   events: AnyEvent[] = [];
   spawnedAt = 0;
+  /** input commands are numbered; the server only simulates newer ones */
+  private seq = 0;
+  private slot = 0;
+  private nav: NavGrid | null = null;
 
   constructor(
     url: string,
@@ -81,7 +93,8 @@ export class Bot {
       this.spawnedAt = Date.now();
     });
     this.s.on('state', (st) => (this.state = st));
-    this.s.on('player:correct', (d) => (this.pos = { ...d }));
+    // Where the server says we are (the authority)
+    this.s.on('player:ack', (d) => (this.pos = { x: d.s.x, y: d.s.y, z: d.s.z }));
     this.s.onAny((ev: string, d: unknown) => {
       if (ev !== 'state') this.events.push([ev, d]);
     });
@@ -100,16 +113,23 @@ export class Bot {
     return this.state?.players.find((p) => p.id === this.id);
   }
 
+  private joined(res: JoinResult): JoinResult {
+    if (res.ok) this.nav = new NavGrid(getMap(res.room.mapId, res.room.size));
+    return res;
+  }
+
   async create(opts: Record<string, unknown>): Promise<JoinResult> {
     await this.connected();
-    return new Promise((r) => this.s.emit('room:create', { nickname: this.name, ...opts }, r));
+    const res = await new Promise<JoinResult>((r) => this.s.emit('room:create', { nickname: this.name, ...opts }, r));
+    return this.joined(res);
   }
 
   async join(roomId: string, password?: string): Promise<JoinResult> {
     await this.connected();
-    return new Promise((r) =>
+    const res = await new Promise<JoinResult>((r) =>
       this.s.emit('room:join', { roomId, nickname: this.name, ...(password ? { password } : {}) }, r),
     );
+    return this.joined(res);
   }
 
   async spawn(characterId = 'soldado'): Promise<void> {
@@ -118,24 +138,45 @@ export class Bot {
     await this.until(() => this.spawnedAt !== before, 3000, 'spawn');
   }
 
-  /** Report the current position (keeps the server's view of the bot alive and still). */
-  hold(): void {
-    this.s.emit('player:state', { ...this.pos, ry: 0, rx: 0, sl: 0, cr: 0 });
+  /** Sends 50 ms of input (3 simulation steps) like the real client does. */
+  private input(f: number, yaw: number): void {
+    const c: MoveInput[] = [];
+    for (let i = 0; i < 3; i++) c.push({ seq: this.seq++, f, s: 0, yaw, pitch: 0, b: 0, slot: this.slot });
+    this.s.emit('player:input', { c });
   }
 
-  /** Walk to (x, z) in short steps. */
-  async goTo(x: number, z: number, y = this.pos.y): Promise<void> {
-    const STEP = 1.2;
-    for (;;) {
-      const dx = x - this.pos.x;
-      const dy = y - this.pos.y;
-      const dz = z - this.pos.z;
-      const d = Math.hypot(dx, dy, dz);
-      const k = Math.min(1, STEP / (d || 1));
-      this.pos = { x: this.pos.x + dx * k, y: this.pos.y + dy * k, z: this.pos.z + dz * k };
+  /** Stands still facing -z (yaw 0), so the server keeps simulating the bot (gravity, regen…). */
+  hold(): void {
+    this.input(0, 0);
+  }
+
+  /** Walks to (x, z) around obstacles (A* over the map) and stops there facing -z. */
+  async goTo(x: number, z: number): Promise<void> {
+    const WAYPOINT_REACHED = 0.5;
+    const ARRIVED = 0.35;
+    const TIMEOUT_MS = 20000;
+    const path = this.nav?.path({ x: this.pos.x, z: this.pos.z }, { x, z });
+    if (!path) throw new Error(`${this.name}: no path to (${x}, ${z})`);
+    const end = Date.now() + TIMEOUT_MS;
+    for (const [idx, wp] of path.entries()) {
+      const last = idx === path.length - 1;
+      for (;;) {
+        const dx = wp.x - this.pos.x;
+        const dz = wp.z - this.pos.z;
+        if (Math.hypot(dx, dz) < (last ? ARRIVED : WAYPOINT_REACHED)) break;
+        if (Date.now() > end)
+          throw new Error(
+            `${this.name}: stuck at (${this.pos.x.toFixed(1)}, ${this.pos.z.toFixed(1)}) going to (${x}, ${z})`,
+          );
+        // forward is (-sin yaw, -cos yaw)
+        this.input(1, Math.atan2(-dx, -dz));
+        await sleep(50);
+      }
+    }
+    // let the ground friction stop us
+    for (let i = 0; i < 6; i++) {
       this.hold();
       await sleep(50);
-      if (d < 0.01) return;
     }
   }
 
@@ -169,6 +210,7 @@ export class Bot {
   }
 
   switchSlot(slot: number): void {
+    this.slot = slot;
     this.s.emit('player:switch', { slot });
   }
 

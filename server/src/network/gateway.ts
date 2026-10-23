@@ -6,11 +6,11 @@ import {
   COMBAT_LOCK_MS,
   CreateRoomSchema,
   EmptySchema,
+  InputSchema,
   JoinRoomSchema,
   MAX_PING_MS,
   PLAYER,
   PingSchema,
-  PlayerStateSchema,
   SPAWN_REQUEST_GRACE_MS,
   ShootSchema,
   SpawnSchema,
@@ -27,7 +27,7 @@ import {
 } from '@blockshot/shared';
 import { handleReload, handleShoot, handleSwitch } from '../combat/shooting';
 import type { Logger } from '../logger';
-import { applyReportedState } from '../players/movement';
+import { queueInputs } from '../players/movement';
 import type { Player } from '../players/player';
 import { spawnPlayer } from '../players/spawn';
 import { cleanNickname, type RoomRegistry } from '../rooms/registry';
@@ -165,9 +165,10 @@ export function attachGateway(io: GameServer, rooms: RoomRegistry, log: Logger):
       if (p.alive && p.characterId) spawnPlayer(room, p, CHAR_BY_ID[p.characterId], p.skin);
     });
 
-    on('player:state', 'movement', PlayerStateSchema, (d) => {
+    // Movement commands: simulated by the server at a fixed rate (players/movement.ts)
+    on('player:input', 'movement', InputSchema, (d) => {
       const c = ctx();
-      if (c?.p.alive) applyReportedState(c.room, c.p, d);
+      if (c?.p.alive) queueInputs(c.p, d.c);
     });
 
     on('player:switch', 'combat', SwitchSchema, (d) => {

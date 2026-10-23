@@ -84,7 +84,8 @@ describe('infected', () => {
 });
 
 describe('streak rewards', () => {
-  it('gives radar at 5 and armor at 7 kills in a row', async () => {
+  // Slow on purpose: the victim respawns 7 times and walks back to its spot every time
+  it('gives radar at 5 and armor at 7 kills in a row', { timeout: 240_000 }, async () => {
     const { a, b } = await room('ffa', 20);
     await Promise.all([a.goTo(...SPOT_A), b.goTo(...SPOT_B)]);
     b.dropProtection();

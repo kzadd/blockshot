@@ -2,13 +2,15 @@ import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Server } from 'socket.io';
-import { SERVER_TICK_MS } from '@blockshot/shared';
+import { FIXED_DT, SIM_STEPS_PER_TICK } from '@blockshot/shared';
 import { serverConfig } from './config';
-import { tickRoom } from './game/tick';
+import { startFixedLoop } from './game/loop';
+import { snapshotRoom } from './game/tick';
 import { createApp } from './http/app';
 import { logger } from './logger';
 import { LOBBY_CHANNEL, attachGateway, type GameServer } from './network/gateway';
 import { announce, findLanAddress, printBanner } from './network/lan';
+import { simulateRoom } from './players/movement';
 import { RoomRegistry } from './rooms/registry';
 import type { RoomChannel } from './rooms/room';
 
@@ -33,11 +35,16 @@ const rooms = new RoomRegistry(channelFor, {
 });
 attachGateway(io, rooms, logger);
 
-// Fixed tick: mode rules, regeneration and one snapshot per room
-setInterval(() => {
-  const now = Date.now();
-  for (const room of rooms.all()) tickRoom(room, now);
-}, SERVER_TICK_MS);
+// Fixed tick: movement at 60 Hz; mode rules, regeneration, snapshots and acks every SIM_STEPS_PER_TICK steps
+const MS_PER_S = 1000;
+let step = 0;
+startFixedLoop(FIXED_DT * MS_PER_S, (now) => {
+  const snapshot = ++step % SIM_STEPS_PER_TICK === 0;
+  for (const room of rooms.all()) {
+    simulateRoom(room, FIXED_DT, now);
+    if (snapshot) snapshotRoom(room, now);
+  }
+});
 
 httpServer.listen(serverConfig.port, '0.0.0.0', () => {
   const ip = findLanAddress();

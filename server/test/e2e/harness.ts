@@ -5,6 +5,7 @@ import { createServer } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { io, type Socket } from 'socket.io-client';
+import msgpackParser from 'socket.io-msgpack-parser';
 import {
   PLAYER,
   getMap,
@@ -87,7 +88,7 @@ export class Bot {
     url: string,
     readonly name: string,
   ) {
-    this.s = io(url, { transports: ['websocket'], forceNew: true });
+    this.s = io(url, { transports: ['websocket'], forceNew: true, parser: msgpackParser });
     this.s.on('player:spawned', (d) => {
       this.pos = { x: d.x, y: d.y, z: d.z };
       this.spawnedAt = Date.now();

@@ -3,7 +3,21 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  build: { outDir: 'dist', emptyOutDir: true, chunkSizeWarningLimit: 1200 },
+  build: {
+    outDir: 'dist',
+    emptyOutDir: true,
+    chunkSizeWarningLimit: 1200,
+    // Libraries in their own files: they change less than the game code, so browsers keep them cached
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          three: ['three'],
+          react: ['react', 'react-dom', 'zustand'],
+          net: ['socket.io-client', 'socket.io-msgpack-parser'],
+        },
+      },
+    },
+  },
   server: {
     host: true,
     port: 5173,

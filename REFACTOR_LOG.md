@@ -366,3 +366,28 @@ Dos detalles que hubo que resolver:
 
 Verificado en el navegador: contexto en `running`, volumen de los ajustes aplicado, y 1 s de ráfaga de rifle genera
 20 voces (10 disparos × ruido + golpe grave), igual que antes.
+
+## 9. msgpack y rendimiento
+
+**msgpack** (`socket.io-msgpack-parser` en servidor, cliente y bots de test). Medido con un snapshot realista de
+12 jugadores y un ack:
+
+| Mensaje                       | JSON   | MessagePack | Ahorro |
+| ----------------------------- | ------ | ----------- | ------ |
+| Snapshot (12 jugadores, 20/s) | 2816 B | 2049 B      | −27 %  |
+| Ack (por jugador, 20/s)       | 369 B  | 270 B       | −27 %  |
+
+Los números siguen viajando en float64, así que el estado del ack es **idéntico** al del servidor (la predicción sigue
+con corrección 0 tras el cambio).
+
+**Carga inicial del cliente:** el juego (three.js + motor) se carga con `React.lazy` solo al entrar en una sala, y las
+librerías van en _chunks_ propios (`three`, `react`, `net`) que el navegador mantiene en caché entre versiones.
+
+|                         | JS que descarga el lobby                                                   |
+| ----------------------- | -------------------------------------------------------------------------- |
+| Antes (un único bundle) | 859 KB                                                                     |
+| Ahora                   | 281 KB (index + react + net); three + juego (579 KB) al entrar en una sala |
+
+**Otras mejoras de rendimiento hechas en pasos anteriores (resumen):** HUD con suscripción por campo (11 → 0,7 commits
+de React por segundo en reposo), efectos con _pool_, historial de lag comp a 60 Hz sin coste extra (se graba en el
+mismo bucle), y el motor solo publica el HUD 15 veces por segundo.

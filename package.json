@@ -17,12 +17,15 @@
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run --passWithNoTests",
     "format": "prettier --write .",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test:unit": "vitest run --passWithNoTests server/src shared/src client/src",
+    "test:coverage": "vitest run --coverage --coverage.include=server/src/** --coverage.include=shared/src/** --coverage.exclude=**/*.test.ts --coverage.exclude=server/src/testing/** server/src shared/src"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.5.0",
     "@commitlint/config-conventional": "^19.5.0",
     "@eslint/js": "^9.14.0",
+    "@vitest/coverage-v8": "2.1.9",
     "concurrently": "^9.0.1",
     "eslint": "^9.14.0",
     "eslint-config-prettier": "^9.1.0",

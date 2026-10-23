@@ -391,3 +391,29 @@ librerías van en _chunks_ propios (`three`, `react`, `net`) que el navegador ma
 **Otras mejoras de rendimiento hechas en pasos anteriores (resumen):** HUD con suscripción por campo (11 → 0,7 commits
 de React por segundo en reposo), efectos con _pool_, historial de lag comp a 60 Hz sin coste extra (se graba en el
 mismo bucle), y el motor solo publica el HUD 15 veces por segundo.
+
+## 10. Tests con Vitest
+
+**Unitarios de la lógica del servidor** con un `RecordingChannel` falso (`server/src/testing/fakeRoom.ts`): salas y
+jugadores reales, sin Socket.IO. Posible gracias a `RoomChannel` (paso 3).
+
+| Archivo                                                                               | Qué cubre                                                                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `combat/damage.test.ts`                                                               | protección de reaparición, blindaje antes que la vida, estadísticas de baja, fin de racha, Radar a 5 y Blindaje a 7, sin recompensas en Infectados                                                                                                                                                                                                         |
+| `combat/shooting.test.ts`                                                             | multiplicador a la cabeza, cadencia, cargador, recarga, cambio de arma que cancela la recarga, origen lejano / perdigones de más / dirección inválida, caída por distancia, **compensación de lag** (sin rebobinar falla, rebobinando acierta), sin fuego amigo, asistencia y puñalada del cuchillo, cuchillo de frente                                    |
+| `modes/modes.test.ts`                                                                 | los 6 modos: fin por límite y reinicio limpio, equipo con menos gente y puntuación, CTF (spawns por mitad, coger, soltar, devolver, capturar, vuelta sola), escalada (subir, bajar por cuchillazo, ganar), Confirmar bajas (confirmar, negar, caducar), Infectados (primer infectado, contagio, victoria por exterminio y por tiempo, reelección si se va) |
+| `players/players.test.ts`                                                             | cola de órdenes (repetidas, tope), presupuesto de simulación, movimiento + historial, muertos no se mueven, spawn lejos del enemigo, «Mejor jugada»                                                                                                                                                                                                        |
+| `rooms/registry.test.ts`                                                              | saneado de textos, puntuación por defecto, contraseña, sala llena, borrado de salas vacías                                                                                                                                                                                                                                                                 |
+| `network/rateLimiter.test.ts`                                                         | ráfaga, recarga y categorías independientes                                                                                                                                                                                                                                                                                                                |
+| `shared/.../raycast.test.ts`, `movement.test.ts`, `schemas.test.ts`, `golden.test.ts` | raycast y hitboxes, simulación de movimiento, esquemas Valibot, datos de gameplay                                                                                                                                                                                                                                                                          |
+| `client/.../hudStore.test.ts`, `modeUi.test.ts`                                       | store del HUD y presentación por modo                                                                                                                                                                                                                                                                                                                      |
+
+**End-to-end** (`server/test/e2e/`, servidor real en otro proceso, bots que andan con A*): lobby, combate, los 6
+modos, recompensas, movimiento autoritativo (plataformas, anti speed-hack), mensajes inválidos y _flood_.
+
+**Totales:** 91 tests unitarios + 21 e2e (9 archivos + 4 suites e2e, todos en verde). Cobertura de la lógica de
+servidor y `/shared` solo con unitarios (`pnpm test:coverage`): **86 %** de líneas (modos 95 %, combate 91 %,
+jugadores 97 %, mapas y físicas 100 %). Gateway, bucle y red los cubren los e2e, que no cuentan para la cobertura
+porque corren en otro proceso.
+
+Scripts: `pnpm test` (todo), `pnpm test:unit` (rápido, sin e2e), `pnpm test:coverage`.

@@ -179,7 +179,7 @@ function Health() {
             {h.maxHp} máx.
           </span>
         </div>
-        <div style={{ position: 'relative' }}>
+        <div className="relative">
           <div className="hpbar">
             <span className="trail" style={{ width: `${pct * 100}%` }} />
             <span className="fill" style={{ width: `${pct * 100}%`, background: hpColor(pct) }} />
@@ -237,7 +237,7 @@ function Ammo() {
   const low = h.mag > 0 && h.mag <= h.magSize * LOW_AMMO;
   return (
     <div className="ammo">
-      <span className="hud-txt" style={{ fontSize: 14 }}>
+      <span className="hud-txt text-[14px]">
         {h.gunLevel ? `Arma ${h.gunLevel}/${h.gunTotal} · ` : ''}
         {h.weaponName}
       </span>

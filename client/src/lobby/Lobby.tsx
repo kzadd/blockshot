@@ -152,7 +152,7 @@ export default function Lobby({ onJoined }: { onJoined: (s: Session) => void }) 
               <p>Arena de bloques para la clase. Crea una sala, comparte la contraseña y a jugar.</p>
             </div>
             <div className="head-actions">
-              <label className="field" style={{ position: 'relative' }}>
+              <label className="field relative">
                 <span>Tu nombre</span>
                 <input
                   className={`input ${nickError ? 'error' : ''}`}
@@ -259,9 +259,8 @@ export default function Lobby({ onJoined }: { onJoined: (s: Session) => void }) 
                       <button
                         type="button"
                         key={n}
-                        className={form.scoreLimit === n ? 'on' : ''}
+                        className={`justify-items-center ${form.scoreLimit === n ? 'on' : ''}`}
                         onClick={() => setForm({ ...form, scoreLimit: n })}
-                        style={{ justifyItems: 'center' }}
                       >
                         <b>{n}</b>
                         <small>{mode.unit}</small>
@@ -376,7 +375,7 @@ export default function Lobby({ onJoined }: { onJoined: (s: Session) => void }) 
             }}
           >
             <div className="modal-head">
-              <h2 style={{ fontSize: 20 }}>🔒 Sala con contraseña</h2>
+              <h2 className="text-[20px]">🔒 Sala con contraseña</h2>
               <button type="button" className="btn ghost icon" onClick={() => setJoining(null)} aria-label="Cerrar">
                 ✕
               </button>

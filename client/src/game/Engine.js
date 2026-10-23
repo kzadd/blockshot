@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PLAYER, WEAPONS, CHAR_BY_ID, CLIENT_SEND_MS, FLAG, getColliders, isTeamMode, loadoutOf, gunLadder } from '../../../shared/config.js';
+import { PLAYER, WEAPONS, CHAR_BY_ID, CLIENT_SEND_MS, FLAG, PAD, INFECT, getColliders, isTeamMode, loadoutOf, gunLadder } from '../../../shared/config.js';
 import { castShot } from '../../../shared/physics.js';
 import { buildWorld } from './world.js';
 import { buildCharacter, buildGun, buildArms, makeNameTag } from './models.js';
@@ -25,6 +25,9 @@ const impactGeo = new THREE.SphereGeometry(0.08, 6, 6);
 // Burbuja de los que acaban de reaparecer (invulnerables)
 const bubbleGeo = new THREE.SphereGeometry(1, 18, 12);
 const bubbleMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.18, depthWrite: false });
+// Placas de Confirmar bajas
+const tagGeo = new THREE.OctahedronGeometry(0.32, 0);
+const INFECTED_COLOR = '#6fcf3a';
 
 const damp = (k, dt) => 1 - Math.exp(-k * dt);
 
@@ -85,6 +88,10 @@ export class Engine {
     this.swingAt = 0; // último golpe de cuchillo (animación)
     this.myTeam = 0;
     this.teamScore = null;
+    this.infect = null; // Infectados: { st, t } del servidor
+    this.tags = new Map(); // Confirmar bajas: id -> malla de la placa
+    this.radar = false; // recompensa de racha: enemigos en el minimapa
+    this.armor = 0;
     this.rtt = 0;
     this.colliders = getColliders(map);
     this.applySettings(getSettings());
@@ -143,6 +150,7 @@ export class Engine {
     this.stamina = PLAYER.stamina;
     this.staminaAt = 0; // último momento en que se gastó estamina
     this.staminaLock = false; // agotada: hay que recuperar un mínimo para volver a esprintar
+    this.slideEndAt = 0; // fin del último slide (espera entre slides)
     this.sprinting = false;
     this.sprintLerp = 0;
     this.sprintBlockUntil = 0; // disparar corta el sprint un momento
@@ -268,6 +276,7 @@ export class Engine {
   // Por equipos todos visten el color de su equipo; en todos contra todos, el del personaje y su skin
   outfit(charId, skin, team) {
     const ch = CHAR_BY_ID[charId];
+    if (this.mode === 'infect' && team === 2) return { color: INFECTED_COLOR, skin: 'base' };
     if (isTeamMode(this.mode) && team) return { color: teamColor(team, ch.color), skin: 'base' };
     return { color: ch.color, skin };
   }
@@ -392,13 +401,18 @@ export class Engine {
     });
     on('loadout', (d) => {
       // Escalada de armas: nueva arma (por subir o por un cuchillazo)
-      const up = d.level > this.level;
+      const up = d.level > this.level || (d.team && d.team !== this.myTeam);
       this.level = d.level;
+      if (d.team) this.myTeam = d.team;
       if (this.alive) {
         this.equip();
         this.swapUntil = performance.now() + 250;
       }
       if (up) sfx.streak();
+    });
+    on('tag', (d) => {
+      if (d.type === 'confirm') sfx.blip(988, 0.1, 'triangle', 0.22);
+      else sfx.blip(440, 0.12, 'triangle', 0.18);
     });
     on('flag', (d) => {
       if (d.type === 'capture') sfx.streak();
@@ -430,11 +444,15 @@ export class Engine {
     this.socket.emit('player:spawn', { characterId, skin });
   }
 
-  onState({ players, ts, fl }) {
+  onState({ players, ts, fl, tg, inf }) {
     this.players = players;
     this.teamScore = ts;
     this.flags = fl || null;
+    this.infect = inf || null;
+    this.syncTags(tg);
     const me = players.find((p) => p.id === this.myId);
+    // Radar: lo tienes tú o (por equipos) un compañero
+    this.radar = players.some((p) => p.rd && (p.id === this.myId || (isTeamMode(this.mode) && p.tm === this.myTeam)));
     if (me && me.tm !== this.myTeam) {
       this.myTeam = me.tm;
       // Cambié de equipo: aliados y enemigos cambian de color
@@ -444,7 +462,11 @@ export class Engine {
     const seen = new Set();
     for (const p of players) {
       if (p.id === this.myId) {
-        if (this.alive) this.hp = p.h;
+        if (this.alive) {
+          this.hp = p.h;
+          if (p.mh) this.maxHp = p.mh;
+          this.armor = p.ar || 0;
+        }
         continue;
       }
       seen.add(p.id);
@@ -464,8 +486,8 @@ export class Engine {
       r.name = p.n;
       if (!r.model) continue;
       const ch = CHAR_BY_ID[r.charId];
-      r.tag.userData.setHp(p.h / ch.hp);
-      const wid = loadoutOf(this.mode, ch, p.lv, this.limit)[p.s] ?? ch.primary;
+      r.tag.userData.setHp(Math.min(1, p.h / (p.mh || ch.hp)));
+      const wid = loadoutOf(this.mode, ch, p.lv, this.limit, p.tm)[p.s] ?? ch.primary;
       if (wid !== r.weaponId) this.setRemoteGun(r, wid);
       if (r.alive && !r.wasAlive) {
         r.model.group.position.copy(r.target);
@@ -475,6 +497,34 @@ export class Engine {
       r.model.group.visible = r.alive;
     }
     for (const id of [...this.remotes.keys()]) if (!seen.has(id)) this.removeRemote(id);
+  }
+
+  // Confirmar bajas: placas que giran en el suelo, del color del equipo de la víctima
+  syncTags(list) {
+    const seen = new Set();
+    for (const [id, x, y, z, team] of list || []) {
+      seen.add(id);
+      if (this.tags.has(id)) continue;
+      const color = teamColor(team);
+      const mesh = new THREE.Mesh(tagGeo, new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: 0.5 }));
+      mesh.position.set(x, y + 0.6, z);
+      mesh.userData = { y: y + 0.6, team };
+      this.scene.add(mesh);
+      this.tags.set(id, mesh);
+    }
+    for (const [id, mesh] of this.tags) {
+      if (seen.has(id)) continue;
+      this.scene.remove(mesh);
+      mesh.material.dispose();
+      this.tags.delete(id);
+    }
+  }
+
+  updateTags(now) {
+    for (const m of this.tags.values()) {
+      m.rotation.y = now * 0.004;
+      m.position.y = m.userData.y + Math.sin(now * 0.005 + m.id) * 0.12;
+    }
   }
 
   buildRemote(r, p) {
@@ -524,7 +574,9 @@ export class Engine {
     this.vel.set(0, 0, 0);
     this.yaw = d.ry;
     this.pitch = 0;
-    this.hp = this.maxHp = this.character.hp;
+    if (d.team) this.myTeam = d.team;
+    this.hp = this.maxHp = d.hp ?? this.character.hp;
+    this.armor = 0;
     this.alive = true;
     this.protUntil = performance.now() + PLAYER.spawnProtection;
     this.everSpawned = true;
@@ -831,6 +883,7 @@ export class Engine {
         if (d < 0) {
           p.y = b.max[1];
           this.grounded = true;
+          if (b.c === 'pad') this.onPad = true;
         } else p.y = b.min[1] - H;
         this.vel.y = 0;
       } else {
@@ -871,12 +924,13 @@ export class Engine {
     if (crouchKey) this.crouching = true;
     else if (this.crouching && !this.overlaps(this.pos.x, this.pos.y + 0.001, this.pos.z, PLAYER.height)) this.crouching = false;
 
-    // Sprint (Shift) con estamina: solo hacia delante, sin apuntar ni disparar
+    // Sprint (Shift): solo hacia delante, sin apuntar ni disparar. Con useStamina gasta estamina
     const w = this.weapon();
+    if (!PLAYER.useStamina) this.stamina = PLAYER.stamina;
     if (this.staminaLock && this.stamina >= PLAYER.staminaMin) this.staminaLock = false;
     const canSprint = sprintKey && f > 0 && !this.aiming && !this.mouseDown && !this.crouching && !this.sliding && now >= this.sprintBlockUntil;
     this.sprinting = canSprint && !this.staminaLock && this.stamina > 0 && (this.grounded || this.sprinting);
-    if (this.sprinting && hs > 1) {
+    if (this.sprinting && hs > 1 && PLAYER.useStamina) {
       this.stamina = Math.max(0, this.stamina - PLAYER.staminaDrain * dt);
       this.staminaAt = now;
       if (this.stamina <= 0) {
@@ -887,21 +941,25 @@ export class Engine {
       this.stamina = Math.min(PLAYER.stamina, this.stamina + PLAYER.staminaRegen * dt);
     }
 
-    // Las armas pesadas frenan; apuntando se va más despacio (adsMove de cada arma)
-    const walk = this.character.speed * (w.weight ?? 1);
+    // Las armas pesadas frenan; apuntando se va más despacio (adsMove de cada arma). Los infectados corren más
+    const walk = this.character.speed * (w.weight ?? 1) * (this.mode === 'infect' && this.myTeam === 2 ? INFECT.speed : 1);
     const base = walk * (this.aiming ? w.adsMove ?? 0.65 : this.sprinting ? PLAYER.sprint : 1);
     const speed = base * (this.crouching && !this.sliding ? PLAYER.crouchSpeed : 1);
 
     if (this.grounded) {
       this.coyote = PLAYER.coyote;
-      // Deslizamiento: C o Ctrl corriendo (también al aterrizar con la tecla pulsada). Gasta estamina
-      if (slideKey && (!this.crouchHeld || this.justLanded) && hs > walk * 0.6 && !this.sliding && this.stamina >= PLAYER.slideCost) {
+      // Deslizamiento: C o Ctrl corriendo (también al aterrizar con la tecla pulsada: slide-hop).
+      // Encadenando salto + slide cada deslizamiento gana un poco de velocidad (slideGain)
+      const slideReady = now - this.slideEndAt > PLAYER.slideCooldown * 1000 && (!PLAYER.useStamina || this.stamina >= PLAYER.slideCost);
+      if (slideKey && (!this.crouchHeld || this.justLanded) && hs > walk * 0.6 && !this.sliding && slideReady) {
         this.sliding = true;
-        this.slideTime = 0.75;
-        this.stamina -= PLAYER.slideCost;
-        this.staminaAt = now;
+        this.slideTime = PLAYER.slideTime;
+        if (PLAYER.useStamina) {
+          this.stamina -= PLAYER.slideCost;
+          this.staminaAt = now;
+        }
         this.sprinting = false;
-        const boost = Math.max(hs, walk * 1.55);
+        const boost = Math.max(hs * (this.justLanded ? PLAYER.slideGain : 1), walk * PLAYER.slideBoost);
         const dx = wl > 0 ? wx : v.x / hs;
         const dz = wl > 0 ? wz : v.z / hs;
         v.x = dx * boost;
@@ -909,11 +967,15 @@ export class Engine {
         sfx.slide();
       }
       if (this.sliding) {
-        const fr = Math.exp(-1.6 * dt);
+        // Por encima del tope suave el slide frena más (overFriction)
+        const fr = Math.exp(-(hs > walk * PLAYER.softCap ? PLAYER.overFriction : PLAYER.slideFriction) * dt);
         v.x *= fr;
         v.z *= fr;
         this.slideTime -= dt;
-        if (this.slideTime <= 0 || !slideKey) this.sliding = false;
+        if (this.slideTime <= 0 || !slideKey) {
+          this.sliding = false;
+          this.slideEndAt = now;
+        }
       } else if (!(wantJump && hs > speed)) {
         // Al encadenar saltos no se frena: así funciona el bunny hop
         const a = damp(14, dt);
@@ -941,6 +1003,7 @@ export class Engine {
       }
     }
     const nh = Math.hypot(v.x, v.z);
+    // Tope absoluto (el tope suave solo frena en el suelo; en el aire se conserva la velocidad)
     const max = walk * PLAYER.maxSpeed;
     if (nh > max) {
       v.x *= max / nh;
@@ -953,6 +1016,7 @@ export class Engine {
       this.grounded = false;
       this.coyote = 0;
       this.jumpPressedAt = -1e9;
+      if (this.sliding) this.slideEndAt = now;
       this.sliding = false;
       sfx.jump();
     }
@@ -965,7 +1029,16 @@ export class Engine {
     this.grounded = false;
     this.moveAxis(0, v.x * dt, wasGrounded);
     this.moveAxis(2, v.z * dt, wasGrounded);
+    this.onPad = false;
     this.moveAxis(1, v.y * dt, wasGrounded);
+    // Plataforma de salto: impulso hacia arriba conservando la velocidad horizontal
+    if (this.onPad) {
+      v.y = PAD.power;
+      this.grounded = false;
+      this.coyote = 0;
+      this.sliding = false;
+      sfx.pad();
+    }
     this.justLanded = this.grounded && !wasGrounded;
     if (this.justLanded && fall < -7) {
       this.landDip = Math.min(0.3, -fall * 0.014);
@@ -1121,6 +1194,7 @@ export class Engine {
     this.updateRemotes(dt);
     this.updateEffects(dt);
     this.updateFlags(dt, now);
+    this.updateTags(now);
     // La dispersión por ráfaga baja en cuanto dejas de disparar
     if (this.alive && now - this.lastShot[this.slot] > 140) this.bloom *= Math.exp(-7 * dt);
 
@@ -1160,7 +1234,10 @@ export class Engine {
       maxHp: this.maxHp,
       characterId: this.character?.id,
       charName: this.character?.name,
-      stamina: this.stamina / PLAYER.stamina,
+      stamina: PLAYER.useStamina ? this.stamina / PLAYER.stamina : null,
+      armor: this.alive ? this.armor : 0,
+      radar: this.radar,
+      infect: this.infect,
       staminaLow: this.staminaLock,
       sprinting: this.sprinting,
       weaponName: w?.name,

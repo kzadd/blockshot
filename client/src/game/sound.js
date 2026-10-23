@@ -108,6 +108,22 @@ class Sfx {
   hurt() { this.blip(150, 0.14, 'sawtooth', 0.25); }
   reload() { this.blip(420, 0.04, 'square', 0.12); this.blip(620, 0.04, 'square', 0.12, 0.12); }
   jump() { this.blip(260, 0.05, 'sine', 0.08); }
+  // Plataforma de salto: barrido hacia arriba
+  pad() {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(220, t);
+    o.frequency.exponentialRampToValueAtTime(880, t + 0.22);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.22, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+    o.connect(g).connect(this.master);
+    o.start(t);
+    o.stop(t + 0.32);
+  }
 }
 
 export const sfx = new Sfx();

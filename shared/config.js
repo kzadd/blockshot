@@ -18,6 +18,8 @@ export const MODES = [
   { id: 'teams', name: 'Por equipos', limits: [20, 40, 60, 100], def: 40, unit: 'bajas' },
   { id: 'ctf', name: 'Captura la bandera', limits: [1, 3, 5, 7], def: 3, unit: 'capturas' },
   { id: 'gungame', name: 'Escalada de armas', limits: [5, 8], def: 8, unit: 'armas' },
+  { id: 'kc', name: 'Confirmar bajas', limits: [15, 30, 50, 75], def: 30, unit: 'placas' },
+  { id: 'infect', name: 'Infectados', limits: [2, 3, 5], def: 3, unit: 'min' },
 ];
 // Escalada de armas: todos empiezan con la primera y cada baja da la siguiente.
 // Gana quien consigue una baja con la última (el cuchillo). Una baja a cuchillo le quita un arma a la víctima.
@@ -27,16 +29,33 @@ export const GUN_LADDERS = {
 };
 export const gunLadder = (limit) => GUN_LADDERS[limit] || GUN_LADDERS[8];
 export const MODE_BY_ID = Object.fromEntries(MODES.map((m) => [m.id, m]));
-// Modos con equipo Rojo contra Azul
-export const isTeamMode = (mode) => mode === 'teams' || mode === 'ctf';
+// Modos con dos bandos (sin fuego amigo). En Infectados el bando lo decide el juego, no el jugador
+export const isTeamMode = (mode) => mode === 'teams' || mode === 'ctf' || mode === 'kc' || mode === 'infect';
+export const canSwitchTeam = (mode) => isTeamMode(mode) && mode !== 'infect';
 // Captura la bandera: radio para coger / devolver / capturar y tiempo hasta que vuelve sola
 export const FLAG = { radius: 1.6, returnMs: 20000 };
+// Confirmar bajas: cada baja suelta una placa; si la coge el equipo rival suma un punto, si la coge
+// un compañero de la víctima la niega. Desaparece sola a los lifeMs
+export const TAG = { radius: 1.5, lifeMs: 30000 };
+// Infectados: el primero se elige al haber 2 jugadores; los infectados solo llevan cuchillo y corren más.
+// Si quedan supervivientes al acabar el tiempo (los minutos elegidos al crear la sala), ganan ellos
+export const INFECT = { pickDelay: 10000, speed: 1.15, hp: 1.3 };
 export const TEAMS = {
   1: { name: 'Rojo', color: '#ff5a4d' },
   2: { name: 'Azul', color: '#4da3ff' },
 };
+const INFECT_TEAMS = { 1: 'Supervivientes', 2: 'Infectados' };
+export const teamName = (mode, t) => (mode === 'infect' ? INFECT_TEAMS[t] : TEAMS[t]?.name) ?? '';
 // Avisos de racha (bajas seguidas sin morir)
 export const STREAKS = { 3: 'En racha', 5: 'Imparable', 7: 'Dominando', 10: 'Leyenda' };
+// Recompensas por racha: radar = ves a todos los enemigos en el minimapa (tú y tu equipo);
+// blindaje = vida extra que se gasta antes que la normal y no se regenera
+export const STREAK_REWARDS = {
+  5: { id: 'radar', name: 'Radar', ms: 12000 },
+  7: { id: 'armor', name: 'Blindaje', amount: 50 },
+};
+// Plataformas de salto (cajas de tipo 'pad'): impulso vertical al pisarlas
+export const PAD = { power: 17, h: 0.3, size: 1.8 };
 
 export const PLAYER = {
   radius: 0.35,
@@ -52,14 +71,26 @@ export const PLAYER = {
   jumpBuffer: 0.15, // s que se recuerda un salto pulsado antes de tocar el suelo
   airCap: 0.3, // control en el aire (fracción de la velocidad); permite ganar velocidad girando
   airAccel: 6,
-  maxSpeed: 1.8, // tope de velocidad horizontal (x velocidad del personaje) con slide y bunny hop
+  // Velocidad horizontal (× la del personaje). Por encima de softCap, en el suelo se frena poco a poco
+  // (overFriction); en el aire se conserva. maxSpeed es el tope absoluto con slide + bunny hop
+  softCap: 1.7,
+  overFriction: 2.2,
+  maxSpeed: 2.6,
   sprint: 1.3, // multiplicador al esprintar (Shift)
+  // Estamina (false = como Krunker: sprint y slide sin límite)
+  useStamina: false,
   stamina: 100, // estamina máxima
   staminaDrain: 15, // por segundo esprintando (unos 6,5 s seguidos)
   staminaRegen: 25, // por segundo descansando
   staminaDelay: 700, // ms sin esprintar antes de recuperarla
   staminaMin: 25, // si se agota, hace falta esto para volver a esprintar
-  slideCost: 20, // estamina que gasta cada deslizamiento
+  slideCost: 20, // estamina que gasta cada deslizamiento (con useStamina)
+  // Deslizamiento: duración, rozamiento, impulso mínimo (× velocidad) y lo que gana cada slide encadenado
+  slideTime: 1.05,
+  slideFriction: 0.9,
+  slideBoost: 1.55,
+  slideGain: 1.12,
+  slideCooldown: 0.25, // s entre slides (para que no se pueda spamear en el sitio)
   respawnDelay: 3000,
   regenDelay: 5000, // ms sin recibir daño antes de regenerar
   regenRate: 15, // vida por segundo
@@ -118,7 +149,8 @@ export const WEAPONS = {
 };
 
 // Armas que lleva un jugador, por orden de tecla (1, 2, 3)
-export function loadoutOf(mode, ch, level = 0, limit = 8) {
+export function loadoutOf(mode, ch, level = 0, limit = 8, team = 0) {
+  if (mode === 'infect' && team === 2) return ['knife'];
   if (mode === 'gungame') {
     const ladder = gunLadder(limit);
     const w = ladder[Math.min(level, ladder.length - 1)];
@@ -200,7 +232,7 @@ const PALLET = [[0, 0, 0, 1.2, 0.15, 1.2, 'pallet'], [0, 0.15, 0, 1, 1, 1, 'crat
 // Colores de los objetos (minimapa y vista previa; el 3D los usa como tinte)
 const PROP_COLORS = {
   barrel: '#3d6e9e', planter: '#9a8f80', trunk: '#6b4a2b', lamp: '#3a3f47',
-  sandbag: '#b8a57a', pallet: '#a8834f', cactus: '#4f8a45', car: '#c0503e', carTop: '#2b3a4a',
+  sandbag: '#b8a57a', pad: '#3ee08a', pallet: '#a8834f', cactus: '#4f8a45', car: '#c0503e', carTop: '#2b3a4a',
 };
 const car = (alongX) => (alongX
   ? [[0, 0, 0, 4.2, 1, 1.9, 'car'], [0.3, 1, 0, 2.2, 0.75, 1.7, 'carTop']]
@@ -232,6 +264,9 @@ function stairs(B, x, z, axis, dir, steps, width, c = 'step') {
   }
 }
 
+// Plataforma de salto centrada en (x, z), apoyada en el suelo (o en y)
+const pad = (B, x, z, y = 0) => B(x, y, z, PAD.size, PAD.h, PAD.size, 'pad');
+
 // --- Patio: torre central, muros intermedios y habitaciones en las esquinas
 function buildPatio({ B, S, P, H }) {
   const k = H / 40;
@@ -244,6 +279,8 @@ function buildPatio({ B, S, P, H }) {
   }
   B(-3.5, 3, -3.5, 2, 1.2, 2, 'crate2');
   B(3.5, 3, 3.5, 2, 1.2, 2, 'crate2');
+  // Plataformas de salto junto a las escaleras: suben directo a la torre
+  for (const sx of [1, -1]) for (const sz of [1, -1]) pad(B, sx * 4.6, sz * 9);
 
   // Muros intermedios con hueco en el centro (segundo anillo en el grande)
   const rings = [Math.max(13, 0.45 * H)];
@@ -340,6 +377,11 @@ function buildAlmacen({ B, S, P, H, rand }) {
   B(-2, 0, -1.6, 2.4, 1.2, 2.4, 'crate');
   B(2, 0, 1.6, 2.4, 2.4, 2.4, 'crate2');
   B(4.4, 0, 1.6, 2.4, 1.2, 2.4, 'crate');
+  // Plataformas de salto: a lo alto de los contenedores y a las entreplantas
+  for (const s of [1, -1]) {
+    pad(B, 0, s * 5);
+    pad(B, 0, s * (H - 7.5));
+  }
 
   // Barriles junto a las paredes y palés con cajas por los pasillos
   for (const s of [1, -1]) {
@@ -390,6 +432,8 @@ function buildDesfiladero({ B, S, P: Prop, H, rand }) {
     }
   }
   for (const z of bridges) B(0, 3.4, z, 2 * P, 0.6, 4, 'bridge');
+  // Plataformas de salto al pie de cada meseta (el otro lado que las escaleras)
+  for (const s of [1, -1]) pad(B, s * (P - 2), -s * 0.25 * H);
 
   // Sacos terreros a la entrada de los puentes, cactus y barriles
   for (const s of [1, -1]) {
@@ -479,6 +523,9 @@ function buildPolvo({ B, S, P, H }) {
     P(s * 18 * k, 16 * k, BARREL);
   }
   P(-26 * k, -12 * k, BARREL);
+  // Plataformas de salto en el medio: para asomarse por encima de las casas
+  pad(B, 0, 20 * k);
+  pad(B, 0, -20 * k);
   P(27 * k, -15 * k, sandbags(1, 3));
 
   const spawns = [
@@ -528,6 +575,11 @@ function buildCiudad({ B, S, P, H, rand }) {
         }
       } else B(cx, 0, cz, bs, h, bs, c);
     }
+  }
+  // Plataformas de salto en mitad de algunas calles: suben a las azoteas bajas
+  for (let i = 1; i < n; i++) {
+    pad(B, street(i), at(i - 1));
+    pad(B, at(n - i), street(i));
   }
   // Coches aparcados, farolas y barriles en las calles
   for (let i = 0; i <= n; i++) {
@@ -628,7 +680,7 @@ function placeProps(boxes, points, props) {
     const y = groundAt(boxes, x, z);
     const list = parts.map(([dx, dy, dz, w, h, d, c]) => ({ x: r2(x + dx), y: r2(y + dy), z: r2(z + dz), w, h, d, c, p: id + 1 }));
     const blocked = list.some((b) =>
-      boxes.some((o) => o.c !== 'floor' && hit(b, o)) ||
+      boxes.some((o) => o.c !== 'floor' && (hit(b, o) || (o.c === 'pad' && hit({ ...b, y: o.y }, o)))) ||
       points.some(([sx, sz]) => Math.abs(sx - b.x) < b.w / 2 + 1.3 && Math.abs(sz - b.z) < b.d / 2 + 1.3));
     if (blocked) continue;
     id++;
@@ -679,6 +731,7 @@ export function getMap(mapId, sizeId) {
 
 export function getColliders(map) {
   return map.boxes.map((b) => ({
+    c: b.c,
     min: [b.x - b.w / 2, b.y, b.z - b.d / 2],
     max: [b.x + b.w / 2, b.y + b.h, b.z + b.d / 2],
   }));

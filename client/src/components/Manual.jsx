@@ -6,7 +6,7 @@ export const CONTROLS = [
   [['W', 'A', 'S', 'D'], 'Moverse'],
   [['Espacio'], 'Saltar. Mantenlo pulsado para encadenar saltos (bunny hop)'],
   [['C', 'Ctrl'], 'Agacharse: más bajo y más preciso. Si vas corriendo, te deslizas'],
-  [['Shift'], 'Esprintar (gasta estamina; se recupera sola al soltar)'],
+  [['Shift'], PLAYER.useStamina ? 'Esprintar (gasta estamina; se recupera sola al soltar)' : 'Esprintar hacia delante'],
   [['Clic izq.'], 'Disparar'],
   [['Clic der.'], 'Apuntar (mira telescópica con el francotirador)'],
   [['R'], 'Recargar'],
@@ -27,21 +27,25 @@ const STEPS = [
   ['Gana la partida', `Quien crea la sala elige los puntos. Por defecto: ${MODE_BY_ID.ffa.def} bajas (todos contra todos), ${MODE_BY_ID.teams.def} bajas del equipo (por equipos) o ${MODE_BY_ID.ctf.def} capturas.`],
   ['Escalada de armas', 'Todos empiezan con la misma arma y cada baja da la siguiente. Gana quien elimine con el cuchillo.'],
   ['Captura la bandera', 'Coge la bandera rival pasando por encima y llévala a tu base con la tuya en casa. Si cae, tócala para devolverla.'],
+  ['Confirmar bajas', 'Cada baja suelta una placa. Si la recoge tu equipo, suma un punto; si la recoge el equipo de la víctima, la niega.'],
+  ['Infectados', 'Uno empieza infectado: solo lleva cuchillo, pero corre más y aguanta más. Cada superviviente que cae se infecta. Los supervivientes ganan si aguantan hasta el final.'],
   ['Si te eliminan', `Reapareces a los ${PLAYER.respawnDelay / 1000} s. Pulsa B para cambiar de personaje antes.`],
 ];
 
 const TRICKS = [
   ['Bunny hop', 'Mantén Espacio al aterrizar: cada salto encadenado conserva la velocidad.'],
-  ['Deslízate', 'Corre y pulsa C para entrar en una esquina más rápido y más bajo. Gasta un poco de estamina.'],
-  ['Guarda estamina', 'Esprinta para cruzar zonas abiertas, no todo el rato: si la agotas tardas en poder volver a correr.'],
+  ['Deslízate', 'Corre y pulsa C para entrar en una esquina más rápido y más bajo.'],
+  ['Slide-hop', 'Desliza, salta y vuelve a pulsar C justo al aterrizar: cada slide encadenado gana velocidad. En el aire no se frena.'],
+  ['Plataformas de salto', 'Las placas verdes del suelo te lanzan hacia arriba: úsalas para subir a torres, contenedores y azoteas.'],
   ['Armas pesadas', 'El francotirador y la ametralladora te frenan. Saca la secundaria para moverte más rápido.'],
-  ['Apunta a la cabeza', 'Multiplica el daño: el francotirador solo mata de un tiro a la cabeza.'],
+  ['Apunta a la cabeza', 'Multiplica el daño. Al Tanque, el francotirador solo lo tumba de un tiro a la cabeza.'],
   ['Francotirador quieto', 'Tarda en apuntar y, si te mueves o saltas con la mira puesta, el tiro se desvía.'],
   ['Agáchate al disparar', 'Con C la mira se abre menos y aciertas más ráfagas.'],
   ['Recarga a cubierto', `La ametralladora del Bastión tarda ${WEAPONS.lmg.reload / 1000} s. Hazlo detrás de una caja.`],
   ['Mira el minimapa', 'Los enemigos que disparan aparecen un momento en rojo.'],
   ['Ráfagas cortas', 'Cada disparo sube la mira; al soltar el gatillo vuelve sola a su sitio.'],
   ['Rachas', 'Encadena 3, 5, 7 o 10 bajas sin morir y toda la sala lo verá en el killfeed.'],
+  ['Recompensas', 'Con 5 bajas seguidas ganas Radar (ves a todos los enemigos en el minimapa un rato); con 7, Blindaje (+50 que se gasta antes que la vida).'],
   ['Disparos justos', 'El servidor compensa el retraso de la red: si en tu pantalla le diste, cuenta.'],
 ];
 

@@ -655,6 +655,13 @@ export function buildWorld(scene, map) {
   let n = 0;
   for (const b of map.boxes) {
     if (b.p && addProp(props, b, map.colors, rand, b.c === 'car' ? ++n : n)) continue;
+    // Plataforma de salto: base oscura y tapa verde que brilla
+    if (b.c === 'pad') {
+      props.add(BOX, mat('#2b2f36', 'diamond'), b.x, b.y + b.h * 0.35, b.z, 0, b.w, b.h * 0.7, b.d);
+      props.add(BOX, glow(map.colors.pad), b.x, b.y + b.h * 0.85, b.z, 0, b.w - 0.25, b.h * 0.3, b.d - 0.25);
+      props.add(BOX, glow('#eafff2'), b.x, b.y + b.h + 0.005, b.z, Math.PI / 4, 0.5, 0.01, 0.5);
+      continue;
+    }
     // Edificios: azotea con remate de hormigón
     if (b.c.startsWith('bld')) props.add(BOX, mat('#7d7f84', 'concrete'), b.x, b.y + b.h + 0.15, b.z, 0, b.w + 0.3, 0.3, b.d + 0.3);
     const [texName, tile] = theme[b.c] || COMMON[b.c] || theme.wall;

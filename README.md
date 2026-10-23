@@ -66,6 +66,11 @@ desde la red en el puerto 5173).
      pantalla de personaje o con **T**): gana el primer equipo en llegar a las bajas elegidas, sin fuego amigo.
    - **Captura la bandera:** roba la bandera rival y llévala a tu base con la tuya en casa.
    - **Escalada de armas:** todos llevan la misma arma y cada baja da la siguiente; gana quien elimine con el cuchillo.
+   - **Confirmar bajas** (Rojo contra Azul): cada baja suelta una placa; si la recoge el equipo del que mató suma un
+     punto, si la recoge un compañero de la víctima la niega. Gana el primer equipo en llegar a las placas elegidas.
+   - **Infectados:** con 2 jugadores empieza una cuenta atrás de 10 s y uno se convierte en infectado (solo cuchillo,
+     +30 % de vida y +15 % de velocidad). Cada superviviente que cae se infecta. Ganan los infectados si no queda nadie;
+     los supervivientes, si aguantan los minutos elegidos (2, 3 o 5).
    La partida se reinicia sola a los 8 s. Todos los personajes llevan cuchillo (tecla **3**); por la espalda mata de un golpe.
 
 | Tecla | Acción |
@@ -73,7 +78,7 @@ desde la red en el puerto 5173).
 | WASD | Moverse |
 | Espacio | Saltar (mantén pulsado para encadenar saltos: bunny hop) |
 | C / Ctrl | Agacharse (más preciso y más bajo). Corriendo: deslizarse (desliza + salta = mucha velocidad) |
-| Shift | Esprintar hacia delante (gasta estamina) |
+| Shift | Esprintar hacia delante |
 | Clic izquierdo | Disparar |
 | Clic derecho | Apuntar: más zoom y precisión, pero te mueves más despacio (mira telescópica con el francotirador) |
 | R | Recargar |
@@ -91,8 +96,18 @@ la pestaña.
 
 La vida se regenera tras 5 s sin recibir daño. Los disparos a la cabeza hacen más daño.
 
-**Estamina:** esprintar (Shift) y deslizarse la gastan; se recupera sola al poco de dejar de correr. Si se agota del
-todo, hay que esperar a que se recupere un poco para volver a esprintar (barra fina bajo la vida).
+**Movimiento estilo Krunker:** no hay estamina (sprint y slide sin límite; se puede volver a activar con
+`PLAYER.useStamina` en `shared/config.js`). El slide dura más y frena menos, y encadenar **slide + salto + slide al
+aterrizar** (slide-hop) gana un poco de velocidad cada vez. En el aire la velocidad se conserva; en el suelo, por encima
+de un tope suave, se frena poco a poco. Todo se ajusta en `PLAYER` (`softCap`, `maxSpeed`, `slideTime`, `slideGain`…).
+
+**Plataformas de salto:** las placas verdes del suelo lanzan a unos 5,5 m de altura conservando la velocidad. Hay en
+todos los mapas (junto a la torre del Patio, ante las entreplantas del Almacén, al pie de las mesetas del Desfiladero, en
+el medio de Polvo y en las calles de Ciudad). Para poner una en un mapa nuevo: `pad(B, x, z)`.
+
+**Recompensas por racha:** con 5 bajas seguidas, **Radar** (12 s viendo a todos los enemigos en el minimapa, tú y tu
+equipo); con 7, **Blindaje** (+50 que se gasta antes que la vida y no se regenera). Se configuran en `STREAK_REWARDS`.
+No hay en Infectados.
 
 **Armas:** las pesadas (francotirador, ametralladora) frenan al llevarlas en la mano; saca la secundaria para correr.
 Apuntar tarda un momento (más con las pesadas) y la precisión llega al terminar de subir el arma. Casi todas pierden

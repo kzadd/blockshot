@@ -20,6 +20,8 @@ const MODE_SUB = {
   teams: 'Rojo contra Azul',
   ctf: 'Roba la bandera rival',
   gungame: 'Un arma nueva por baja',
+  kc: 'Recoge las placas de tus bajas',
+  infect: 'Huye de los del cuchillo',
 };
 const EMPTY_COLORS = ['#3a4a6c', '#ffc93c', '#3a4a6c', '#3f7fe0', '#d0533a', '#3aa65a'];
 
@@ -183,7 +185,7 @@ export default function Lobby({ onJoined }) {
 
               <div className="row-2">
                 <div>
-                  <div className="label-row"><span className="label">Para ganar</span><span className="hint">{form.scoreLimit} {MODE_BY_ID[form.mode].unit}{form.mode === 'teams' ? ' del equipo' : ''}</span></div>
+                  <div className="label-row"><span className="label">Para ganar</span><span className="hint">{form.mode === 'infect' ? `Aguantar ${form.scoreLimit} min` : `${form.scoreLimit} ${MODE_BY_ID[form.mode].unit}${form.mode === 'teams' || form.mode === 'kc' ? ' del equipo' : ''}`}</span></div>
                   <div className="seg">
                     {MODE_BY_ID[form.mode].limits.map((n) => (
                       <button type="button" key={n} className={form.scoreLimit === n ? 'on' : ''} onClick={() => setForm({ ...form, scoreLimit: n })} style={{ justifyItems: 'center' }}>

@@ -1,7 +1,8 @@
-import { CHAR_BY_ID, TEAMS, WEAPONS, isTeamMode, gunLadder } from '../../../shared/config.js';
+import { CHAR_BY_ID, WEAPONS, isTeamMode, gunLadder, teamName } from '../../../shared/config.js';
 
 const TEAM_TXT = { 1: 'var(--eq-rojo-txt)', 2: 'var(--eq-azul-txt)' };
 
+// caps = título de la columna de puntos propios (Capturas, Placas…) o nada
 function Table({ players, me, numbered, caps, ladder }) {
   return (
     <table className="sb-table">
@@ -9,7 +10,7 @@ function Table({ players, me, numbered, caps, ladder }) {
         <tr>
           {numbered && <th>#</th>}
           <th>Jugador</th><th style={{ width: 130 }}>Personaje</th>
-          {caps && <th className="num" style={{ width: 80 }}>Capturas</th>}
+          {caps && <th className="num" style={{ width: 80 }}>{caps}</th>}
           {ladder && <th style={{ width: 150 }}>Arma</th>}
           <th className="num" style={{ width: 64 }}>Bajas</th><th className="num" style={{ width: 72 }}>Muertes</th>
           <th className="num" style={{ width: 64 }}>Racha</th><th className="num" style={{ width: 56 }}>Ping</th>
@@ -38,8 +39,13 @@ export default function Scoreboard({ players, me, info, scoreLimit, mode, teamSc
   const ladder = mode === 'gungame' ? gunLadder(scoreLimit) : null;
   const sorted = [...players].sort((a, b) => (ladder ? b.lv - a.lv : 0) || b.k - a.k || a.d - b.d);
   const teams = isTeamMode(mode);
-  const ctf = mode === 'ctf';
-  const goal = ladder ? `gana quien elimine con el cuchillo (${ladder.length} armas)` : ctf ? `gana el primer equipo en hacer ${scoreLimit} capturas` : teams ? `gana el primer equipo en llegar a ${scoreLimit} bajas` : `gana quien llegue a ${scoreLimit} bajas`;
+  const infect = mode === 'infect';
+  const caps = mode === 'ctf' ? 'Capturas' : mode === 'kc' ? 'Placas' : null;
+  const goal = ladder ? `gana quien elimine con el cuchillo (${ladder.length} armas)`
+    : mode === 'ctf' ? `gana el primer equipo en hacer ${scoreLimit} capturas`
+      : mode === 'kc' ? `gana el primer equipo en recoger ${scoreLimit} placas`
+        : infect ? `los supervivientes ganan si aguantan ${scoreLimit} min`
+          : teams ? `gana el primer equipo en llegar a ${scoreLimit} bajas` : `gana quien llegue a ${scoreLimit} bajas`;
   return (
     <div className="scoreboard">
       <div className="sb-head">
@@ -50,11 +56,11 @@ export default function Scoreboard({ players, me, info, scoreLimit, mode, teamSc
         [1, 2].map((t) => (
           <div key={t} className="sb-team" style={{ '--t': `var(--eq-${t === 1 ? 'rojo' : 'azul'})`, '--tt': TEAM_TXT[t] }}>
             <div className="sb-team-head">
-              <b>Equipo {TEAMS[t].name}</b>
-              <span>{teamScore?.[t] ?? 0} / {scoreLimit}</span>
+              <b>{infect ? teamName(mode, t) : `Equipo ${teamName(mode, t)}`}</b>
+              <span>{infect ? `${sorted.filter((p) => p.tm === t).length} ${sorted.filter((p) => p.tm === t).length === 1 ? 'jugador' : 'jugadores'}` : `${teamScore?.[t] ?? 0} / ${scoreLimit}`}</span>
             </div>
-            <div className="pbar"><i style={{ width: `${((teamScore?.[t] ?? 0) / scoreLimit) * 100}%` }} /></div>
-            <Table players={sorted.filter((p) => p.tm === t)} me={me} caps={ctf} />
+            {!infect && <div className="pbar"><i style={{ width: `${((teamScore?.[t] ?? 0) / scoreLimit) * 100}%` }} /></div>}
+            <Table players={sorted.filter((p) => p.tm === t)} me={me} caps={caps} />
           </div>
         ))
       ) : (

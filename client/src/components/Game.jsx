@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { socket } from '../socket.js';
 import { Engine } from '../game/Engine.js';
-import { getMap, CHAR_BY_ID, PLAYER, STREAKS, TEAMS, isTeamMode } from '../../../shared/config.js';
+import { getMap, CHAR_BY_ID, PLAYER, STREAKS, canSwitchTeam, teamName } from '../../../shared/config.js';
 import { sfx } from '../game/sound.js';
 import { useSettings } from '../settings.js';
 import { Keys, playCurtain } from '../ui.jsx';
@@ -109,9 +109,9 @@ export default function Game({ session, onLeave }) {
       if (d.ended) push({ type: 'notice', text: `${d.killerName} acabó con la racha de ${d.victimName} (${d.ended})` });
       if (d.victim === you) setLastDeath({ name: d.killerName, char: d.killerChar, weapon: d.weapon, hp: d.killerHp });
       if (d.killer === you) {
-        if (label) sfx.streak();
+        if (label || d.reward) sfx.streak();
         clearTimeout(bannerTimer);
-        setBanner({ key: Date.now(), name: d.victimName, head: d.head, label, n: d.streak });
+        setBanner({ key: Date.now(), name: d.victimName, head: d.head, label, n: d.streak, reward: d.reward });
         bannerTimer = setTimeout(() => setBanner(null), 2300);
       }
     };
@@ -150,7 +150,7 @@ export default function Game({ session, onLeave }) {
         return;
       }
       // T: cambiar de equipo (por equipos)
-      if (e.code === 'KeyT' && !e.repeat && isTeamMode(room.mode) && h?.myTeam && !m && !open) {
+      if (e.code === 'KeyT' && !e.repeat && canSwitchTeam(room.mode) && h?.myTeam && !m && !open) {
         socket.emit('team:set', { team: 3 - h.myTeam });
       }
       // B: cambiar de personaje, solo estando muerto (se aplica al reaparecer)
@@ -274,9 +274,9 @@ export default function Game({ session, onLeave }) {
               <div className="actions" onClick={(e) => e.stopPropagation()}>
                 <button className="btn has-key" onClick={() => setMenu('settings')}><span className="key">O</span>Ajustes</button>
                 <button className="btn has-key" onClick={() => setMenu('manual')}><span className="key">H</span>Manual</button>
-                {isTeamMode(room.mode) && hud.myTeam && (
+                {canSwitchTeam(room.mode) && hud.myTeam && (
                   <button className="btn has-key" onClick={() => socket.emit('team:set', { team: 3 - hud.myTeam })}>
-                    <span className="key">T</span>Pasar a {TEAMS[3 - hud.myTeam].name}
+                    <span className="key">T</span>Pasar a {teamName(room.mode, 3 - hud.myTeam)}
                   </button>
                 )}
                 <button className="btn ghost danger" onClick={leave}>Salir de la sala</button>

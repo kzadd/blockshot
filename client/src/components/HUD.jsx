@@ -1,11 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { TEAMS, WEAPONS, isTeamMode, gunLadder } from '../../../shared/config.js';
+import { WEAPONS, STREAK_REWARDS, isTeamMode, gunLadder, teamName } from '../../../shared/config.js';
 import { hpColor } from '../game/models.js';
 import { useSettings } from '../settings.js';
 import Crosshair from './Crosshair.jsx';
 import Minimap from './Minimap.jsx';
 
 const TEAM_TXT = { 1: 'var(--eq-rojo-txt)', 2: 'var(--eq-azul-txt)' };
+const ARMOR_MAX = Object.values(STREAK_REWARDS).find((r) => r.id === 'armor')?.amount || 50;
+const clock = (ms) => {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
 
 // Icono de tiro a la cabeza del killfeed: cuadro sol con dos ojos
 const HeadIcon = () => (
@@ -89,7 +94,7 @@ function Health({ hud }) {
     <div className={`hp ${low ? 'low' : ''}`}>
       <b className="hp-num">{hud.hp}</b>
       <div className="hp-side">
-        <div className="hp-labels hud-txt"><span>{hud.charName}</span><span>{hud.maxHp} máx.</span></div>
+        <div className="hp-labels hud-txt"><span>{hud.charName}</span><span>{hud.armor > 0 && <span className="armor-num">🛡 {hud.armor} · </span>}{hud.maxHp} máx.</span></div>
         <div style={{ position: 'relative' }}>
           <div className="hpbar">
             <span className="trail" style={{ width: `${pct * 100}%` }} />
@@ -100,10 +105,18 @@ function Health({ hud }) {
             <i key={c.key} className="chunk" style={{ left: `calc(${c.left}% - 3px)`, top: 6, animationDelay: `${c.i * 30}ms`, '--dx': `${c.dx}px`, '--rot': `${c.rot}deg` }} />
           ))}
         </div>
-        {/* Estamina del sprint (Shift): se apaga cuando está llena; naranja si se agotó */}
-        <div className={`stamina ${hud.stamina < 0.99 || hud.sprinting ? 'on' : ''} ${hud.staminaLow ? 'empty' : ''}`} title="Estamina">
-          <i style={{ width: `${(hud.stamina ?? 1) * 100}%` }} />
-        </div>
+        {/* Blindaje de la racha: se gasta antes que la vida */}
+        {hud.armor > 0 && (
+          <div className="armor" title={`Blindaje ${hud.armor}`}>
+            <i style={{ width: `${Math.min(1, hud.armor / ARMOR_MAX) * 100}%` }} />
+          </div>
+        )}
+        {/* Estamina del sprint (Shift), solo si está activada: se apaga cuando está llena; naranja si se agotó */}
+        {hud.stamina != null && (
+          <div className={`stamina ${hud.stamina < 0.99 || hud.sprinting ? 'on' : ''} ${hud.staminaLow ? 'empty' : ''}`} title="Estamina">
+            <i style={{ width: `${hud.stamina * 100}%` }} />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -145,12 +158,27 @@ function flagStatus(f, players, you) {
 }
 
 function TopCenter({ hud, mode, scoreLimit, you }) {
+  if (mode === 'infect') {
+    // Infectados: cuántos quedan de cada bando y tiempo que falta (o hasta que salga el primer infectado)
+    const count = (t) => (hud.players || []).filter((p) => p.tm === t).length;
+    const inf = hud.infect;
+    const status = !inf || inf.t < 0 ? 'Esperando a otro jugador…' : inf.st ? clock(inf.t) : `Infección en ${Math.ceil(inf.t / 1000)} s`;
+    return (
+      <div className="infect-bar">
+        <span className="sv">{count(1)} {count(1) === 1 ? 'superviviente' : 'supervivientes'}{hud.myTeam === 1 ? ' · TÚ' : ''}</span>
+        <span className="sep" />
+        <span className="clock">{status}</span>
+        <span className="sep" />
+        <span className="iz">{count(2)} {count(2) === 1 ? 'infectado' : 'infectados'}{hud.myTeam === 2 ? ' · TÚ' : ''}</span>
+      </div>
+    );
+  }
   if (isTeamMode(mode) && hud.teamScore) {
     return (
       <div className="team-score">
         {[1, 2].map((t) => (
           <div key={t} className={`ts ${hud.myTeam === t ? 'mine' : ''}`} style={{ '--t': `var(--eq-${t === 1 ? 'rojo' : 'azul'})`, '--tt': TEAM_TXT[t] }}>
-            <small>{TEAMS[t].name.toUpperCase()}{hud.myTeam === t ? ' · TÚ' : ''}</small>
+            <small>{teamName(mode, t).toUpperCase()}{hud.myTeam === t ? ' · TÚ' : ''}</small>
             <b>{hud.teamScore[t]}</b>
             <span className="bar"><i style={{ width: `${(hud.teamScore[t] / scoreLimit) * 100}%` }} /></span>
             {hud.flags && <span className="flag-st">{flagStatus(hud.flags[t], hud.players, you)}</span>}
@@ -203,7 +231,7 @@ export default function HUD({ hud, info, engine, map, mode, scoreLimit, you, fee
   return (
     <div className="hud stage">
       {!scoped && <RoomInfo info={info} ping={hud.ping} />}
-      {alive && !scoped && <Minimap engine={engine} map={map} />}
+      {alive && !scoped && <Minimap engine={engine} map={map} radar={hud.radar} />}
       {alive && !scoped && <TopCenter hud={hud} mode={mode} scoreLimit={scoreLimit} you={you} />}
       {!scoped && <Feed feed={feed} you={you} mode={mode} />}
 
@@ -244,6 +272,7 @@ export default function HUD({ hud, info, engine, map, mode, scoreLimit, you, fee
                 <div className="kill-banner" key={banner.key}>
                   <span className="line1">Eliminaste a <span className="v">{banner.name}</span>{banner.head && <span className="h"> · cabeza</span>}</span>
                   {banner.label && <span className="line2">🔥 {banner.label} · {banner.n} seguidas</span>}
+                  {banner.reward && <span className="line2">🎁 {banner.reward}</span>}
                 </div>
               )}
             </>

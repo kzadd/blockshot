@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CHARACTERS, WEAPONS, CHAR_BY_ID, SKINS, TEAMS, isTeamMode, weightName, speedWith } from '../../../shared/config.js';
+import { CHARACTERS, WEAPONS, CHAR_BY_ID, SKINS, TEAMS, canSwitchTeam, weightName, speedWith } from '../../../shared/config.js';
 import CharacterPreview from './CharacterPreview.jsx';
 
 // Muestra de cada skin: diagonal de 135° con dos colores
@@ -121,7 +121,7 @@ export default function CharacterSelect({ info, current, skins, respawnIn = 0, f
         </div>
 
         <div className="select-foot">
-          {isTeamMode(mode) && myTeam ? <TeamPicker myTeam={myTeam} players={players} onTeam={onTeam} /> : <span>Sala: <b>{info.name}</b></span>}
+          {canSwitchTeam(mode) && myTeam ? <TeamPicker myTeam={myTeam} players={players} onTeam={onTeam} /> : <span>Sala: <b>{info.name}</b></span>}
           {onKeep && current && <button className="btn" onClick={onKeep}>Seguir con {CHAR_BY_ID[current].name}</button>}
           <button className="btn ghost" onClick={onLeave}>Salir de la sala</button>
         </div>

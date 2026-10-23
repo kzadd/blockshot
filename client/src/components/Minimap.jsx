@@ -6,7 +6,8 @@ const PAD = 6;
 const SHOW_SHOT_MS = 1500; // un enemigo aparece después de disparar y se desvanece en 1,5 s
 
 // Minimapa con el norte arriba: tú (flecha amarilla), aliados en verde siempre y enemigos en rojo solo cuando disparan
-export default function Minimap({ engine, map }) {
+// (o siempre, con el radar de la racha)
+export default function Minimap({ engine, map, radar }) {
   const ref = useRef(null);
 
   useEffect(() => {
@@ -66,12 +67,29 @@ export default function Minimap({ engine, map }) {
         if (!r.alive || !r.model) continue;
         const p = r.model.group.position;
         const mate = e.isMate(r);
-        const age = now - (r.lastShot || -1e9);
+        const age = e.radar ? 0 : now - (r.lastShot || -1e9);
         if (!mate && age > SHOW_SHOT_MS) continue;
         g.globalAlpha = mate ? 1 : 1 - age / SHOW_SHOT_MS;
         dot(toPx(p.x), toPx(p.z), mate ? palette().ally : palette().enemy);
       }
       g.globalAlpha = 1;
+
+      // Confirmar bajas: placas en el suelo (rombos del color del equipo de la víctima)
+      for (const m of e.tags.values()) {
+        const x = toPx(m.position.x);
+        const y = toPx(m.position.z);
+        g.beginPath();
+        g.moveTo(x, y - 5);
+        g.lineTo(x + 4, y);
+        g.lineTo(x, y + 5);
+        g.lineTo(x - 4, y);
+        g.closePath();
+        g.fillStyle = teamColor(m.userData.team);
+        g.fill();
+        g.lineWidth = 1.5;
+        g.strokeStyle = '#0b1426';
+        g.stroke();
+      }
 
       // Captura la bandera: banderas siempre visibles (siguen a quien las lleva)
       for (const t of e.flags ? [1, 2] : []) {
@@ -102,6 +120,7 @@ export default function Minimap({ engine, map }) {
   return (
     <div className="minimap">
       <canvas ref={ref} />
+      {radar && <span className="radar-on">RADAR</span>}
       <span className="north">N</span>
     </div>
   );

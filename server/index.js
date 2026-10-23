@@ -9,6 +9,7 @@ import { Server } from 'socket.io';
 import multicastDns from 'multicast-dns';
 import {
   CHAR_BY_ID, WEAPONS, PLAYER, MAPS, damageAt, TEAM_SWITCH_COOLDOWN, MAP_SIZES, SKINS, LAG_COMP_MAX_MS, MODES, MODE_BY_ID, isTeamMode, FLAG, loadoutOf, gunLadder, TEAMS, STREAKS, SERVER_TICK_MS, MATCH_RESTART_MS, getColliders, getMap,
+  TAG, INFECT, STREAK_REWARDS, canSwitchTeam, teamName,
 } from '../shared/config.js';
 import { castShot, rayAABB } from '../shared/physics.js';
 
@@ -63,7 +64,7 @@ function weaponIdOf(p, slot = p.slot) {
 
 // Armas del jugador según el modo (en Escalada de armas, según su nivel), con cargadores llenos
 function equip(room, p) {
-  p.loadout = loadoutOf(room.mode, CHAR_BY_ID[p.characterId], p.level, room.scoreLimit);
+  p.loadout = loadoutOf(room.mode, CHAR_BY_ID[p.characterId], p.level, room.scoreLimit, p.team);
   p.ammo = p.loadout.map((id) => ({ mag: WEAPONS[id].mag, reloadEnd: 0 }));
   p.lastShot = p.loadout.map(() => 0);
   p.slot = 0;
@@ -118,13 +119,14 @@ function smallerTeam(room) {
 function spawnPlayer(socket, room, p, ch, skin) {
   const now = Date.now();
   const [x, y, z, ry] = pickSpawn(room, p);
+  const hp = Math.round(ch.hp * (isInfected(room, p) ? INFECT.hp : 1));
   Object.assign(p, {
-    characterId: ch.id, skin: SKINS.some((k) => k.id === skin) ? skin : 'base', alive: true, hp: ch.hp, maxHp: ch.hp, x, y, z,
+    characterId: ch.id, skin: SKINS.some((k) => k.id === skin) ? skin : 'base', alive: true, hp, maxHp: hp, armor: 0, x, y, z,
     ry, rx: 0, sl: 0, cr: 0, spawnTime: now, protUntil: now + PLAYER.spawnProtection, lastState: now, lastDamage: 0, hist: [],
   });
   equip(room, p);
   record(p, now);
-  socket.emit('player:spawned', { x, y, z, ry: p.ry, characterId: ch.id, skin: p.skin, hp: ch.hp, level: p.level });
+  socket.emit('player:spawned', { x, y, z, ry: p.ry, characterId: ch.id, skin: p.skin, hp, level: p.level, team: p.team });
 }
 
 function joinRoom(socket, room, nickname, cb) {
@@ -132,8 +134,8 @@ function joinRoom(socket, room, nickname, cb) {
     id: socket.id, name: nickname, characterId: null, alive: false, hp: 0, maxHp: 100,
     x: 0, y: 0, z: 0, ry: 0, rx: 0, slot: 0, sl: 0, cr: 0, skin: 'base', kills: 0, deaths: 0,
     ammo: [], lastShot: [0, 0], lastDamage: 0, deathTime: 0, spawnTime: 0, protUntil: 0, lastState: 0,
-    team: isTeams(room) ? smallerTeam(room) : 0, streak: 0, ping: 0, hist: [],
-    bestStreak: 0, heads: 0, shots: 0, hits: 0, caps: 0, level: 0, loadout: [],
+    team: room.mode === 'infect' ? (room.infect.started ? 2 : 1) : isTeams(room) ? smallerTeam(room) : 0, streak: 0, ping: 0, hist: [],
+    bestStreak: 0, heads: 0, shots: 0, hits: 0, caps: 0, level: 0, loadout: [], armor: 0, radarUntil: 0,
   };
   room.players.set(socket.id, p);
   socket.leave('lobby');
@@ -143,7 +145,7 @@ function joinRoom(socket, room, nickname, cb) {
     ok: true, you: socket.id,
     room: { id: room.id, name: room.name, scoreLimit: room.scoreLimit, mapId: room.map.id, size: room.map.size, mode: room.mode, max: room.max },
   });
-  const team = p.team ? ` · ${TEAMS[p.team].name}` : '';
+  const team = p.team ? ` · ${teamName(room.mode, p.team)}` : '';
   socket.to(room.id).emit('notice', `${nickname} entró en la sala${team}`);
   broadcastRooms();
 }
@@ -259,12 +261,15 @@ function endMatch(room, winnerName, winnerTeam = 0) {
   room.restartTimer = setTimeout(() => {
     room.teamScore = { 1: 0, 2: 0 };
     resetFlags(room);
+    room.tags = [];
+    room.infect = newInfect();
     for (const p of room.players.values()) {
+      if (room.mode === 'infect') p.team = 1;
       p.kills = 0;
       p.deaths = 0;
       p.deathTime = 0;
       p.streak = 0;
-      Object.assign(p, { bestStreak: 0, heads: 0, shots: 0, hits: 0, caps: 0, level: 0 });
+      Object.assign(p, { bestStreak: 0, heads: 0, shots: 0, hits: 0, caps: 0, level: 0, armor: 0, radarUntil: 0 });
     }
     room.matchOver = false;
     io.to(room.id).emit('match:start');
@@ -275,7 +280,10 @@ function applyDamage(room, shooter, victim, dmg, head, w, socket, at3) {
   const now = Date.now();
   // Recién reaparecido: invulnerable unos segundos (hasta que dispare)
   if (!victim.alive || now < victim.protUntil) return;
-  victim.hp -= dmg;
+  // El blindaje (recompensa de racha) se gasta antes que la vida
+  const absorbed = Math.min(victim.armor || 0, dmg);
+  victim.armor -= absorbed;
+  victim.hp -= dmg - absorbed;
   victim.lastDamage = now;
   io.to(victim.id).emit('damaged', { hp: Math.max(0, Math.ceil(victim.hp)), from: [r2(shooter.x), r2(shooter.z)] });
 
@@ -286,6 +294,7 @@ function applyDamage(room, shooter, victim, dmg, head, w, socket, at3) {
   }
   victim.alive = false;
   victim.hp = 0;
+  victim.armor = 0;
   victim.deaths++;
   victim.deathTime = now;
   const ended = victim.streak >= 3 ? victim.streak : 0;
@@ -293,14 +302,20 @@ function applyDamage(room, shooter, victim, dmg, head, w, socket, at3) {
   shooter.kills++;
   shooter.streak++;
   shooter.bestStreak = Math.max(shooter.bestStreak, shooter.streak);
+  const reward = room.mode === 'infect' ? null : STREAK_REWARDS[shooter.streak];
+  if (reward?.id === 'radar') shooter.radarUntil = now + reward.ms;
+  if (reward?.id === 'armor') shooter.armor = reward.amount;
   socket.emit('hitmarker', { head, kill: true, dmg: Math.round(dmg), at });
   io.to(room.id).emit('kill', {
     killer: shooter.id, killerName: shooter.name, killerTeam: shooter.team,
     killerChar: shooter.characterId, killerHp: Math.ceil(shooter.hp),
     victim: victim.id, victimName: victim.name, victimTeam: victim.team,
-    weapon: w.name, head, streak: shooter.streak, ended,
+    weapon: w.name, head, streak: shooter.streak, ended, reward: reward?.name,
   });
+  if (reward) io.to(room.id).emit('notice', `${shooter.name} consiguió ${reward.name} por su racha`);
   if (room.mode === 'gungame') return gunGameKill(room, shooter, victim, w);
+  if (room.mode === 'kc') return dropTag(room, victim);
+  if (room.mode === 'infect') return infectKill(room, shooter, victim);
   // En Captura la bandera las bajas no suman: solo las capturas
   if (room.mode === 'teams') {
     room.teamScore[shooter.team]++;
@@ -323,6 +338,82 @@ function gunGameKill(room, shooter, victim, w) {
   equip(room, shooter);
   io.to(shooter.id).emit('loadout', { level: shooter.level });
   if (shooter.level === ladder.length - 1) io.to(room.id).emit('notice', `¡${shooter.name} llegó al cuchillo!`);
+}
+
+// ---------------------------------------------------------------- Confirmar bajas
+// Cada baja suelta una placa del color de la víctima. Si la coge un rival suma un punto a su
+// equipo; si la coge un compañero de la víctima la niega. A los 30 s desaparece.
+function dropTag(room, victim) {
+  room.tagSeq = (room.tagSeq || 0) + 1;
+  const y = floorBelow(room, victim.x, victim.y + 0.5, victim.z);
+  room.tags.push({ id: room.tagSeq, x: victim.x, y, z: victim.z, team: victim.team, t: Date.now() });
+}
+function updateTags(room, now) {
+  room.tags = room.tags.filter((g) => now - g.t < TAG.lifeMs);
+  for (const p of room.players.values()) {
+    if (!p.alive || !p.team) continue;
+    const i = room.tags.findIndex((g) => Math.hypot(p.x - g.x, p.z - g.z) < TAG.radius && Math.abs(p.y - g.y) < 2.5);
+    if (i < 0) continue;
+    const [g] = room.tags.splice(i, 1);
+    if (g.team === p.team) {
+      io.to(p.id).emit('tag', { type: 'deny' });
+      continue;
+    }
+    room.teamScore[p.team]++;
+    p.caps++;
+    io.to(p.id).emit('tag', { type: 'confirm' });
+    if (room.teamScore[p.team] >= room.scoreLimit) return endMatch(room, `Equipo ${TEAMS[p.team].name}`, p.team);
+  }
+}
+
+// ---------------------------------------------------------------- Infectados
+// Con 2 jugadores vivos empieza una cuenta atrás y se elige al primer infectado (bando 2). Los
+// infectados solo llevan cuchillo, más vida y corren más; cada superviviente que matan se une a
+// ellos. Ganan si no queda nadie; los supervivientes, si aguantan los minutos de la partida.
+const newInfect = () => ({ started: false, pickAt: 0, endAt: 0 });
+const isInfected = (room, p) => room.mode === 'infect' && p.team === 2;
+function infect(room, p) {
+  p.team = 2;
+  p.streak = 0;
+  if (!p.alive) return;
+  equip(room, p);
+  p.maxHp = p.hp = Math.round(CHAR_BY_ID[p.characterId].hp * INFECT.hp);
+  io.to(p.id).emit('loadout', { level: p.level, team: p.team });
+}
+function infectKill(room, shooter, victim) {
+  if (victim.team !== 1 || shooter.team !== 2) return;
+  victim.team = 2;
+  io.to(room.id).emit('notice', `${victim.name} ha sido infectado`);
+}
+function updateInfect(room, now) {
+  const inf = room.infect;
+  const ps = [...room.players.values()];
+  if (!inf.started) {
+    const alive = ps.filter((p) => p.alive);
+    if (alive.length < 2) {
+      inf.pickAt = 0;
+      return;
+    }
+    if (!inf.pickAt) {
+      inf.pickAt = now + INFECT.pickDelay;
+      io.to(room.id).emit('notice', `La infección empieza en ${INFECT.pickDelay / 1000} s`);
+    }
+    if (now < inf.pickAt) return;
+    const first = alive[Math.floor(Math.random() * alive.length)];
+    infect(room, first);
+    Object.assign(inf, { started: true, endAt: now + room.scoreLimit * 60000 });
+    io.to(room.id).emit('notice', `¡${first.name} es el primer infectado! Corred`);
+    io.to(room.id).emit('flag', { type: 'capture' }); // mismo aviso sonoro que una captura
+    return;
+  }
+  const survivors = ps.filter((p) => p.team === 1).length;
+  const infected = ps.filter((p) => p.team === 2).length;
+  if (!infected) {
+    // El infectado se fue de la sala: se vuelve a elegir
+    Object.assign(inf, newInfect());
+    io.to(room.id).emit('notice', 'No quedan infectados: se elige otro');
+  } else if (!survivors) endMatch(room, 'Los infectados', 2);
+  else if (now >= inf.endAt) endMatch(room, 'Los supervivientes', 1);
 }
 
 // Cuchillo: además del rayo, acierta a quien esté muy cerca y delante (no hace falta apuntar al píxel)
@@ -376,6 +467,8 @@ io.on('connection', (socket) => {
       restartTimer: null,
     };
     resetFlags(room);
+    room.tags = [];
+    room.infect = newInfect();
     rooms.set(room.id, room);
     joinRoom(socket, room, nickname, cb);
   });
@@ -415,7 +508,7 @@ io.on('connection', (socket) => {
   // Por equipos: elegir o cambiar de equipo. Si estás vivo reapareces en el lado de tu nuevo equipo
   socket.on('team:set', (d = {}) => {
     const c = ctx(socket);
-    if (!c || !isTeams(c.room)) return;
+    if (!c || !canSwitchTeam(c.room.mode)) return;
     const { room, p } = c;
     const team = d.team === 1 || d.team === 2 ? d.team : 0;
     if (!team || team === p.team) return;
@@ -431,7 +524,7 @@ io.on('connection', (socket) => {
     p.team = team;
     p.teamAt = now;
     p.streak = 0;
-    io.to(room.id).emit('notice', `${p.name} se cambió al equipo ${TEAMS[team].name}`);
+    io.to(room.id).emit('notice', `${p.name} se cambió al equipo ${teamName(room.mode, team)}`);
     if (p.alive) spawnPlayer(socket, room, p, CHAR_BY_ID[p.characterId], p.skin);
   });
 
@@ -442,8 +535,9 @@ io.on('connection', (socket) => {
     const now = Date.now();
     const elapsed = Math.min(1, (now - p.lastState) / 1000);
     const dist = Math.hypot(d.x - p.x, d.y - p.y, d.z - p.z);
-    // Anti-teleport muy básico (el juego es para clase, no para un torneo)
-    if (dist > 4 + 22 * elapsed) {
+    // Anti-teleport muy básico (el juego es para clase, no para un torneo). Holgado para el
+    // slide encadenado, el bunny hop y las plataformas de salto
+    if (dist > 4 + 40 * elapsed) {
       socket.emit('player:correct', { x: p.x, y: p.y, z: p.z });
       return;
     }
@@ -555,6 +649,8 @@ setInterval(() => {
   const dt = SERVER_TICK_MS / 1000;
   for (const room of rooms.values()) {
     if (room.flags && !room.matchOver) updateFlags(room, now);
+    if (room.mode === 'kc' && !room.matchOver) updateTags(room, now);
+    if (room.mode === 'infect' && !room.matchOver) updateInfect(room, now);
     const players = [];
     for (const p of room.players.values()) {
       if (p.alive && p.hp < p.maxHp && now - p.lastDamage > PLAYER.regenDelay) {
@@ -564,10 +660,16 @@ setInterval(() => {
         id: p.id, n: p.name, c: p.characterId, sk: p.skin, x: r2(p.x), y: r2(p.y), z: r2(p.z),
         ry: r2(p.ry), rx: r2(p.rx), s: p.slot, sl: p.sl, cr: p.cr, a: p.alive ? 1 : 0,
         h: Math.ceil(p.hp), pr: p.alive && now < p.protUntil ? 1 : 0, k: p.kills, d: p.deaths, tm: p.team, pg: p.ping, st: p.streak, cp: p.caps, lv: p.level,
+        mh: p.maxHp, ar: Math.ceil(p.armor || 0), rd: now < p.radarUntil ? 1 : 0,
       });
     }
     const fl = room.flags ? { 1: flagState(room.flags[1]), 2: flagState(room.flags[2]) } : null;
-    io.to(room.id).volatile.emit('state', { players, ts: isTeams(room) ? room.teamScore : null, fl });
+    const tg = room.mode === 'kc' ? room.tags.map((g) => [g.id, r2(g.x), r2(g.y), r2(g.z), g.team]) : null;
+    // Infectados: st = ya hay infectado · t = ms que quedan (de partida, o hasta elegir al primero; -1 = esperando jugadores)
+    const inf = room.mode === 'infect'
+      ? { st: room.infect.started ? 1 : 0, t: room.infect.started ? room.infect.endAt - now : room.infect.pickAt ? room.infect.pickAt - now : -1 }
+      : null;
+    io.to(room.id).volatile.emit('state', { players, ts: isTeams(room) ? room.teamScore : null, fl, tg, inf });
   }
 }, SERVER_TICK_MS);
 

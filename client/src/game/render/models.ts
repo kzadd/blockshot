@@ -804,15 +804,18 @@ function ringGeo(inner: number, outer: number): THREE.BufferGeometry {
 }
 
 // Shared optic and sight parts ------------------------------------------------------------
-/** Red dot radius (m): a few pixels at aiming distance, so it never hides a target. */
+/** Red dot radius (m) on the LMG: a few pixels at aiming distance, so it never hides a target. */
 const RETICLE_DOT_R = 0.0008;
+// The rifle and SMG optics sit closer to the eye (see AIM_Z in viewModel.ts): smaller dots look the same size
+const RIFLE_DOT_R = RETICLE_DOT_R * 0.77;
+const SMG_DOT_R = RETICLE_DOT_R * 0.6;
 const FRAME = 0.0032;
 
 /**
  * Compact red dot on a riser: thin frame and a clear window, so aiming hides almost nothing.
  * `railY` = top of the rail it sits on, `z` = window position.
  */
-function redDot(d: GunDraw, railY: number, z: number, riser: number): void {
+function redDot(d: GunDraw, railY: number, z: number, riser: number, dotR = RETICLE_DOT_R): void {
   const winW = 0.036;
   const winH = 0.03;
   const depth = 0.026;
@@ -827,12 +830,12 @@ function redDot(d: GunDraw, railY: number, z: number, riser: number): void {
   for (const s of [-1, 1]) d.box(FRAME, winH + FRAME, depth, s * (winW / 2 + FRAME / 2), sightY + FRAME / 2, z, 'm');
   d.box(winW + FRAME * 2, FRAME, depth, 0, sightY + winH / 2 + FRAME / 2, z, 'm');
   d.box(winW, winH, 0.002, 0, sightY, z - depth / 2 + 0.002, 't');
-  d.ring(0, RETICLE_DOT_R, 0, sightY, z + 0.004, 'd');
+  d.ring(0, dotR, 0, sightY, z + 0.004, 'd');
   d.sight(sightY);
 }
 
-/** Holographic sight: boxy hood, wide window and a ring-and-dot reticle. */
-function holoSight(d: GunDraw, railY: number, z: number): void {
+/** Holographic sight: boxy hood, wide window and a plain dot reticle. */
+function holoSight(d: GunDraw, railY: number, z: number, dotR: number): void {
   const winW = 0.046;
   const winH = 0.036;
   const depth = 0.03;
@@ -843,8 +846,7 @@ function holoSight(d: GunDraw, railY: number, z: number): void {
   for (const s of [-1, 1]) d.box(FRAME, winH + FRAME, depth, s * (winW / 2 + FRAME / 2), sightY + FRAME / 2, z, 'o');
   d.box(winW + FRAME * 2, FRAME, depth, 0, sightY + winH / 2 + FRAME / 2, z, 'o');
   d.box(winW, winH, 0.002, 0, sightY, z - depth / 2 + 0.003, 't');
-  d.ring(0.0092, 0.0098, 0, sightY, z + 0.004, 'd');
-  d.ring(0, RETICLE_DOT_R, 0, sightY, z + 0.004, 'd');
+  d.ring(0, dotR, 0, sightY, z + 0.004, 'd');
   d.sight(sightY);
 }
 
@@ -879,7 +881,7 @@ const GUNS: Record<WeaponId, (d: GunDraw) => void> = {
     d.box(0.012, 0.012, 0.022, 0.032, 0.04, 0.06, 'o'); // forward assist
     d.box(0.034, 0.01, 0.026, 0, 0.064, 0.13, 'o'); // charging handle
     rail(d, 0.059, -0.17, 0.12);
-    holoSight(d, 0.0685, 0.02);
+    holoSight(d, 0.0685, 0.02, RIFLE_DOT_R);
     d.bev(0.062, 0.064, 0.3, 0, 0.022, -0.32, 'p'); // handguard
     for (const z of [-0.22, -0.28, -0.34, -0.4]) d.box(0.064, 0.012, 0.034, 0, 0.014, z, 'o'); // M-LOK slots
     rail(d, 0.054, -0.47, -0.17, 0.03);
@@ -966,7 +968,7 @@ const GUNS: Record<WeaponId, (d: GunDraw) => void> = {
     d.box(0.004, 0.018, 0.05, 0.027, 0.02, -0.02, 'o');
     d.box(0.054, 0.012, 0.06, 0, -0.012, 0.05, 'c');
     rail(d, 0.045, -0.16, 0.1, 0.03);
-    redDot(d, 0.0545, 0.02, 0.034);
+    redDot(d, 0.0545, 0.02, 0.034, SMG_DOT_R);
     d.bev(0.056, 0.054, 0.13, 0, 0.008, -0.235, 'q'); // handguard
     for (const z of [-0.2, -0.24, -0.28]) d.box(0.058, 0.01, 0.022, 0, 0.004, z, 'p');
     d.cyl(0.019, 0.17, 0, 0.012, -0.385, 'o', 12); // suppressor

@@ -50,6 +50,8 @@ const MAP_DEFS: Record<MapId, MapDef> = {
       platform: '#7d8a96',
       step: '#9aa6b1',
       rail: '#e0b33a',
+      railing: '#e0b33a',
+      metal: '#8d9aa6',
       crate: '#c9944a',
       crate2: '#8d6a3f',
       cont1: '#c0503e',

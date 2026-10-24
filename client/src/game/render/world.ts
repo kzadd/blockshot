@@ -462,7 +462,7 @@ const COMMON: Partial<Record<BoxKind, Look>> = {
   tile: ['tiles', 2],
   railing: [null],
   trim: ['concrete', 2],
-  frame: ['planks', 1],
+  frame: [null],
   shutter: ['louver', 1],
   awning: ['stripes', 2],
 };

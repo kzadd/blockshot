@@ -132,6 +132,13 @@ p {
   zoom: var(--s);
 }
 
+/* Menus taller than the design keep its proportions (centred, map behind) instead of stretching the panels */
+.lobby .stage,
+.select-screen .stage {
+  top: max(0px, calc((100vh / var(--s) - 720px) / 2));
+  height: min(calc(100vh / var(--s)), 720px);
+}
+
 /* Fondo de menú: el mapa desenfocado detrás de los paneles */
 .menu-bg {
   position: absolute;
@@ -974,6 +981,13 @@ kbd.down,
   min-height: 44px;
   object-fit: cover;
   border-radius: var(--radius-s);
+}
+.lb-map {
+  container-type: inline-size;
+}
+/* Never taller than wide: a tall window must not turn the screenshots into strips */
+.lb-map img {
+  max-height: 100cqw;
 }
 .lb-map .lb-cell-text {
   padding: 0 4px;

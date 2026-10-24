@@ -804,7 +804,8 @@ function ringGeo(inner: number, outer: number): THREE.BufferGeometry {
 }
 
 // Shared optic and sight parts ------------------------------------------------------------
-const RETICLE_DOT = 0.0032;
+/** Red dot radius (m): a few pixels at aiming distance, so it never hides a target. */
+const RETICLE_DOT_R = 0.0008;
 const FRAME = 0.0032;
 
 /**
@@ -826,7 +827,7 @@ function redDot(d: GunDraw, railY: number, z: number, riser: number): void {
   for (const s of [-1, 1]) d.box(FRAME, winH + FRAME, depth, s * (winW / 2 + FRAME / 2), sightY + FRAME / 2, z, 'm');
   d.box(winW + FRAME * 2, FRAME, depth, 0, sightY + winH / 2 + FRAME / 2, z, 'm');
   d.box(winW, winH, 0.002, 0, sightY, z - depth / 2 + 0.002, 't');
-  d.box(RETICLE_DOT, RETICLE_DOT, 0.002, 0, sightY, z + 0.004, 'd');
+  d.ring(0, RETICLE_DOT_R, 0, sightY, z + 0.004, 'd');
   d.sight(sightY);
 }
 
@@ -842,8 +843,8 @@ function holoSight(d: GunDraw, railY: number, z: number): void {
   for (const s of [-1, 1]) d.box(FRAME, winH + FRAME, depth, s * (winW / 2 + FRAME / 2), sightY + FRAME / 2, z, 'o');
   d.box(winW + FRAME * 2, FRAME, depth, 0, sightY + winH / 2 + FRAME / 2, z, 'o');
   d.box(winW, winH, 0.002, 0, sightY, z - depth / 2 + 0.003, 't');
-  d.ring(0.0085, 0.0102, 0, sightY, z + 0.004, 'd');
-  d.box(RETICLE_DOT * 0.9, RETICLE_DOT * 0.9, 0.002, 0, sightY, z + 0.004, 'd');
+  d.ring(0.0092, 0.0098, 0, sightY, z + 0.004, 'd');
+  d.ring(0, RETICLE_DOT_R, 0, sightY, z + 0.004, 'd');
   d.sight(sightY);
 }
 

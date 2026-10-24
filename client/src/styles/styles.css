@@ -2273,9 +2273,9 @@ kbd.down,
   left: 50%;
   bottom: 48px;
   transform: translateX(-50%);
-  width: 500px;
+  width: 520px;
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
     'title count'
     'killer count'
@@ -2304,6 +2304,7 @@ kbd.down,
 }
 .death > .countdown {
   grid-area: count;
+  justify-self: end;
 }
 .death > .pbar {
   grid-area: bar;

@@ -1242,25 +1242,23 @@ export function makeNameTag(text: string, color: string | undefined, throughWall
   tex.colorSpace = THREE.SRGBColorSpace;
   let last = -1;
 
-  // Name in Rubik 800 with outline and a small health bar of the same colour (green ally, red enemy)
+  // Name in Inter 600 with a soft shadow and a thin health bar of the same colour (green ally, red enemy)
   const tint = color || '#ffffff';
   const draw = (hp: number) => {
     g.clearRect(0, 0, 256, 96);
-    g.font = '800 30px Rubik, system-ui, sans-serif';
+    g.font = '600 26px Inter, system-ui, sans-serif';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.lineJoin = 'round';
-    g.lineWidth = 8;
-    g.strokeStyle = '#1b2a4a';
-    g.strokeText(text, 128, 30);
+    g.shadowColor = 'rgba(0, 0, 0, 0.85)';
+    g.shadowBlur = 6;
+    g.shadowOffsetY = 1;
     g.fillStyle = tint;
-    g.fillText(text, 128, 30);
-    g.fillStyle = '#1b2a4a';
-    g.fillRect(58, 58, 140, 18);
-    g.fillStyle = 'rgba(247,249,252,0.18)';
-    g.fillRect(62, 62, 132, 10);
+    g.fillText(text, 128, 34);
+    g.shadowColor = 'transparent';
+    g.fillStyle = 'rgba(9, 14, 21, 0.75)';
+    g.fillRect(70, 60, 116, 8);
     g.fillStyle = tint;
-    g.fillRect(62, 62, 132 * hp, 10);
+    g.fillRect(72, 62, 112 * hp, 4);
     tex.needsUpdate = true;
   };
   draw(1);
@@ -1268,7 +1266,7 @@ export function makeNameTag(text: string, color: string | undefined, throughWall
   const s = new THREE.Sprite(
     new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: !throughWalls }),
   ) as unknown as NameTag;
-  s.scale.set(1.6, 0.6, 1);
+  s.scale.set(1.4, 0.525, 1);
   if (throughWalls) s.renderOrder = 5;
   s.userData.setHp = (f: number) => {
     const q = Math.round(Math.max(0, Math.min(1, f)) * 50) / 50; // only redrawn when it changes

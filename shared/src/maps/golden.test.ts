@@ -19,9 +19,9 @@ const MAP_HASHES: Record<string, string> = {
   'polvo:s': '3f75fc0f02b2c0ef',
   'polvo:m': '87dfc8c8c46119fc',
   'polvo:l': 'b061e1e7882b849d',
-  'ciudad:s': '827ebbd0d0b00f9d',
-  'ciudad:m': 'df2c8f08300f2e3b',
-  'ciudad:l': '2b19f199dd2305f8',
+  'ciudad:s': 'b105cc877be14b0a',
+  'ciudad:m': 'd00601f6b555f63f',
+  'ciudad:l': 'f26e27d6dc034b52',
 };
 
 const TABLE_HASHES = {

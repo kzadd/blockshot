@@ -9,6 +9,7 @@ import { buildDesfiladero } from './builders/desfiladero';
 import { buildPatio } from './builders/patio';
 import { buildPolvo } from './builders/polvo';
 import { PROP_COLORS } from './props';
+import { ROOF_KINDS, STRUCTURE_COLORS } from './structures';
 import type { BoxKind, GameMap, MapBox, MapDef, MapId, PropPart, SizeId, Spawn } from './types';
 
 export const MAP_SIZES: Record<SizeId, { id: SizeId; name: string; half: number; players: number }> = {
@@ -49,6 +50,8 @@ const MAP_DEFS: Record<MapId, MapDef> = {
       platform: '#7d8a96',
       step: '#9aa6b1',
       rail: '#e0b33a',
+      railing: '#e0b33a',
+      metal: '#8d9aa6',
       crate: '#c9944a',
       crate2: '#8d6a3f',
       cont1: '#c0503e',
@@ -72,6 +75,10 @@ const MAP_DEFS: Record<MapId, MapDef> = {
       bridge: '#8a6440',
       rock: '#9b8b7a',
       crate: '#d4a24c',
+      concrete: '#d6bc94',
+      stair: '#cdb089',
+      slab: '#a8916f',
+      plaster: '#ecd9b8',
     },
   },
   polvo: {
@@ -90,6 +97,13 @@ const MAP_DEFS: Record<MapId, MapDef> = {
       step: '#b9a27c',
       crate: '#c99a55',
       crate2: '#8f7a52',
+      plaster: '#e2c79c',
+      slab: '#b39a74',
+      stair: '#c9b08a',
+      tile: '#d9a77a',
+      frame: '#5b3d26',
+      awning: '#b5553a',
+      trim: '#f0e2c6',
     },
   },
   ciudad: {
@@ -186,10 +200,13 @@ const overlaps = (a: Footprint, b: Footprint) =>
   a.y < b.y + b.h - OVERLAP_EPSILON &&
   b.y < a.y + a.h - OVERLAP_EPSILON;
 
-// Places the decoration props that fit: on the ground, not colliding with anything and away from spawns
+// Places the decoration props that fit: on the ground, not colliding with anything, away from spawns and out of buildings
 function placeProps(boxes: MapBox[], points: [number, number][], props: PendingProp[]): void {
   let id = 0;
   for (const { x, z, parts } of props) {
+    // Never inside a building nor on its roof
+    if (boxes.some((b) => ROOF_KINDS.has(b.c) && Math.abs(x - b.x) <= b.w / 2 && Math.abs(z - b.z) <= b.d / 2))
+      continue;
     const y = groundAt(boxes, x, z);
     const list: MapBox[] = parts.map(([dx, dy, dz, w, h, d, c]) => ({
       x: round2(x + dx),
@@ -238,6 +255,10 @@ export function getMap(mapId: string, sizeId: string): GameMap {
   const B = (x: number, y: number, z: number, w: number, h: number, d: number, c: BoxKind = 'wall') => {
     boxes.push({ x: round2(x), y: round2(y), z: round2(z), w: round2(w), h: round2(h), d: round2(d), c });
   };
+  const decor: MapBox[] = [];
+  const D = (x: number, y: number, z: number, w: number, h: number, d: number, c: BoxKind = 'trim') => {
+    decor.push({ x: round2(x), y: round2(y), z: round2(z), w: round2(w), h: round2(h), d: round2(d), c });
+  };
   // Floor and outer walls
   B(0, -1, 0, 2 * H, 1, 2 * H, 'floor');
   B(0, 0, -H - 0.5, 2 * H + 2, def.wallH, 1);
@@ -247,6 +268,7 @@ export function getMap(mapId: string, sizeId: string): GameMap {
   const props: PendingProp[] = [];
   def.build({
     B,
+    D,
     S: (x, z) => points.push([round2(x), round2(z)]),
     P: (x, z, parts) => props.push({ x, z, parts }),
     H,
@@ -271,8 +293,9 @@ export function getMap(mapId: string, sizeId: string): GameMap {
     bounds: H - BOUNDS_MARGIN,
     wallH: def.wallH,
     sky: def.sky,
-    colors: { ...PROP_COLORS, ...def.colors },
+    colors: { ...PROP_COLORS, ...STRUCTURE_COLORS, ...def.colors },
     boxes,
+    decor,
     spawns,
     bases: { 1: base(side(1)), 2: base(side(-1)) },
   };

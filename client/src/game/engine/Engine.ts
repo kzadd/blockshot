@@ -702,6 +702,7 @@ export class Engine implements MinimapSource {
     this.effects.dispose();
     this.vm.dispose();
     this.renderer.dispose();
+    this.renderer.forceContextLoss(); // free the WebGL context now: Chrome keeps only ~16 alive
     this.renderer.domElement.remove();
   }
 }

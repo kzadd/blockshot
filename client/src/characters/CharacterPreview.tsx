@@ -114,6 +114,7 @@ export default function CharacterPreview({
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       renderer.dispose();
+      renderer.forceContextLoss(); // free the WebGL context now: Chrome keeps only ~16 alive
       renderer.domElement.remove();
     };
   }, []);

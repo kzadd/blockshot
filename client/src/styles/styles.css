@@ -1581,64 +1581,110 @@ kbd.down,
 
 /* Mira telescópica */
 .scope {
+  /* lens radius: big enough that the black around it only frames the view */
+  --lens: 46vmin;
+  --reticle: rgba(8, 10, 14, 0.9);
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at center, transparent 0 288px, rgba(0, 0, 0, 0.55) 300px, #000 304px);
+  pointer-events: none;
+  background: radial-gradient(
+    circle at center,
+    transparent 0 calc(var(--lens) - 28px),
+    rgba(0, 0, 0, 0.35) calc(var(--lens) - 4px),
+    rgba(5, 7, 10, 0.9) var(--lens),
+    rgba(5, 7, 10, 0.95) 100%
+  );
   animation: bsFadeIn 120ms ease-out;
 }
-.scope .ring {
+.scope .lens {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 600px;
-  height: 600px;
-  margin: -300px 0 0 -300px;
+  width: calc(var(--lens) * 2);
+  height: calc(var(--lens) * 2);
+  transform: translate(-50%, -50%);
   border-radius: 50%;
-  border: 6px solid #000;
-  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.55);
+  border: 2px solid rgba(20, 24, 30, 0.95);
+  box-shadow: inset 0 0 calc(var(--lens) * 0.18) rgba(0, 0, 0, 0.35);
 }
-.scope .h,
-.scope .v {
+/* Thin crosshair with a clear gap in the middle, heavier posts only near the edge */
+.scope .l,
+.scope .p {
   position: absolute;
-  background: #000;
+  background: var(--reticle);
 }
-.scope .h {
-  left: calc(50% - 300px);
-  width: 600px;
+.scope .l.h {
   top: 50%;
-  height: 2px;
-  margin-top: -1px;
+  height: 1px;
+  width: calc(var(--lens) - 14px);
+  margin-top: -0.5px;
 }
-.scope .v {
-  top: calc(50% - 300px);
-  height: 600px;
+.scope .l.v {
   left: 50%;
-  width: 2px;
-  margin-left: -1px;
+  width: 1px;
+  height: calc(var(--lens) - 14px);
+  margin-left: -0.5px;
 }
-.scope .h.thick {
-  height: 6px;
-  margin-top: -3px;
-  width: 228px;
+.scope .l.left {
+  right: calc(50% + 14px);
 }
-.scope .h.thick.r {
-  left: calc(50% + 72px);
+.scope .l.right {
+  left: calc(50% + 14px);
 }
-.scope .v.thick {
-  width: 6px;
-  margin-left: -3px;
-  height: 228px;
-  top: calc(50% + 72px);
+.scope .l.top {
+  bottom: calc(50% + 14px);
+}
+.scope .l.bottom {
+  top: calc(50% + 14px);
+}
+.scope .p.h {
+  top: 50%;
+  height: 3px;
+  margin-top: -1.5px;
+  width: calc(var(--lens) * 0.4);
+}
+.scope .p.v {
+  left: 50%;
+  width: 3px;
+  margin-left: -1.5px;
+  height: calc(var(--lens) * 0.4);
+}
+.scope .p.left {
+  right: calc(50% + var(--lens) * 0.6);
+}
+.scope .p.right {
+  left: calc(50% + var(--lens) * 0.6);
+}
+.scope .p.bottom {
+  top: calc(50% + var(--lens) * 0.6);
+}
+/* Small range ticks along the horizontal line */
+.scope .ticks {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--lens) * 1.1);
+  height: 7px;
+  transform: translate(-50%, -50%);
+  background: repeating-linear-gradient(
+      90deg,
+      transparent 0 calc(var(--lens) * 0.11 - 1px),
+      var(--reticle) calc(var(--lens) * 0.11 - 1px) calc(var(--lens) * 0.11)
+    )
+    center / 100% 100%;
+  -webkit-mask: linear-gradient(90deg, #000 0 42%, transparent 42% 58%, #000 58%);
+  mask: linear-gradient(90deg, #000 0 42%, transparent 42% 58%, #000 58%);
 }
 .scope .dot {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 6px;
-  height: 6px;
-  margin: -3px;
+  width: 4px;
+  height: 4px;
+  margin: -2px;
   border-radius: 50%;
   background: var(--rojo);
+  box-shadow: 0 0 4px rgba(255, 77, 77, 0.8);
 }
 .ts .flag-st {
   font: 700 11px var(--body);

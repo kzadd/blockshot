@@ -402,12 +402,15 @@ function Vignette() {
 function Scope() {
   return (
     <div className="scope">
-      <div className="ring" />
-      <i className="h" />
-      <i className="v" />
-      <i className="h thick" />
-      <i className="h thick r" />
-      <i className="v thick" />
+      <div className="lens" />
+      <i className="l h left" />
+      <i className="l h right" />
+      <i className="l v top" />
+      <i className="l v bottom" />
+      <i className="p h left" />
+      <i className="p h right" />
+      <i className="p v bottom" />
+      <i className="ticks" />
       <i className="dot" />
       <span className="scope-hint">Clic der. para salir · el resto del HUD se oculta mientras apuntas</span>
     </div>

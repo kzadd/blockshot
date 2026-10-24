@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { OUTFIT_COLORS, SKINS, isOutfitColor, isSkinId } from '../characters/characters';
+import { OUTFIT_COLORS, SKINS, isCharacterId, isOutfitColor, isSkinId } from '../characters/characters';
+import { isMapId, isSizeId } from '../maps/maps';
+import { isModeId } from '../modes/modes';
 import { CreateRoomSchema, InputSchema, MAX_INPUTS_PER_MESSAGE, ShootSchema, SpawnSchema, v } from './schemas';
 
 const ok = (schema: v.GenericSchema, data: unknown) => v.safeParse(schema, data).success;
@@ -51,5 +53,19 @@ describe('cosmetics', () => {
     expect(isOutfitColor('#3f7fe0')).toBe(true);
     expect(isOutfitColor('#000000')).toBe(false);
     expect(isOutfitColor(undefined)).toBe(false);
+  });
+});
+
+describe('id guards', () => {
+  it('reject inherited object keys like constructor or toString', () => {
+    for (const key of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+      expect([isCharacterId(key), isMapId(key), isSizeId(key), isModeId(key)]).toEqual([false, false, false, false]);
+    }
+    expect([isCharacterId('soldado'), isMapId('patio'), isSizeId('m'), isModeId('ffa')]).toEqual([
+      true,
+      true,
+      true,
+      true,
+    ]);
   });
 });

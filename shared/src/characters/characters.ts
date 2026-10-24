@@ -73,7 +73,7 @@ export const CHARACTERS: Character[] = [
 ];
 
 export const CHAR_BY_ID = Object.fromEntries(CHARACTERS.map((c) => [c.id, c])) as Record<CharacterId, Character>;
-export const isCharacterId = (v: unknown): v is CharacterId => typeof v === 'string' && v in CHAR_BY_ID;
+export const isCharacterId = (v: unknown): v is CharacterId => typeof v === 'string' && Object.hasOwn(CHAR_BY_ID, v);
 
 export type SkinId =
   'base' | 'camo' | 'noche' | 'artico' | 'oro' | 'urbano' | 'desierto' | 'bosque' | 'carbono' | 'neon';

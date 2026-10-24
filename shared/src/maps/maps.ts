@@ -17,7 +17,7 @@ export const MAP_SIZES: Record<SizeId, { id: SizeId; name: string; half: number;
   m: { id: 'm', name: 'Mediano', half: 40, players: 12 },
   l: { id: 'l', name: 'Grande', half: 56, players: 20 },
 };
-export const isSizeId = (v: unknown): v is SizeId => typeof v === 'string' && v in MAP_SIZES;
+export const isSizeId = (v: unknown): v is SizeId => typeof v === 'string' && Object.hasOwn(MAP_SIZES, v);
 
 const MAP_DEFS: Record<MapId, MapDef> = {
   patio: {
@@ -133,7 +133,7 @@ export const MAPS = (Object.entries(MAP_DEFS) as [MapId, MapDef][]).map(([id, m]
   tag: m.tag,
   desc: m.desc,
 }));
-export const isMapId = (v: unknown): v is MapId => typeof v === 'string' && v in MAP_DEFS;
+export const isMapId = (v: unknown): v is MapId => typeof v === 'string' && Object.hasOwn(MAP_DEFS, v);
 
 const DEFAULT_MAP: MapId = 'patio';
 const DEFAULT_SIZE: SizeId = 'm';

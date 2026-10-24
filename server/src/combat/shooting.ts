@@ -8,6 +8,7 @@ import {
   PLAYER,
   RELOAD_GRACE_MS,
   SHOT_ORIGIN_TOLERANCE,
+  castShot,
   clamp,
   damageAt,
   round2,
@@ -22,6 +23,9 @@ import { sameTeam } from '../players/teams';
 import type { Room } from '../rooms/room';
 import { applyDamage } from './damage';
 import { behaviorOf } from './weaponBehavior';
+
+/** Vertical speed counted for the origin tolerance at most (m/s, about a jump's take-off). */
+const MAX_VERTICAL_SLACK_SPEED = 10;
 
 interface PendingDamage {
   dmg: number;
@@ -53,10 +57,22 @@ export function handleShoot(room: Room, p: Player, msg: ShootInput): void {
   if (a.mag <= 0 || now - (p.lastShot[p.slot] ?? 0) < w.fireRate * FIRE_RATE_TOLERANCE) return;
 
   // The client predicts its own movement, so it can be slightly ahead of the server: allow for its speed
-  const o = msg.o;
-  const speed = Math.hypot(p.move.vx, p.move.vy, p.move.vz);
+  // (vertical speed capped, or falling fast would give metres of slack)
+  const eye: Vec3 = [p.x, p.y + PLAYER.eye, p.z];
+  const speed = Math.hypot(p.move.vx, Math.min(Math.abs(p.move.vy), MAX_VERTICAL_SLACK_SPEED), p.move.vz);
   const tolerance = SHOT_ORIGIN_TOLERANCE + speed * MAX_INPUT_DELAY_S;
-  if (Math.hypot(o[0] - p.x, o[1] - (p.y + PLAYER.eye), o[2] - p.z) > tolerance) return;
+  const gap: Vec3 = [msg.o[0] - eye[0], msg.o[1] - eye[1], msg.o[2] - eye[2]];
+  const gapLen = Math.hypot(...gap);
+  if (gapLen > tolerance) return;
+  // ...and that origin must be reachable from the real eye without crossing a wall
+  if (
+    gapLen > 0 &&
+    castShot(eye, [gap[0] / gapLen, gap[1] / gapLen, gap[2] / gapLen], room.colliders, [], p.id, gapLen).hit
+  ) {
+    return;
+  }
+  // Melee reach is measured from the server's eye, so a shifted origin cannot lengthen the knife
+  const o = w.melee ? eye : msg.o;
   if (msg.d.length > w.pellets) return;
   const dirs = normalized(msg.d);
   if (!dirs) return;

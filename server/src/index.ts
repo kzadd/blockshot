@@ -15,13 +15,20 @@ import { simulateRoom } from './players/movement';
 import { RoomRegistry } from './rooms/registry';
 import type { RoomChannel } from './rooms/room';
 
+/** Every game message is a few hundred bytes; bigger ones are refused before being decoded. */
+const MAX_MESSAGE_BYTES = 16 * 1024;
+
 // server/src (dev) and server/dist (build) are both one level below server/
 const here = path.dirname(fileURLToPath(import.meta.url));
 const CLIENT_DIST = path.resolve(here, '../../client/dist');
 
 const httpServer = http.createServer(createApp(CLIENT_DIST));
 // MessagePack instead of JSON: snapshots and acks are ~27 % smaller and faster to decode
-const io: GameServer = new Server(httpServer, { cors: { origin: '*' }, parser: msgpackParser });
+const io: GameServer = new Server(httpServer, {
+  cors: { origin: '*' },
+  parser: msgpackParser,
+  maxHttpBufferSize: MAX_MESSAGE_BYTES,
+});
 
 const channelFor = (roomId: string): RoomChannel => ({
   broadcast: (event, args, exceptId) => {
@@ -43,8 +50,12 @@ let step = 0;
 startFixedLoop(FIXED_DT * MS_PER_S, (now) => {
   const snapshot = ++step % SIM_STEPS_PER_TICK === 0;
   for (const room of rooms.all()) {
-    simulateRoom(room, FIXED_DT, now);
-    if (snapshot) snapshotRoom(room, now);
+    try {
+      simulateRoom(room, FIXED_DT, now);
+      if (snapshot) snapshotRoom(room, now);
+    } catch (err) {
+      logger.error({ err, room: room.id }, 'room tick failed');
+    }
   }
 });
 

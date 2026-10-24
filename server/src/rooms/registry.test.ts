@@ -33,4 +33,15 @@ describe('room registry', () => {
     registry.removePlayer(room, 'solo');
     expect(registry.get(room.id)).toBeUndefined();
   });
+
+  it('falls back to defaults for inherited keys instead of crashing', () => {
+    const { registry } = makeRoom('ffa');
+    const room = registry.create({ mode: 'constructor', mapId: 'toString', size: 'constructor' }, 'Host');
+    expect([room.modeId, room.map.id, room.map.size]).toEqual(['ffa', 'patio', 'm']);
+    expect(Number.isFinite(room.max)).toBe(true);
+  });
+
+  it('strips control and bidi characters from names', () => {
+    expect(cleanText('An\u202Ea\u0000', 16, 'x')).toBe('Ana');
+  });
 });

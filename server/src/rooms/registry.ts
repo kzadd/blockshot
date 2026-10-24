@@ -27,7 +27,7 @@ const DEFAULT_NICKNAME = 'Jugador';
 
 /** Trims, collapses whitespace and cuts to `max` characters; falls back to `def` when empty. */
 export const cleanText = (s: unknown, max: number, def: string): string =>
-  (typeof s === 'string' ? s.trim().replace(/\s+/g, ' ').slice(0, max) : '') || def;
+  (typeof s === 'string' ? s.replace(/\p{C}/gu, '').trim().replace(/\s+/g, ' ').slice(0, max) : '') || def;
 const hash = (s: string) => crypto.createHash('sha256').update(s).digest('hex');
 
 export const cleanNickname = (s: unknown): string => cleanText(s, NICKNAME_MAX, DEFAULT_NICKNAME);
@@ -52,6 +52,10 @@ export class RoomRegistry {
 
   all(): IterableIterator<Room> {
     return this.rooms.values();
+  }
+
+  count(): number {
+    return this.rooms.size;
   }
 
   list(): RoomSummary[] {

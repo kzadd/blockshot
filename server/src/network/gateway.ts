@@ -37,6 +37,8 @@ import { MESSAGE_LIMITS, RateLimiter, type MessageCategory } from './rateLimiter
 export const LOBBY_CHANNEL = 'lobby';
 /** Do not log more than one dropped message per socket and second (floods would flood the log). */
 const DROP_LOG_INTERVAL_MS = 1000;
+/** Open rooms at most (a class needs a handful; this stops room spam). */
+const MAX_ROOMS = 40;
 
 interface SocketData {
   roomId: string | null;
@@ -79,7 +81,11 @@ export function attachGateway(io: GameServer, rooms: RoomRegistry, log: Logger):
         if (!parsed.success) {
           return drop(event, 'invalid', { issues: parsed.issues.map((i) => i.message).slice(0, 3) });
         }
-        handler(parsed.output, cb);
+        try {
+          handler(parsed.output, cb);
+        } catch (err) {
+          log.error({ err, socket: socket.id, event }, 'handler failed');
+        }
       }) as never);
     }
 
@@ -110,6 +116,9 @@ export function attachGateway(io: GameServer, rooms: RoomRegistry, log: Logger):
 
     on('room:create', 'lobby', CreateRoomSchema, (data, cb) => {
       if (!cb) return;
+      if (rooms.count() >= MAX_ROOMS) {
+        return (cb as (r: unknown) => void)({ ok: false, error: 'Hay demasiadas salas abiertas. Únete a una.' });
+      }
       leave();
       const nickname = cleanNickname(data.nickname);
       const room = rooms.create(data, nickname);
@@ -122,6 +131,8 @@ export function attachGateway(io: GameServer, rooms: RoomRegistry, log: Logger):
       const room = rooms.get(data.roomId);
       const error = rooms.canJoin(room, data.password);
       if (error || !room) return (cb as (r: unknown) => void)({ ok: false, error });
+      if (room.id === socket.data.roomId)
+        return (cb as (r: unknown) => void)({ ok: false, error: 'Ya estás en esta sala.' });
       leave();
       enter(room, cleanNickname(data.nickname), cb);
     });

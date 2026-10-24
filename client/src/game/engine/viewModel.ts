@@ -201,6 +201,11 @@ export class ViewModel {
     return p.applyMatrix4(camera.matrixWorld);
   }
 
+  dispose(): void {
+    this.scene.environment?.dispose();
+    this.scene.environment = null;
+  }
+
   resize(aspect: number): void {
     this.camera.aspect = aspect;
     this.camera.updateProjectionMatrix();

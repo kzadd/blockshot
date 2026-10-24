@@ -490,5 +490,6 @@ export class Effects {
     for (const p of this.liveParticles) this.scene.remove(p.sprite);
     for (const n of this.liveNumbers) this.scene.remove(n.sprite);
     this.liveTracers.length = this.liveHoles.length = this.liveParticles.length = this.liveNumbers.length = 0;
+    for (const res of [this.tracerGeo, this.holeGeo, this.tracerTex, this.holeTex, this.softTex]) res.dispose();
   }
 }

@@ -693,6 +693,7 @@ export class Engine implements MinimapSource {
     this.remotes.dispose();
     this.objectives.dispose();
     this.effects.dispose();
+    this.vm.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }

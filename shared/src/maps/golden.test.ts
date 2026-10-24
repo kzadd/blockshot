@@ -7,9 +7,9 @@ import * as shared from '../index';
 const hash = (v: unknown) => createHash('sha256').update(JSON.stringify(v)).digest('hex').slice(0, 16);
 
 const MAP_HASHES: Record<string, string> = {
-  'patio:s': '737f7e71f7dfdf2d',
-  'patio:m': 'cd5ea14e1182c1be',
-  'patio:l': 'fcf39f3182d26936',
+  'patio:s': '69f51e56e83bdd0e',
+  'patio:m': '7e8f34b1271a8e73',
+  'patio:l': 'e404ace138a30db6',
   'almacen:s': '9d3c8f537545f749',
   'almacen:m': 'f53acec140361bde',
   'almacen:l': 'de3bc230a78565dc',

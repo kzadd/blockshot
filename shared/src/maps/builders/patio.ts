@@ -1,8 +1,10 @@
 import { BARREL, LAMP, TREE, pad, sandbags, stairs } from '../props';
+import { STORY, house, mirrorHouse } from '../structures';
 import type { MapBuildContext } from '../types';
 
 // Patio: central tower, middle walls and rooms in the corners
-export function buildPatio({ B, S, P, H }: MapBuildContext): void {
+export function buildPatio(ctx: MapBuildContext): void {
+  const { B, S, P, H } = ctx;
   const k = H / 40;
   B(0, 0, 0, 12, 3, 12, 'platform');
   for (const s of [1, -1]) {
@@ -28,13 +30,57 @@ export function buildPatio({ B, S, P, H }: MapBuildContext): void {
     }
   }
 
-  // Corner rooms (two entrances each)
+  // Corner town houses: two floors and a roof terrace, doors towards the square and the back alley
   const c = 0.55 * H;
-  const L = H - 6 - c;
+  const hw = H < 30 ? 9.6 : H < 50 ? 11 : 13;
+  const hc = c + hw / 2;
+  const alley = (c + hw + H) / 2;
   for (const sx of [1, -1]) {
     for (const sz of [1, -1]) {
-      B(sx * (c + L / 2), 0, sz * c, L, 5, 1);
-      B(sx * c, 0, sz * (c + L / 2), 1, 5, L);
+      const brick = sx * sz > 0;
+      house(
+        ctx,
+        mirrorHouse(
+          {
+            x: sx * hc,
+            z: sz * hc,
+            w: hw,
+            d: hw,
+            stories: 2,
+            wall: brick ? 'brick' : 'plaster',
+            shutter: brick ? undefined : 'shutter',
+            frame: brick ? 'trim' : 'frame',
+            awning: 'awning',
+            ground: 'tile',
+            doors: [
+              { side: 'w', at: -hw / 2 + 2.2 },
+              { side: 'n', at: -hw / 2 + 2.2 },
+              { side: 'e', at: -hw / 2 + 2.2 },
+            ],
+            windows: [
+              { side: 'w', at: hw / 2 - 2.6 },
+              { side: 'n', at: hw / 2 - 2.6 },
+              { side: 'e', at: hw / 2 - 2.6 },
+              { side: 'w', at: -hw / 2 + 2, story: 1 },
+              { side: 'w', at: hw / 2 - 1.6, story: 1 },
+              { side: 'n', at: hw / 2 - 2, story: 1 },
+              { side: 'e', at: 0, story: 1 },
+              { side: 's', at: -hw / 2 + 2, story: 1 },
+              { side: 's', at: hw / 2 - 2, story: 1 },
+            ],
+            stairs: [
+              { side: 's', at: hw / 2 - 1.3, dir: -1 },
+              { side: 'n', at: -hw / 2 + 1, dir: 1, story: 1 },
+            ],
+            balconies: [{ side: 'w', at: 0.4, w: 3 }],
+          },
+          sx,
+          sz,
+        ),
+      );
+      // Some furniture to hide behind: a crate downstairs, a stack upstairs
+      B(sx * (hc + 0.8), 0, sz * (hc - 0.6), 1.4, 1.1, 1.4, 'crate');
+      B(sx * (hc + hw / 2 - 1.6), STORY, sz * (hc - 0.4), 1.4, 1.2, 1.4, 'crate2');
     }
   }
 
@@ -87,11 +133,9 @@ export function buildPatio({ B, S, P, H }: MapBuildContext): void {
     P(0, s * (d0 + 3), sandbags(3, 1));
   }
 
+  // Corner spawns in the back alleys (no further west than the west spawn, which holds the CTF base)
+  for (const sx of [1, -1]) for (const sz of [1, -1]) S(sx * 34 * k, sz * alley);
   const spawns = [
-    [-31, -31],
-    [31, -31],
-    [-31, 31],
-    [31, 31],
     [0, -34],
     [0, 34],
     [-34, 0],

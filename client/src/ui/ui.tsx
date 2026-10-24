@@ -6,8 +6,11 @@ import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react
 // 1280×720 window is pixel for pixel the design; it drops below 1 on laptops with the browser bar (~650 px tall).
 const DESIGN_W = 1280;
 const DESIGN_H = 720;
-/** Below this the small labels stop being readable: the screens scroll instead of shrinking further. */
-const MIN_SCALE = 0.85;
+/**
+ * Below this the small labels stop being readable. Low enough for a 1366×768 laptop at 125 % with the browser
+ * bar (~940×490 CSS px); the panels compress (and scroll inside as a last resort) instead of overlapping.
+ */
+const MIN_SCALE = 0.68;
 /** 1920×1080 */
 const MAX_SCALE = 1.5;
 export function useUiScale(): void {

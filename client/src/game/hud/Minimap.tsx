@@ -1,5 +1,5 @@
 import { useEffect, useRef, type RefObject } from 'react';
-import { ROOF_KINDS, type GameMap, type SideTeam } from '@blockshot/shared';
+import { INDOOR_FLOOR_KINDS, ROOF_KINDS, type GameMap, type SideTeam } from '@blockshot/shared';
 import { palette, teamColor } from '../../settings/palette';
 import { uiScale } from '../../ui/ui';
 
@@ -53,7 +53,7 @@ export default function Minimap({
     b.scale(k, k);
     b.globalAlpha = BACKGROUND_ALPHA;
     for (const box of [...map.boxes].sort((p, q) => p.y + p.h - (q.y + q.h))) {
-      if (box.c === 'floor') continue;
+      if (box.c === 'floor' || INDOOR_FLOOR_KINDS.has(box.c)) continue;
       b.fillStyle = map.colors[box.c] ?? map.colors.wall;
       b.globalAlpha = ROOF_KINDS.has(box.c) ? BACKGROUND_ALPHA * ROOF_ALPHA : BACKGROUND_ALPHA;
       b.fillRect(toPx(box.x - box.w / 2), toPx(box.z - box.d / 2), box.w * world, box.d * world);

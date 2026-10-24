@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { ROOF_KINDS, getMap } from '@blockshot/shared';
+import { INDOOR_FLOOR_KINDS, ROOF_KINDS, getMap } from '@blockshot/shared';
 import { uiScale } from '../ui/ui';
 
 const SPAWN_DOT_R = 1.1;
@@ -34,6 +34,7 @@ export default function MapPreview({ mapId, size, px = 120, className = 'map-pre
     g.setTransform(s, 0, 0, s, (px * dpr) / 2, (px * dpr) / 2);
     const boxes = [...map.boxes].sort((a, b) => a.y + a.h - (b.y + b.h));
     for (const b of boxes) {
+      if (INDOOR_FLOOR_KINDS.has(b.c)) continue;
       const top = b.y + b.h;
       g.fillStyle = map.colors[b.c] ?? map.colors.wall;
       g.filter =

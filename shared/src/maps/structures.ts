@@ -524,7 +524,9 @@ export function mirrorHouse(h: HouseSpec, sx: number, sz: number): HouseSpec {
 }
 
 /** Kinds that cover what is under them: maps seen from above draw them see-through. */
-export const ROOF_KINDS: ReadonlySet<BoxKind> = new Set<BoxKind>(['slab', 'roof', 'wood']);
+export const ROOF_KINDS: ReadonlySet<BoxKind> = new Set<BoxKind>(['slab', 'roof']);
+/** Floors inside buildings: maps seen from above skip them so the walls of the rooms show. */
+export const INDOOR_FLOOR_KINDS: ReadonlySet<BoxKind> = new Set<BoxKind>(['wood', 'tile']);
 
 /** Default colours of the building kinds (minimap, previews and 3D tint). */
 export const STRUCTURE_COLORS: Partial<Record<BoxKind, string>> = {

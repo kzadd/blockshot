@@ -41,6 +41,18 @@ describe('raycast', () => {
     expect(castShot([0, 1, 0], [0, 0, -1], [], [target({ alive: false })], '', 100).hit).toBeNull();
   });
 
+  it('shots go through railings', () => {
+    const rail = {
+      c: 'railing',
+      min: [-2, 0, -6] as [number, number, number],
+      max: [2, 1, -5.9] as [number, number, number],
+    };
+    expect(castShot([0, 0.5, 0], [0, 0, -1], [rail], [target()], '', 100).hit?.type).toBe('player');
+    expect(castShot([0, 0.5, 0], [0, 0, -1], [{ ...rail, c: 'wall' }], [target()], '', 100).hit).toEqual({
+      type: 'wall',
+    });
+  });
+
   it('damage falls off between the falloff distances', () => {
     const w = WEAPONS.rifle;
     const [from, to, min] = w.falloff!;

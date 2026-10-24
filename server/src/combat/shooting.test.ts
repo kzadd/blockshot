@@ -172,4 +172,29 @@ describe('handleShoot', () => {
     handleShoot(r.room, a, { o: eye(a), d: [aim(a, b.x, b.y + 1, b.z)], lag: 0 });
     expect(b.hp).toBe(150 - WEAPONS.knife.damage);
   });
+
+  it('rejects a shot whose origin is on the other side of a wall', () => {
+    const r = makeRoom('ffa');
+    // the east boundary wall: its inner face is the smallest min.x among the eastmost boxes
+    const wall = r.room.colliders.reduce((a, b) => (b.max[0] > a.max[0] ? b : a));
+    const a = r.join('A', wall.min[0] - 0.6, 0);
+    const b = r.join('B', wall.min[0] - 6, 0);
+    const o: Vec3 = [a.x + 1.4, a.y + PLAYER.eye, a.z]; // past the inner face, within the distance tolerance
+    handleShoot(r.room, a, { o, d: [aim(a, b.x, b.y + CHEST, b.z)], lag: 0 });
+    expect(a.shots).toBe(0);
+    // the same shot from the real eye is accepted
+    handleShoot(r.room, a, shotAt(a, b));
+    expect(a.shots).toBe(1);
+  });
+
+  it('a shifted origin does not lengthen the knife', () => {
+    const r = makeRoom('ffa');
+    const a = r.join('A', 13, -6);
+    const b = r.join('B', ...B, 'tanque'); // 3.5 m away: out of the knife's 2.6 m reach
+    b.ry = 0;
+    a.slot = 2;
+    const o: Vec3 = [a.x, a.y + PLAYER.eye, a.z + 1.2]; // moved towards b, inside the tolerance
+    handleShoot(r.room, a, { o, d: [aim(a, b.x, b.y + 1, b.z)], lag: 0 });
+    expect(b.hp).toBe(150);
+  });
 });

@@ -28,6 +28,8 @@ export interface Player {
   name: string;
   characterId: CharacterId | null;
   skin: SkinId;
+  /** outfit colour (one of OUTFIT_COLORS) */
+  color: string;
   team: Team;
   alive: boolean;
   hp: number;
@@ -89,6 +91,7 @@ export function createPlayer(id: string, name: string, team: Team): Player {
     name,
     characterId: null,
     skin: 'base',
+    color: '',
     team,
     alive: false,
     hp: 0,

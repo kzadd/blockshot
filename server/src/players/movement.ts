@@ -29,8 +29,8 @@ export function queueInputs(p: Player, cmds: readonly MoveInput[]): void {
 
 function stepPlayer(room: Room, p: Player, input: MoveInput): void {
   if (!p.characterId) return;
-  const slot = input.slot < p.loadout.length ? input.slot : p.slot;
-  const weaponId = p.loadout[slot];
+  // The weapon actually held decides the speed: the slot inside the input is only the client's prediction
+  const weaponId = p.loadout[p.slot];
   const w = weaponId ? WEAPONS[weaponId] : null;
   const walk = CHAR_BY_ID[p.characterId].speed * (w?.weight ?? 1) * (room.mode.speedFactor?.(p) ?? 1);
   const spawn = room.map.spawns[0];

@@ -7,7 +7,8 @@ import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react
 const DESIGN_W = 1280;
 const DESIGN_H = 720;
 const UI_FIT = 0.9;
-const MIN_SCALE = 0.7;
+/** Below this the small labels stop being readable: the screens scroll instead of shrinking further. */
+const MIN_SCALE = 0.85;
 const MAX_SCALE = 1.25;
 export function useUiScale(): void {
   useEffect(() => {
@@ -199,7 +200,7 @@ export function Curtain() {
         <i
           key={`${run}-${r}-${c}`}
           style={{
-            background: (r + c) % 2 ? '#22355c' : '#1b2a4a',
+            background: (r + c) % 2 ? '#18222f' : '#111923',
             animationDelay: `${CURTAIN_STAGGER_MS * (r + c)}ms`,
           }}
         />,

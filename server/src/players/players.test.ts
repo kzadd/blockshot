@@ -83,4 +83,19 @@ describe('best plays', () => {
       { t: 'Precisión', v: '50 %', n: 'Beto · 10 de 20' },
     ]);
   });
+
+  it('speed comes from the weapon actually held, not from the slot claimed in the input', () => {
+    const run = (claimedSlot: number) => {
+      const { room, join } = makeRoom('ffa');
+      const p = join('A', 0, 20);
+      queueInputs(
+        p,
+        Array.from({ length: 30 }, (_, i) => ({ ...cmd(i), slot: claimedSlot })),
+      );
+      for (let i = 0; i < 30; i++) simulateRoom(room, FIXED_DT, Date.now() + i);
+      return 20 - p.z;
+    };
+    // slot 2 is the knife (lighter than the rifle in slot 0) but the player holds the rifle
+    expect(run(2)).toBeCloseTo(run(0), 6);
+  });
 });

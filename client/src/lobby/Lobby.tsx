@@ -34,7 +34,7 @@ const loadNick = (): string => {
   }
 };
 
-const EMPTY_COLORS = ['#3a4a6c', '#ffc93c', '#3a4a6c', '#3f7fe0', '#d0533a', '#3aa65a'];
+const EMPTY_COLORS = ['#2b3a4f', '#ffc93c', '#2b3a4f', '#3fa7ff', '#ff4f5e', '#3ddc84'];
 
 interface RoomForm {
   name: string;
@@ -336,7 +336,7 @@ export default function Lobby({ onJoined }: { onJoined: (s: Session) => void }) 
                             {r.locked ? ' 🔒' : ''}
                           </b>
                           <small>
-                            {r.map} · {r.size} · {r.mode} a {r.limit} · de {r.host}
+                            {r.mode} a {r.limit} · {r.map} {r.size.toLowerCase()} · de {r.host}
                           </small>
                         </div>
                         <div className="room-count">

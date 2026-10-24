@@ -21,7 +21,7 @@ export const PING_INTERVAL_MS = 2000;
 export const MAX_PING_MS = 999;
 
 /** Shot origin may differ this much from the server's eye position (m). */
-export const SHOT_ORIGIN_TOLERANCE = 3;
+export const SHOT_ORIGIN_TOLERANCE = 1.5;
 /** Fire-rate check tolerates this fraction of the weapon's fireRate (network jitter). */
 export const FIRE_RATE_TOLERANCE = 0.8;
 /** A reload counts as finished this early (ms) when the next shot arrives. */

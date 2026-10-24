@@ -74,7 +74,8 @@ function Table({ players, me, numbered, caps, ladder }: TableProps) {
             {caps && <td className="num k">{p.cp ?? 0}</td>}
             {ladder && (
               <td>
-                {p.lv + 1}/{ladder.length} · {WEAPONS[ladder[Math.min(p.lv, ladder.length - 1)]!].name}
+                {Math.min(p.lv + 1, ladder.length)}/{ladder.length} ·{' '}
+                {WEAPONS[ladder[Math.min(p.lv, ladder.length - 1)]!].name}
               </td>
             )}
             <td className="num k">{p.k}</td>

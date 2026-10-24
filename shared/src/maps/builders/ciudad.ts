@@ -1,8 +1,17 @@
-import { BARREL, LAMP, TREE, car, pad, sandbags, stairs } from '../props';
+import { BARREL, LAMP, TREE, car, pad, sandbags } from '../props';
+import { STORY, house } from '../structures';
 import type { MapBuildContext, StructureKind } from '../types';
 
-// Ciudad: city blocks with streets, alleys, squares and some rooftops with stairs
-export function buildCiudad({ B, S, P, H, rand }: MapBuildContext): void {
+/** Shop windows: wide and low. */
+const SHOP_WINDOW = { w: 2.4, sill: 0.7, top: 2.2 };
+/** Blocks at least this wide get a two-story walk-up (the outside stairs need the length). */
+const WALKUP_MIN = 10;
+/** Tall blocks (m) get a shop on the ground floor. */
+const SHOP_MIN_H = 6.5;
+
+// Ciudad: city blocks with streets, alleys and squares; walk-up houses with roof terraces and shops under the towers
+export function buildCiudad(ctx: MapBuildContext): void {
+  const { B, S, P, H, rand } = ctx;
   const n = H < 34 ? 3 : H < 50 ? 4 : 5; // blocks per side
   const sw = 7; // street width
   const bs = (2 * H - (n + 1) * sw) / n; // block side
@@ -11,6 +20,41 @@ export function buildCiudad({ B, S, P, H, rand }: MapBuildContext): void {
   const cols: StructureKind[] = ['bld1', 'bld2', 'bld3', 'bld4'];
   const pickColor = () => cols[Math.floor(rand() * cols.length)]!;
   const plaza = Math.floor((n - 1) / 2);
+  // Walk-up house: shop downstairs, a flat upstairs (two stories) and outside stairs to the roof
+  const walkUp = (cx: number, cz: number, stories: number, brick: boolean) => {
+    const w = bs - 1.4;
+    house(ctx, {
+      x: cx + 0.7,
+      z: cz,
+      w,
+      d: bs,
+      stories,
+      wall: brick ? 'brick' : 'plaster',
+      ground: 'tile',
+      awning: 'awning',
+      frame: brick ? 'trim' : 'frame',
+      doors: [
+        { side: 'e', at: -0.2 * bs },
+        { side: 'n', at: 0.15 * w },
+        { side: 's', at: -0.15 * w },
+      ],
+      windows: [
+        { side: 'e', at: 0.2 * bs, ...SHOP_WINDOW },
+        { side: 'n', at: -0.25 * w, ...SHOP_WINDOW, w: 2 },
+        { side: 's', at: 0.25 * w, ...SHOP_WINDOW, w: 2 },
+        ...(stories > 1
+          ? ([
+              { side: 'e', at: -0.25 * bs, story: 1 },
+              { side: 'e', at: 0.25 * bs, story: 1 },
+              { side: 'n', at: 0, story: 1 },
+              { side: 's', at: 0, story: 1 },
+            ] as const)
+          : []),
+      ],
+      stairs: stories > 1 ? [{ side: 'w', at: 0.35 * bs, dir: -1 }] : [],
+      outside: { side: 'w', at: -bs / 2 + 0.1, dir: 1 },
+    });
+  };
   for (let i = 0; i < n; i++) {
     for (let j = 0; j < n; j++) {
       const cx = at(i);
@@ -32,9 +76,7 @@ export function buildCiudad({ B, S, P, H, rand }: MapBuildContext): void {
       }
       const h = 4 + Math.floor(rand() * 4) * 2.5;
       if (roll < 0.28) {
-        // Low building with stairs to the roof
-        B(cx + 1.25, 0, cz, bs - 2.5, 3.5, bs, c);
-        stairs(B, cx - bs / 2 + 1.25, cz + bs / 2 - 0.5, 'z', 1, 7, 2.5);
+        walkUp(cx, cz, bs >= WALKUP_MIN ? 2 : 1, (i + j) % 2 === 1);
       } else if (roll < 0.6) {
         // Two buildings with an alley between them
         const w = (bs - 2.6) / 2;
@@ -46,7 +88,34 @@ export function buildCiudad({ B, S, P, H, rand }: MapBuildContext): void {
           B(cx, 0, cz - (w + 2.6) / 2, bs, h, w, c);
           B(cx, 0, cz + (w + 2.6) / 2, bs, h2, w, pickColor());
         }
-      } else B(cx, 0, cz, bs, h, bs, c);
+      } else if (h >= SHOP_MIN_H) {
+        // Tall block with a walk-through shop on the ground floor
+        house(ctx, {
+          x: cx,
+          z: cz,
+          w: bs,
+          d: bs,
+          wall: 'concrete',
+          ground: 'tile',
+          awning: 'awning',
+          parapet: false,
+          doors: [
+            { side: 'n', at: -0.2 * bs },
+            { side: 's', at: 0.2 * bs },
+            { side: 'e', at: 0 },
+          ],
+          windows: [
+            { side: 'n', at: 0.2 * bs, ...SHOP_WINDOW },
+            { side: 's', at: -0.2 * bs, ...SHOP_WINDOW },
+            { side: 'w', at: 0.2 * bs, ...SHOP_WINDOW },
+            { side: 'w', at: -0.2 * bs, ...SHOP_WINDOW },
+            { side: 'e', at: 0.3 * bs, ...SHOP_WINDOW, w: 2 },
+            { side: 'e', at: -0.3 * bs, ...SHOP_WINDOW, w: 2 },
+          ],
+        });
+        B(cx - 0.15 * bs, 0, cz, 1, 1.1, 0.35 * bs, 'crate'); // counter
+        B(cx, STORY, cz, bs, h - STORY, bs, c);
+      } else walkUp(cx, cz, 1, (i + j) % 2 === 0); // low block: one story with a roof terrace
     }
   }
   // Jump pads in the middle of some streets: up to the low rooftops

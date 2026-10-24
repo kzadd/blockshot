@@ -45,6 +45,10 @@ const CHUNK_PIECES = 4;
 const CHUNK_LIFE_MS = 1000;
 const COMBO_MIN = 2;
 const BAD_PING_MS = 120;
+/** The weapon list shows for a moment after switching, then hides. */
+const SLOTS_VISIBLE_MS = 2200;
+/** Killfeed lines on screen at most. */
+const FEED_MAX = 5;
 /** Crosshair fades out while the gun's own sight comes up. */
 const AIM_FADE = 2.5;
 const VIGNETTE_DAMAGE = 0.8;
@@ -68,7 +72,7 @@ export function Feed({ feed, you, mode }: { feed: FeedItem[]; you: string; mode:
   const color = (t: Team) => (isTeamMode(mode) && t ? TEAM_TXT[t] : undefined);
   return (
     <div className="feed">
-      {feed.map((f) => {
+      {feed.slice(-FEED_MAX).map((f) => {
         const out = f.out ? ' out' : '';
         if (f.type === 'kill') {
           const cls = f.killer === you ? ' mine' : f.victim === you ? ' died' : '';
@@ -117,6 +121,24 @@ export function RoomInfo({ info }: { info: RoomView }) {
   );
 }
 
+/** In game the room details live in the scoreboard (Tab): only a bad connection is shown. */
+function NetWarning() {
+  const ping = useHud((h) => h.ping) ?? 0;
+  if (ping <= BAD_PING_MS) return null;
+  return <div className="net-warn">⚠ Conexión lenta · {ping} ms</div>;
+}
+
+/** True for a while after `value` changes. */
+function useRecentChange(value: unknown, ms: number): boolean {
+  const [recent, setRecent] = useState(true);
+  useEffect(() => {
+    setRecent(true);
+    const t = setTimeout(() => setRecent(false), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return recent;
+}
+
 interface Chunk {
   key: string;
   left: number;
@@ -158,7 +180,6 @@ function Health() {
   const h = useHud((s) => ({
     hp: s.hp,
     maxHp: s.maxHp,
-    charName: s.charName,
     armor: s.armor,
     stamina: s.stamina,
     staminaLow: s.staminaLow,
@@ -172,13 +193,12 @@ function Health() {
     <div className={`hp ${low ? 'low' : ''}`}>
       <b className="hp-num">{h.hp}</b>
       <div className="hp-side">
-        <div className="hp-labels hud-txt">
-          <span>{h.charName}</span>
-          <span>
-            {h.armor > 0 && <span className="armor-num">🛡 {h.armor} · </span>}
-            {h.maxHp} máx.
-          </span>
-        </div>
+        {h.armor > 0 && (
+          <div className="hp-labels">
+            <span>Blindaje</span>
+            <span className="armor-num">{h.armor}</span>
+          </div>
+        )}
         <div className="relative">
           <div className="hpbar">
             <span className="trail" style={{ width: `${pct * 100}%` }} />
@@ -233,11 +253,12 @@ function Ammo() {
     gunTotal: s.gunTotal,
     scoped: s.scoped,
   }));
+  const showSlots = useRecentChange(`${h?.slot}:${h?.loadout.join()}`, SLOTS_VISIBLE_MS);
   if (!h) return null;
   const low = h.mag > 0 && h.mag <= h.magSize * LOW_AMMO;
   return (
     <div className="ammo">
-      <span className="hud-txt text-[14px]">
+      <span className="wname">
         {h.gunLevel ? `Arma ${h.gunLevel}/${h.gunTotal} · ` : ''}
         {h.weaponName}
       </span>
@@ -259,7 +280,7 @@ function Ammo() {
         </div>
       )}
       {!h.scoped && (
-        <div className="slots">
+        <div className={`slots ${showSlots ? '' : 'hide'}`}>
           {h.loadout.map((n, i) => (
             <span key={n + i} className={h.slot === i ? 'on' : ''}>
               <em>{i + 1}</em>
@@ -369,21 +390,21 @@ function TopCenter({ mode, scoreLimit, you }: { mode: ModeId; scoreLimit: number
   const pos = sorted.findIndex((p) => p.id === you) + 1;
   const me = sorted[pos - 1];
   const second = sorted[1];
-  // When you lead, the right side shows who follows you
+  // When you lead, the right side shows who follows you (nothing when you are alone)
   const right =
-    pos === 1
-      ? second
-        ? `2º ${second.n} · ${second.k}`
-        : `Tú · ${me?.k ?? 0}/${scoreLimit}`
-      : `Tú ${pos}º · ${me?.k ?? 0}/${scoreLimit}`;
+    pos === 1 ? (second ? `2º ${second.n} · ${second.k}` : null) : `Tú ${pos}º · ${me?.k ?? 0}/${scoreLimit}`;
   return (
     <div className="leader">
       <span className="first">
         1º {pos === 1 ? 'Tú' : first.n} · {first.k}
         {pos === 1 ? `/${scoreLimit}` : ''}
       </span>
-      <span className="sep" />
-      <span>{right}</span>
+      {right && (
+        <>
+          <span className="sep" />
+          <span>{right}</span>
+        </>
+      )}
     </div>
   );
 }
@@ -402,12 +423,15 @@ function Vignette() {
 function Scope() {
   return (
     <div className="scope">
-      <div className="ring" />
-      <i className="h" />
-      <i className="v" />
-      <i className="h thick" />
-      <i className="h thick r" />
-      <i className="v thick" />
+      <div className="lens" />
+      <i className="l h left" />
+      <i className="l h right" />
+      <i className="l v top" />
+      <i className="l v bottom" />
+      <i className="p h left" />
+      <i className="p h right" />
+      <i className="p v bottom" />
+      <i className="ticks" />
       <i className="dot" />
       <span className="scope-hint">Clic der. para salir · el resto del HUD se oculta mientras apuntas</span>
     </div>
@@ -513,13 +537,13 @@ function SpawnProtection() {
   if (seconds <= 0) return null;
   return (
     <div className="spawn-prot">
-      🛡 Protegido {seconds} s<small>Disparar quita la protección</small>
+      🛡 Protegido <b>{seconds} s</b>
+      <small>· disparar la quita</small>
     </div>
   );
 }
 
 interface HudProps {
-  info: RoomView;
   engine: RefObject<MinimapSource | null>;
   map: GameMap;
   mode: ModeId;
@@ -529,14 +553,14 @@ interface HudProps {
   banner: KillBanner | null;
 }
 
-export default function HUD({ info, engine, map, mode, scoreLimit, you, feed, banner }: HudProps) {
+export default function HUD({ engine, map, mode, scoreLimit, you, feed, banner }: HudProps) {
   const h = useHud((s) => ({ alive: s.alive, scoped: s.alive && s.scoped, radar: s.radar }));
   if (!h) return null;
   const { alive, scoped } = h;
   return (
     <div className="hud stage">
-      {!scoped && <RoomInfo info={info} />}
       {alive && !scoped && <Minimap engine={engine} map={map} radar={h.radar} />}
+      {alive && !scoped && <NetWarning />}
       {alive && !scoped && <TopCenter mode={mode} scoreLimit={scoreLimit} you={you} />}
       {!scoped && <Feed feed={feed} you={you} mode={mode} />}
 

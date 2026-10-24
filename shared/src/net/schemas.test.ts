@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { CreateRoomSchema, InputSchema, MAX_INPUTS_PER_MESSAGE, ShootSchema, v } from './schemas';
+import { OUTFIT_COLORS, SKINS, isCharacterId, isOutfitColor, isSkinId } from '../characters/characters';
+import { isMapId, isSizeId } from '../maps/maps';
+import { isModeId } from '../modes/modes';
+import { CreateRoomSchema, InputSchema, MAX_INPUTS_PER_MESSAGE, ShootSchema, SpawnSchema, v } from './schemas';
 
 const ok = (schema: v.GenericSchema, data: unknown) => v.safeParse(schema, data).success;
 const cmd = { seq: 1, f: 1, s: 0, yaw: 0.5, pitch: 0, b: 3, slot: 0 };
@@ -23,5 +26,46 @@ describe('message schemas', () => {
     expect(
       ok(InputSchema, { c: Array.from({ length: MAX_INPUTS_PER_MESSAGE + 1 }, (_, i) => ({ ...cmd, seq: i })) }),
     ).toBe(false);
+  });
+
+  it('accepts a spawn with any palette outfit colour, or none, and nothing else', () => {
+    expect(ok(SpawnSchema, { characterId: 'soldado', skin: 'neon' })).toBe(true);
+    for (const c of OUTFIT_COLORS)
+      expect(ok(SpawnSchema, { characterId: 'rayo', skin: 'base', color: c.hex })).toBe(true);
+    expect(ok(SpawnSchema, { characterId: 'rayo', color: '#123456' })).toBe(false);
+    expect(ok(SpawnSchema, { characterId: 'rayo', color: 0x3f7fe0 })).toBe(false);
+    expect(ok(SpawnSchema, { characterId: 'rayo', color: 'red' })).toBe(false);
+  });
+});
+
+describe('cosmetics', () => {
+  it('has ten skins with unique ids that the server accepts', () => {
+    expect(SKINS).toHaveLength(10);
+    expect(new Set(SKINS.map((k) => k.id)).size).toBe(SKINS.length);
+    for (const k of SKINS) expect(isSkinId(k.id)).toBe(true);
+    expect(isSkinId('rgb')).toBe(false);
+  });
+
+  it('offers eight distinct outfit colours as #rrggbb', () => {
+    expect(OUTFIT_COLORS).toHaveLength(8);
+    expect(new Set(OUTFIT_COLORS.map((c) => c.hex)).size).toBe(8);
+    for (const c of OUTFIT_COLORS) expect(c.hex).toMatch(/^#[0-9a-f]{6}$/);
+    expect(isOutfitColor('#3f7fe0')).toBe(true);
+    expect(isOutfitColor('#000000')).toBe(false);
+    expect(isOutfitColor(undefined)).toBe(false);
+  });
+});
+
+describe('id guards', () => {
+  it('reject inherited object keys like constructor or toString', () => {
+    for (const key of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+      expect([isCharacterId(key), isMapId(key), isSizeId(key), isModeId(key)]).toEqual([false, false, false, false]);
+    }
+    expect([isCharacterId('soldado'), isMapId('patio'), isSizeId('m'), isModeId('ffa')]).toEqual([
+      true,
+      true,
+      true,
+      true,
+    ]);
   });
 });

@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import {
   CHAR_BY_ID,
   VIEW_DELAY_MS,
+  isOutfitColor,
   isTeamMode,
   loadoutOf,
   type CharacterId,
@@ -16,7 +17,14 @@ import {
   type WeaponId,
 } from '@blockshot/shared';
 import { palette, teamColor } from '../../settings/palette';
-import { buildCharacter, buildGun, makeNameTag, type CharacterModel, type NameTag } from '../render/models';
+import {
+  buildCharacter,
+  buildGun,
+  makeNameTag,
+  type CharacterModel,
+  type GunModel,
+  type NameTag,
+} from '../render/models';
 import { damp, dampAngle } from './util';
 
 const INFECTED_COLOR = '#6fcf3a';
@@ -24,6 +32,10 @@ const INFECTED_COLOR = '#6fcf3a';
 const BUFFER_SIZE = 20;
 const NAME_TAG_Y = 2.3;
 const REMOTE_GUN_SCALE = 1.3;
+/** Muzzle flash of remote guns (ms) and the shot origin when the gun is not drawn yet. */
+const REMOTE_FLASH_MS = 60;
+const MUZZLE_Y_STANDING = 1.35;
+const MUZZLE_Y_SLIDING = 0.85;
 const BUBBLE_Y = 0.95;
 // Spawn protection bubble
 const bubbleGeo = new THREE.SphereGeometry(1, 18, 12);
@@ -37,6 +49,11 @@ const WALK_CYCLE = 2.2;
 const WALK_FULL_SPEED = 7;
 const LEG_SWING = 0.7;
 const LEG_SWING_CROUCHED = 0.35;
+/** Knee bend per radian of the leg swinging back while walking. */
+const KNEE_BEND = 1.3;
+/** Crouched: front shin vertical, back knee on the floor. */
+const KNEE_CROUCH_FRONT = -1.1;
+const KNEE_CROUCH_BACK = -1.25;
 /** A running enemy (not crouched, not in the air) this close leaves a footstep mark. */
 const FOOTSTEP_SPEED = 3;
 const FOOTSTEP_EVERY_M = 4.5;
@@ -64,9 +81,12 @@ export interface Remote {
   bubble: THREE.Mesh | null;
   charId: CharacterId | null;
   skin: SkinId | null;
+  /** outfit colour picked by the player */
+  co: string;
   team: Team | -1;
   color: string;
   weaponId: WeaponId | null;
+  gun: GunModel | null;
   buffer: Sample[];
   rx: number;
   sl: number;
@@ -80,12 +100,12 @@ export interface Remote {
   lastShot: number;
 }
 
-/** In team modes everybody wears its team colour; in free for all, the character colour and skin. */
-export function outfitFor(mode: ModeId, charId: CharacterId, skin: string, team: Team): Outfit {
+/** In team modes everybody wears its team colour; in free for all, the colour the player picked and its skin. */
+export function outfitFor(mode: ModeId, charId: CharacterId, skin: string, team: Team, color?: string): Outfit {
   const ch = CHAR_BY_ID[charId];
   if (mode === 'infect' && team === 2) return { color: INFECTED_COLOR, skin: 'base' };
   if (isTeamMode(mode) && team) return { color: teamColor(team, ch.color), skin: 'base' };
-  return { color: ch.color, skin };
+  return { color: isOutfitColor(color) ? color : ch.color, skin };
 }
 
 export class RemotePlayers {
@@ -120,9 +140,11 @@ export class RemotePlayers {
           bubble: null,
           charId: null,
           skin: null,
+          co: '',
           team: -1,
           color: '#ffffff',
           weaponId: null,
+          gun: null,
           buffer: [],
           rx: 0,
           sl: 0,
@@ -136,7 +158,7 @@ export class RemotePlayers {
         };
         this.all.set(p.id, r);
       }
-      if (p.c && (r.charId !== p.c || r.skin !== p.sk || r.team !== p.tm)) this.build(r, p);
+      if (p.c && (r.charId !== p.c || r.skin !== p.sk || r.co !== p.co || r.team !== p.tm)) this.build(r, p);
       r.name = p.n;
       r.rx = p.rx;
       r.sl = p.sl;
@@ -165,7 +187,7 @@ export class RemotePlayers {
   private build(r: Remote, p: PlayerSnapshot): void {
     if (!p.c) return;
     if (r.model) this.scene.remove(r.model.group);
-    const { color, skin } = outfitFor(this.mode, p.c, p.sk, p.tm);
+    const { color, skin } = outfitFor(this.mode, p.c, p.sk, p.tm, p.co);
     r.model = buildCharacter(p.c, skin, color);
     r.color = color;
     // Team modes: name in the team colour (teammates are seen through walls); otherwise the enemy colour
@@ -184,18 +206,20 @@ export class RemotePlayers {
     this.scene.add(r.model.group);
     r.charId = p.c;
     r.skin = p.sk;
+    r.co = p.co;
     r.team = p.tm;
     r.weaponId = null;
+    r.gun = null;
     r.buffer.length = 0;
   }
 
   private setGun(r: Remote, wid: WeaponId): void {
     if (!r.model) return;
-    r.model.hand.clear();
-    const g = buildGun(wid, false, r.color);
+    const g = buildGun(wid, true, r.color);
     g.scale.setScalar(REMOTE_GUN_SCALE);
-    r.model.hand.add(g);
+    r.model.holdGun(g);
     r.weaponId = wid;
+    r.gun = g;
   }
 
   private remove(id: string): void {
@@ -235,6 +259,8 @@ export class RemotePlayers {
     for (const r of this.all.values()) {
       if (!r.model || !r.alive) continue;
       if (r.bubble) r.bubble.visible = r.prot;
+      const flash = r.gun?.userData.flash;
+      if (flash) flash.visible = now - r.lastShot < REMOTE_FLASH_MS;
       const g = r.model.group;
       const s = this.sample(r, renderTime);
       if (!s) continue;
@@ -267,6 +293,10 @@ export class RemotePlayers {
       const low = r.sl || r.cr;
       r.model.legL.rotation.x = r.sl ? 1.2 : r.cr ? 1.1 + swing : swing;
       r.model.legR.rotation.x = r.sl ? 1.2 : r.cr ? -0.35 - swing : -swing;
+      const kneeL = r.sl ? 0 : r.cr ? KNEE_CROUCH_FRONT : -Math.max(0, -swing) * KNEE_BEND;
+      const kneeR = r.sl ? 0 : r.cr ? KNEE_CROUCH_BACK : -Math.max(0, swing) * KNEE_BEND;
+      r.model.kneeL.rotation.x += (kneeL - r.model.kneeL.rotation.x) * k;
+      r.model.kneeR.rotation.x += (kneeR - r.model.kneeR.rotation.x) * k;
       r.model.legL.position.y = r.model.legR.position.y += ((low ? 0.5 : 0.8) - r.model.legR.position.y) * k;
       r.model.upper.position.y += ((low ? -0.5 : 0) - r.model.upper.position.y) * k;
     }
@@ -292,14 +322,24 @@ export class RemotePlayers {
 
   markShot(id: string, now: number): Remote | undefined {
     const r = this.all.get(id);
-    if (r) r.lastShot = now;
+    if (!r) return r;
+    r.lastShot = now;
+    const flash = r.gun?.userData.flash;
+    if (flash) {
+      flash.rotation.z = Math.random() * Math.PI * 2;
+      flash.visible = true;
+    }
     return r;
   }
 
-  /** Shot origin of a remote (its gun height). */
+  /** Shot origin of a remote: the muzzle of the gun it holds (or its gun height while not drawn). */
   muzzle(r: Remote, out = this.tmp): THREE.Vector3 | null {
+    if (r.gun && r.model) {
+      r.model.group.updateMatrixWorld(true);
+      return r.gun.localToWorld(out.set(0, r.gun.userData.muzzleY, r.gun.userData.muzzleZ));
+    }
     const g = r.model?.group.position;
-    return g ? out.set(g.x, g.y + (r.sl ? 0.85 : 1.35), g.z) : null;
+    return g ? out.set(g.x, g.y + (r.sl ? MUZZLE_Y_SLIDING : MUZZLE_Y_STANDING), g.z) : null;
   }
 
   dispose(): void {

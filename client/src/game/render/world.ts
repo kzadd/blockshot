@@ -294,6 +294,116 @@ const GEN = {
       }
     }
   },
+  // Concrete cast in panels: seams and tie holes
+  panels(g, rand) {
+    GEN.concrete(g, rand);
+    g.fillStyle = 'rgba(0,0,0,0.16)';
+    g.fillRect(0, S / 2 - 1, S, 2);
+    g.fillRect(S / 2 - 1, 0, 2, S);
+    g.fillStyle = 'rgba(255,255,255,0.18)';
+    g.fillRect(0, S / 2 + 1, S, 1);
+    for (const y of [S / 4, (3 * S) / 4]) {
+      for (const x of [S / 8, (3 * S) / 8, (5 * S) / 8, (7 * S) / 8]) {
+        g.fillStyle = gray(120, 0.55);
+        g.beginPath();
+        g.arc(x, y, 3, 0, Math.PI * 2);
+        g.fill();
+      }
+    }
+    // rain streaks
+    for (let i = 0; i < 18; i++) {
+      g.fillStyle = gray(0, 0.03 + rand() * 0.04);
+      g.fillRect(rand() * S, 0, 2 + rand() * 6, S * (0.2 + rand() * 0.6));
+    }
+  },
+  // Narrow floorboards with staggered joints
+  woodFloor(g, rand) {
+    const n = 8;
+    const h = S / n;
+    for (let i = 0; i < n; i++) {
+      const v = 175 + rand() * 60;
+      g.fillStyle = gray(v);
+      g.fillRect(0, i * h, S, h);
+      g.strokeStyle = gray(v - 40, 0.25);
+      g.lineWidth = 1;
+      for (let k = 0; k < 5; k++) {
+        const y = i * h + 3 + rand() * (h - 6);
+        g.beginPath();
+        g.moveTo(0, y);
+        g.bezierCurveTo(S / 3, y + (rand() - 0.5) * 4, (2 * S) / 3, y + (rand() - 0.5) * 4, S, y);
+        g.stroke();
+      }
+      g.fillStyle = 'rgba(0,0,0,0.4)';
+      g.fillRect(0, i * h, S, 2);
+      const joint = rand() * S;
+      g.fillRect(joint, i * h, 2, h);
+    }
+  },
+  // Painted metal panels with seams and rivets
+  metalPanel(g, rand) {
+    g.fillStyle = gray(215);
+    g.fillRect(0, 0, S, S);
+    speckle(g, rand, 800, 190, 235, 1);
+    blotches(g, rand, 10, 0.07, 10, 40);
+    for (const x of [0, S / 2]) {
+      g.fillStyle = 'rgba(0,0,0,0.3)';
+      g.fillRect(x, 0, 3, S);
+      g.fillStyle = 'rgba(255,255,255,0.35)';
+      g.fillRect(x + 3, 0, 2, S);
+      for (let y = 8; y < S; y += 32) {
+        g.fillStyle = gray(130);
+        g.fillRect(x + 8, y, 3, 3);
+        g.fillRect(x + S / 2 - 11, y, 3, 3);
+      }
+    }
+    g.fillStyle = 'rgba(0,0,0,0.12)';
+    g.fillRect(0, S - 18, S, 18);
+  },
+  // Shutter slats
+  louver(g) {
+    g.fillStyle = gray(150);
+    g.fillRect(0, 0, S, S);
+    for (let y = 0; y < S; y += 16) {
+      const grad = g.createLinearGradient(0, y, 0, y + 16);
+      grad.addColorStop(0, gray(250));
+      grad.addColorStop(1, gray(175));
+      g.fillStyle = grad;
+      g.fillRect(6, y + 2, S - 12, 12);
+    }
+  },
+  // Awning stripes (the material colour tints the dark ones)
+  stripes(g, rand) {
+    for (let x = 0; x < S; x += 32) {
+      g.fillStyle = (x / 32) % 2 ? gray(250) : gray(175);
+      g.fillRect(x, 0, 32, S);
+    }
+    blotches(g, rand, 8, 0.06, 20, 50);
+  },
+  // Ceramic floor tiles, slightly uneven in tone
+  tiles(g, rand) {
+    const n = 4;
+    const t = S / n;
+    g.fillStyle = gray(150);
+    g.fillRect(0, 0, S, S);
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        g.fillStyle = gray((r + c) % 2 ? 235 - rand() * 12 : 200 - rand() * 12);
+        g.fillRect(c * t + 2, r * t + 2, t - 4, t - 4);
+      }
+    }
+    speckle(g, rand, 1500, 170, 245, 1);
+    blotches(g, rand, 10, 0.05, 15, 40);
+  },
+  // Flat roof: gravel over a membrane, with seams
+  gravel(g, rand) {
+    g.fillStyle = gray(200);
+    g.fillRect(0, 0, S, S);
+    speckle(g, rand, 9000, 140, 250, 2);
+    blotches(g, rand, 16, 0.08, 20, 60);
+    g.fillStyle = 'rgba(0,0,0,0.12)';
+    g.fillRect(0, 0, S, 3);
+    g.fillRect(0, 0, 3, S);
+  },
   // Hazard stripes: already coloured (the material is white)
   hazard(g: Ctx) {
     g.fillStyle = '#e8b923';
@@ -342,6 +452,19 @@ const COMMON: Partial<Record<BoxKind, Look>> = {
   bld2: ['windows', 4],
   bld3: ['windows', 4],
   bld4: ['windows', 4],
+  brick: ['brick', 2.4],
+  plaster: ['plaster', 3],
+  concrete: ['panels', 3],
+  metal: ['metalPanel', 3],
+  wood: ['woodFloor', 2],
+  slab: ['gravel', 3],
+  stair: ['concrete', 1.5],
+  tile: ['tiles', 2],
+  railing: [null],
+  trim: ['concrete', 2],
+  frame: [null],
+  shutter: ['louver', 1],
+  awning: ['stripes', 2],
 };
 interface Theme extends Partial<Record<BoxKind, Look>> {
   wall: Look;
@@ -430,9 +553,68 @@ function tiledBox(w: number, h: number, d: number, tile: number | undefined): TH
   return geo;
 }
 
+// Box with UVs taken from world coordinates: the pieces of a wall split by doors and windows continue
+// the same bricks, and every face keeps the real texture size
+type Placed = Pick<MapBox, 'x' | 'y' | 'z' | 'w' | 'h' | 'd'>;
+function worldBox(b: Placed, tile: number): THREE.BoxGeometry {
+  const geo = new THREE.BoxGeometry(b.w, b.h, b.d);
+  const pos = geo.attributes.position!;
+  const nor = geo.attributes.normal!;
+  const uv = geo.attributes.uv!;
+  const cy = b.y + b.h / 2;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i) + b.x;
+    const y = pos.getY(i) + cy;
+    const z = pos.getZ(i) + b.z;
+    const nx = nor.getX(i);
+    const ny = nor.getY(i);
+    const nz = nor.getZ(i);
+    if (Math.abs(nx) > 0.5) uv.setXY(i, (-nx * z) / tile, y / tile);
+    else if (Math.abs(nz) > 0.5) uv.setXY(i, (nz * x) / tile, y / tile);
+    else uv.setXY(i, x / tile, (-ny * z) / tile);
+  }
+  return geo;
+}
+
+// Sky occlusion: surfaces with something above them (inside houses, under roofs and bridges) are darker
+const INDOOR_SHADE = 0.62;
+const OCCLUSION_CELL = 4;
+/** How far from a surface the occlusion is sampled (m), so a box does not cover its own faces. */
+const OCCLUSION_PROBE = 0.06;
+type Shade = (x: number, y: number, z: number) => number;
+function skyShade(boxes: readonly MapBox[]): Shade {
+  const grid = new Map<number, MapBox[]>();
+  const key = (i: number, j: number) => i * 4096 + j;
+  for (const b of boxes) {
+    if (b.c === 'floor' || b.c === 'pad' || b.p) continue;
+    const i0 = Math.floor((b.x - b.w / 2) / OCCLUSION_CELL);
+    const i1 = Math.floor((b.x + b.w / 2) / OCCLUSION_CELL);
+    const j0 = Math.floor((b.z - b.d / 2) / OCCLUSION_CELL);
+    const j1 = Math.floor((b.z + b.d / 2) / OCCLUSION_CELL);
+    for (let i = i0; i <= i1; i++) {
+      for (let j = j0; j <= j1; j++) {
+        const list = grid.get(key(i, j));
+        if (list) list.push(b);
+        else grid.set(key(i, j), [b]);
+      }
+    }
+  }
+  return (x, y, z) => {
+    const list = grid.get(key(Math.floor(x / OCCLUSION_CELL), Math.floor(z / OCCLUSION_CELL)));
+    if (!list) return 1;
+    for (const b of list) {
+      if (b.y > y && Math.abs(x - b.x) < b.w / 2 && Math.abs(z - b.z) < b.d / 2) return INDOOR_SHADE;
+    }
+    return 1;
+  };
+}
+
 // Merges every part sharing a material into a single mesh
 class Batch {
   private readonly parts = new Map<THREE.Material, THREE.BufferGeometry[]>();
+
+  /** `shade` (optional) bakes a brightness per vertex into a colour attribute. */
+  constructor(private readonly shade?: Shade) {}
 
   add(
     geo: THREE.BufferGeometry,
@@ -451,6 +633,20 @@ class Batch {
       new THREE.Vector3(sx, sy, sz),
     );
     const g = (geo.index ? geo.toNonIndexed() : geo.clone()).applyMatrix4(m);
+    if (this.shade) {
+      const pos = g.attributes.position!;
+      const nor = g.attributes.normal!;
+      const colors = new Float32Array(pos.count * 3);
+      for (let i = 0; i < pos.count; i++) {
+        const v = this.shade(
+          pos.getX(i) + nor.getX(i) * OCCLUSION_PROBE,
+          pos.getY(i) + nor.getY(i) * OCCLUSION_PROBE,
+          pos.getZ(i) + nor.getZ(i) * OCCLUSION_PROBE,
+        );
+        colors.fill(v, i * 3, i * 3 + 3);
+      }
+      g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    }
     const list = this.parts.get(mat);
     if (list) list.push(g);
     else this.parts.set(mat, [g]);
@@ -582,6 +778,28 @@ function addProp(batch: Batch, b: PropBox, colors: Partial<MapColors>, rand: Ran
     }
     default:
       return false;
+  }
+}
+
+// Railings: a solid box for collisions, drawn as a top rail, a foot rail and thin posts
+const RAIL_BAR = 0.06;
+const RAIL_POST = 0.04;
+const RAIL_POST_GAP = 0.3;
+function addRailing(batch: Batch, b: PropBox, color: string): void {
+  const metal = mat(color, null);
+  const alongX = b.w >= b.d;
+  const len = alongX ? b.w : b.d;
+  const thick = Math.min(alongX ? b.d : b.w, RAIL_BAR);
+  const bar = (y: number, h: number) =>
+    batch.add(BOX, metal, b.x, y, b.z, 0, alongX ? len : thick, h, alongX ? thick : len);
+  bar(b.y + b.h - RAIL_BAR / 2, RAIL_BAR);
+  bar(b.y + 0.12, RAIL_BAR * 0.7);
+  const posts = Math.max(1, Math.round(len / RAIL_POST_GAP));
+  for (let i = 0; i <= posts; i++) {
+    const a = -len / 2 + (len * i) / posts;
+    const big = i === 0 || i === posts;
+    const s = big ? RAIL_BAR : RAIL_POST;
+    batch.add(BOX, metal, b.x + (alongX ? a : 0), b.y + b.h / 2, b.z + (alongX ? 0 : a), 0, s, b.h, s);
   }
 }
 
@@ -763,14 +981,24 @@ function tiledBoxCached(n: number): THREE.BoxGeometry {
 }
 
 // ------------------------------------------------------------ World
+// Lights (tuned for ACES tone mapping): sky fill from above, warm bounce from the ground, and the sun
+const SKY_LIGHT = 0xdcecff;
+const GROUND_LIGHT = 0xb3a68e;
+const HEMI_INTENSITY = 1.4;
+const SUN_INTENSITY = 2.3;
+/** Step caps: a lighter slab on each step, a hair above it and sticking out a little (a nosing). */
+const STEP_CAP_H = 0.05;
+const STEP_CAP_LIFT = 0.005;
+const STEP_NOSING = 0.03;
+const STEP_CAP_TINT = 1.18;
 export function buildWorld(scene: THREE.Scene, map: GameMap): void {
   const H = map.half;
   const theme = THEMES[map.id];
   scene.background = new THREE.Color(map.sky);
   scene.fog = new THREE.Fog(map.sky, H * 1.9, H * 5);
 
-  scene.add(new THREE.HemisphereLight(0xdcecff, 0x8a7f6a, 1.15));
-  const sun = new THREE.DirectionalLight(theme.sun, 2.1);
+  scene.add(new THREE.HemisphereLight(SKY_LIGHT, GROUND_LIGHT, HEMI_INTENSITY));
+  const sun = new THREE.DirectionalLight(theme.sun, SUN_INTENSITY);
   sun.position.set(30, 50, 20);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
@@ -781,11 +1009,21 @@ export function buildWorld(scene: THREE.Scene, map: GameMap): void {
   addSky(scene, map, theme);
 
   const rand = rng(H * 97 + map.id.length);
-  const arena = new Batch();
+  const arena = new Batch(skyShade(map.boxes));
   const props = new Batch();
+  const solid = (b: MapBox, tint?: string) => {
+    const [texName, tile] = theme[b.c] || COMMON[b.c] || theme.wall;
+    const color = tint ?? (map.colors[b.c] || map.colors.wall);
+    const geo = tile ? worldBox(b, tile) : tiledBox(b.w, b.h, b.d, tile);
+    arena.add(geo, mat(color, texName, { vertexColors: true }), b.x, b.y + b.h / 2, b.z);
+  };
   let n = 0;
   for (const b of map.boxes) {
     if (b.p && addProp(props, b, map.colors, rand, b.c === 'car' ? ++n : n)) continue;
+    if (b.c === 'railing') {
+      addRailing(props, b, map.colors.railing ?? map.colors.wall);
+      continue;
+    }
     // Jump pad: dark base and glowing green top
     if (b.c === 'pad') {
       props.add(BOX, mat('#2b2f36', 'diamond'), b.x, b.y + b.h * 0.35, b.z, 0, b.w, b.h * 0.7, b.d);
@@ -796,9 +1034,17 @@ export function buildWorld(scene: THREE.Scene, map: GameMap): void {
     // Buildings: rooftop with a concrete coping
     if (b.c.startsWith('bld'))
       props.add(BOX, mat('#7d7f84', 'concrete'), b.x, b.y + b.h + 0.15, b.z, 0, b.w + 0.3, 0.3, b.d + 0.3);
-    const [texName, tile] = theme[b.c] || COMMON[b.c] || theme.wall;
-    arena.add(tiledBox(b.w, b.h, b.d, tile), mat(map.colors[b.c] || map.colors.wall, texName), b.x, b.y + b.h / 2, b.z);
+    solid(b);
+    // Steps: a lighter cap on top so every step reads on its own
+    if (b.c === 'stair' || b.c === 'step') {
+      const cap = new THREE.Color(map.colors[b.c] ?? map.colors.wall).multiplyScalar(STEP_CAP_TINT).getStyle();
+      solid(
+        { ...b, y: b.y + b.h + STEP_CAP_LIFT - STEP_CAP_H, h: STEP_CAP_H, w: b.w + STEP_NOSING, d: b.d + STEP_NOSING },
+        cap,
+      );
+    }
   }
+  for (const b of map.decor) solid(b);
   arena.build(scene, { cast: true, receive: true });
   props.build(scene, { cast: true, receive: true });
 

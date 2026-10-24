@@ -1,4 +1,4 @@
-import { PLAYER, createMoveState, isSkinId, type Character, type Spawn } from '@blockshot/shared';
+import { PLAYER, createMoveState, isOutfitColor, isSkinId, type Character, type Spawn } from '@blockshot/shared';
 import type { Room } from '../rooms/room';
 import { recordPosition } from './history';
 import { equip } from './loadout';
@@ -31,13 +31,14 @@ export function pickSpawn(room: Room, me: Player): Spawn {
 }
 
 /** Puts the player on a spawn point with full health and ammo, and tells its client. */
-export function spawnPlayer(room: Room, p: Player, ch: Character, skin: string | undefined): void {
+export function spawnPlayer(room: Room, p: Player, ch: Character, skin: string | undefined, color?: string): void {
   const now = Date.now();
   const [x, y, z, ry] = pickSpawn(room, p);
   const hp = Math.round(ch.hp * (room.mode.hpFactor?.(p) ?? 1));
   Object.assign(p, {
     characterId: ch.id,
     skin: isSkinId(skin) ? skin : 'base',
+    color: isOutfitColor(color) ? color : ch.color,
     alive: true,
     hp,
     maxHp: hp,
@@ -61,6 +62,18 @@ export function spawnPlayer(room: Room, p: Player, ch: Character, skin: string |
   equip(room, p);
   recordPosition(p, now);
   room.channel.to(p.id, 'player:spawned', [
-    { x, y, z, ry: p.ry, characterId: ch.id, skin: p.skin, hp, level: p.level, team: p.team, life: p.life },
+    {
+      x,
+      y,
+      z,
+      ry: p.ry,
+      characterId: ch.id,
+      skin: p.skin,
+      color: p.color,
+      hp,
+      level: p.level,
+      team: p.team,
+      life: p.life,
+    },
   ]);
 }

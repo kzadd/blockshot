@@ -33,6 +33,7 @@ export interface HudState {
   maxHp: number;
   // TODO(review): posible código muerto: published since the original version, no screen reads it
   characterId: CharacterId | undefined;
+  // TODO(review): posible código muerto: the v3 HUD no longer shows the character name
   charName: string | undefined;
   /** 0..1, null when stamina is disabled */
   stamina: number | null;

@@ -1,6 +1,7 @@
 import { Suspense, lazy, useState } from 'react';
 import type { RoomInfo } from '@blockshot/shared';
 import Lobby from '../lobby/Lobby';
+import GameErrorBoundary from './GameErrorBoundary';
 import { Curtain, playCurtain, useUiScale } from '../ui/ui';
 
 // The game (three.js and the engine) only loads when entering a room: the lobby opens faster
@@ -14,12 +15,15 @@ export interface Session {
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   useUiScale();
+  const leave = () => playCurtain(() => setSession(null));
   return (
     <>
       {session ? (
-        <Suspense fallback={null}>
-          <Game key={session.room.id} session={session} onLeave={() => playCurtain(() => setSession(null))} />
-        </Suspense>
+        <GameErrorBoundary key={session.room.id} onLeave={leave}>
+          <Suspense fallback={null}>
+            <Game session={session} onLeave={leave} />
+          </Suspense>
+        </GameErrorBoundary>
       ) : (
         <Lobby onJoined={(s) => playCurtain(() => setSession(s))} />
       )}

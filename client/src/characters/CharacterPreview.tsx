@@ -23,7 +23,15 @@ interface View {
 }
 
 // 3D character turning on the CSS pedestal. It can be turned by dragging.
-export default function CharacterPreview({ charId, skin }: { charId: CharacterId; skin: string }) {
+export default function CharacterPreview({
+  charId,
+  skin,
+  color,
+}: {
+  charId: CharacterId;
+  skin: string;
+  color: string;
+}) {
   const mount = useRef<HTMLDivElement>(null);
   const view = useRef<View | null>(null);
 
@@ -106,26 +114,27 @@ export default function CharacterPreview({ charId, skin }: { charId: CharacterId
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       renderer.dispose();
+      renderer.forceContextLoss(); // free the WebGL context now: Chrome keeps only ~16 alive
       renderer.domElement.remove();
     };
   }, []);
 
-  // Changing character or skin rebuilds the model
+  // Changing character, skin or colour rebuilds the model
   useEffect(() => {
     const v = view.current;
     const ch = CHAR_BY_ID[charId];
     if (!v) return;
     v.holder.clear();
-    const model = buildCharacter(ch.id, skin, ch.color);
+    const model = buildCharacter(ch.id, skin, color);
     model.group.traverse((o) => {
       if (o instanceof THREE.Mesh) o.castShadow = true;
     });
-    const gun = buildGun(ch.primary, false, ch.color);
+    const gun = buildGun(ch.primary, false, color);
     gun.scale.setScalar(GUN_SCALE);
-    model.hand.add(gun);
+    model.holdGun(gun);
     model.aim.rotation.x = AIM_TILT;
     v.holder.add(model.group);
-  }, [charId, skin]);
+  }, [charId, skin, color]);
 
   return <div className="char-stage-3d" ref={mount} />;
 }

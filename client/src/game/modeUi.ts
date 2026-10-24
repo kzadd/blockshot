@@ -49,7 +49,7 @@ export const MODE_UI: Record<ModeId, ModeUi> = {
     top: 'ladder',
   },
   kc: {
-    sub: 'Recoge las placas de tus bajas',
+    sub: 'Recoge las placas',
     hint: (n) => `${units('kc', n)} del equipo`,
     goal: (n) => `gana el primer equipo en recoger ${n} placas`,
     points: 'Placas',

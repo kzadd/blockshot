@@ -60,6 +60,8 @@ export interface PlayerSnapshot {
   c: CharacterId | null;
   /** skin */
   sk: SkinId;
+  /** outfit colour picked by the player (OUTFIT_COLORS) */
+  co: string;
   x: number;
   y: number;
   z: number;
@@ -155,6 +157,8 @@ export interface SpawnedMessage {
   ry: number;
   characterId: CharacterId;
   skin: SkinId;
+  /** outfit colour (OUTFIT_COLORS) */
+  color: string;
   hp: number;
   level: number;
   team: Team;
@@ -217,7 +221,7 @@ export interface ClientToServerEvents {
   'room:join': (data: JoinRoomRequest, cb: (res: JoinResult) => void) => void;
   'room:leave': () => void;
   'net:ping': (d: { rtt: number }, cb: () => void) => void;
-  'player:spawn': (d: { characterId: string; skin?: string }) => void;
+  'player:spawn': (d: { characterId: string; skin?: string; color?: string }) => void;
   'team:set': (d: { team: number }) => void;
   'player:input': (d: InputMessage) => void;
   'player:switch': (d: { slot: number }) => void;

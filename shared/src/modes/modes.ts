@@ -25,7 +25,7 @@ export const MODES: ModeInfo[] = [
   { id: 'infect', name: 'Infectados', limits: [2, 3, 5], def: 3, unit: 'min' },
 ];
 export const MODE_BY_ID = Object.fromEntries(MODES.map((m) => [m.id, m])) as Record<ModeId, ModeInfo>;
-export const isModeId = (v: unknown): v is ModeId => typeof v === 'string' && v in MODE_BY_ID;
+export const isModeId = (v: unknown): v is ModeId => typeof v === 'string' && Object.hasOwn(MODE_BY_ID, v);
 
 // Gun game: everybody starts with the first weapon and each kill gives the next one.
 // The winner is whoever kills with the last one (the knife). A knife kill takes a weapon from the victim.

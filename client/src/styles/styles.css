@@ -963,7 +963,7 @@ kbd.down,
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   grid-template-rows: minmax(0, 1fr);
   gap: 10px;
 }
@@ -985,9 +985,9 @@ kbd.down,
 .lb-map {
   container-type: inline-size;
 }
-/* Never taller than wide: a tall window must not turn the screenshots into strips */
+/* At most a slight portrait: six cards fill their row without turning the screenshots into strips */
 .lb-map img {
-  max-height: 100cqw;
+  max-height: 140cqw;
 }
 .lb-map .lb-cell-text {
   padding: 0 4px;

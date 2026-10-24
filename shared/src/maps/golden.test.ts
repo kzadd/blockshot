@@ -22,6 +22,10 @@ const MAP_HASHES: Record<string, string> = {
   'ciudad:s': 'b105cc877be14b0a',
   'ciudad:m': 'd00601f6b555f63f',
   'ciudad:l': 'f26e27d6dc034b52',
+  // sixth map (construction site) added on purpose
+  'obra:s': '4fbae09d2b1e274d',
+  'obra:m': '45479f810f4d6784',
+  'obra:l': '8c39ea14b4f07024',
 };
 
 const TABLE_HASHES = {
@@ -29,7 +33,7 @@ const TABLE_HASHES = {
   CHARACTERS: '2009178fe674681e',
   MODES: '87ca9b7c1b43670c',
   PLAYER: '0bf57b8a7e2429af',
-  MAPS: 'b76607c240b9cebc',
+  MAPS: '64018304e6c9b34c', // sixth map: Obra
   MAP_SIZES: '0cd287561039dcb2',
   SKINS: '376855100cbba893', // five cosmetic skins added (urbano, desierto, bosque, carbono, neon)
   GUN_LADDERS: '8f9323383a0b8d4b',

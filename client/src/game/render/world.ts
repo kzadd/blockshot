@@ -528,6 +528,16 @@ const THEMES: Record<MapId, Theme> = {
     sky: '#5d8fd0',
     scenery: city,
   },
+  obra: {
+    floor: ['gravel', 3],
+    wall: ['panels', 3],
+    platform: ['planks', 2],
+    step: ['concrete', 2],
+    ground: ['gravel', 4, '#9a8f7c'],
+    sun: 0xffe9cc,
+    sky: '#6f9ccc',
+    scenery: construction,
+  },
 };
 const CAR_COLORS = ['#c0503e', '#3d6e9e', '#e8e4dc', '#2b2f36', '#c9a13a', '#4f7a45'];
 
@@ -959,6 +969,43 @@ function city(batch: Batch, map: GameMap, rand: Rand): void {
     const h = 16 + rand() * 45;
     batch.add(tiledBoxCached(Math.round(h / 6)), mat(pick(cols, i), 'windows'), x, h / 2, z, 0, w, h, d);
     batch.add(BOX, mat('#4a5562', 'concrete'), x, h + 0.4, z, 0, w * 0.5, 0.8, d * 0.5);
+  }
+}
+
+// Around the site: more concrete skeletons, tower cranes and the city behind
+function construction(batch: Batch, map: GameMap, rand: Rand): void {
+  const H = map.half;
+  city(batch, map, rand);
+  const concrete = mat('#b3afa6', 'concrete');
+  for (let i = 0; i < 5; i++) {
+    const [x, z] = outside(rand, H, 14, 40);
+    const floors = 3 + Math.floor(rand() * 4);
+    const w = 12 + rand() * 8;
+    for (let f = 1; f <= floors; f++) batch.add(BOX, concrete, x, f * 3.2, z, 0, w, 0.35, w);
+    for (const cx of [-1, 1]) {
+      for (const cz of [-1, 1]) {
+        batch.add(
+          BOX,
+          concrete,
+          x + (cx * (w - 1)) / 2,
+          (floors * 3.2) / 2,
+          z + (cz * (w - 1)) / 2,
+          0,
+          0.8,
+          floors * 3.2,
+          0.8,
+        );
+      }
+    }
+  }
+  const yellow = mat('#e9b824', 'hazard');
+  for (let i = 0; i < 3; i++) {
+    const [x, z] = outside(rand, H, 20, 55);
+    const h = 30 + rand() * 12;
+    const ry = rand() * Math.PI;
+    batch.add(BOX, yellow, x, h / 2, z, 0, 1.6, h, 1.6);
+    batch.add(BOX, yellow, x + Math.cos(ry) * 10, h + 0.6, z - Math.sin(ry) * 10, ry, 30, 1, 1);
+    batch.add(BOX, mat('#8a8f99', 'concrete'), x - Math.cos(ry) * 6, h - 0.4, z + Math.sin(ry) * 6, ry, 3, 2, 2);
   }
 }
 

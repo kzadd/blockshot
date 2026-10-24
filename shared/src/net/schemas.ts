@@ -1,6 +1,7 @@
 // Valibot schemas for every client → server message. The server drops (and logs) anything that does not match.
 // Schemas check shape and types only; game rules (cooldowns, ranges, ammo…) are enforced by the server logic.
 import * as v from 'valibot';
+import { OUTFIT_COLOR_HEXES } from '../characters/characters';
 
 const finite = v.pipe(v.number(), v.finite());
 const vec3 = v.tuple([finite, finite, finite]);
@@ -32,6 +33,8 @@ export const PingSchema = v.object({ rtt: v.optional(finite) });
 export const SpawnSchema = v.object({
   characterId: text,
   skin: v.optional(text),
+  /** outfit colour: one of OUTFIT_COLORS */
+  color: v.optional(v.picklist(OUTFIT_COLOR_HEXES)),
 });
 
 export const TeamSetSchema = v.object({ team: finite });

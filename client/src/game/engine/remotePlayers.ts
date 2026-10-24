@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import {
   CHAR_BY_ID,
   VIEW_DELAY_MS,
+  isOutfitColor,
   isTeamMode,
   loadoutOf,
   type CharacterId,
@@ -69,6 +70,8 @@ export interface Remote {
   bubble: THREE.Mesh | null;
   charId: CharacterId | null;
   skin: SkinId | null;
+  /** outfit colour picked by the player */
+  co: string;
   team: Team | -1;
   color: string;
   weaponId: WeaponId | null;
@@ -85,12 +88,12 @@ export interface Remote {
   lastShot: number;
 }
 
-/** In team modes everybody wears its team colour; in free for all, the character colour and skin. */
-export function outfitFor(mode: ModeId, charId: CharacterId, skin: string, team: Team): Outfit {
+/** In team modes everybody wears its team colour; in free for all, the colour the player picked and its skin. */
+export function outfitFor(mode: ModeId, charId: CharacterId, skin: string, team: Team, color?: string): Outfit {
   const ch = CHAR_BY_ID[charId];
   if (mode === 'infect' && team === 2) return { color: INFECTED_COLOR, skin: 'base' };
   if (isTeamMode(mode) && team) return { color: teamColor(team, ch.color), skin: 'base' };
-  return { color: ch.color, skin };
+  return { color: isOutfitColor(color) ? color : ch.color, skin };
 }
 
 export class RemotePlayers {
@@ -125,6 +128,7 @@ export class RemotePlayers {
           bubble: null,
           charId: null,
           skin: null,
+          co: '',
           team: -1,
           color: '#ffffff',
           weaponId: null,
@@ -141,7 +145,7 @@ export class RemotePlayers {
         };
         this.all.set(p.id, r);
       }
-      if (p.c && (r.charId !== p.c || r.skin !== p.sk || r.team !== p.tm)) this.build(r, p);
+      if (p.c && (r.charId !== p.c || r.skin !== p.sk || r.co !== p.co || r.team !== p.tm)) this.build(r, p);
       r.name = p.n;
       r.rx = p.rx;
       r.sl = p.sl;
@@ -170,7 +174,7 @@ export class RemotePlayers {
   private build(r: Remote, p: PlayerSnapshot): void {
     if (!p.c) return;
     if (r.model) this.scene.remove(r.model.group);
-    const { color, skin } = outfitFor(this.mode, p.c, p.sk, p.tm);
+    const { color, skin } = outfitFor(this.mode, p.c, p.sk, p.tm, p.co);
     r.model = buildCharacter(p.c, skin, color);
     r.color = color;
     // Team modes: name in the team colour (teammates are seen through walls); otherwise the enemy colour
@@ -189,6 +193,7 @@ export class RemotePlayers {
     this.scene.add(r.model.group);
     r.charId = p.c;
     r.skin = p.sk;
+    r.co = p.co;
     r.team = p.tm;
     r.weaponId = null;
     r.buffer.length = 0;

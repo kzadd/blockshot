@@ -2,10 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import {
   CHARACTERS,
   CHAR_BY_ID,
+  OUTFIT_COLORS,
   SKINS,
   TEAMS,
   WEAPONS,
   canSwitchTeam,
+  isOutfitColor,
+  isTeamMode,
   speedWith,
   weightName,
   type CharacterId,
@@ -24,8 +27,12 @@ import CharacterPreview from './CharacterPreview';
 const MAX_HP_BAR = 150;
 const SPEED_BAR_MIN = 5;
 const SPEED_BAR_RANGE = 5.5;
+/** Outfit colour swatch size (px). */
+const SWATCH_PX = 22;
 
 export type SkinChoice = Partial<Record<CharacterId, SkinId>>;
+/** Outfit colour (hex from OUTFIT_COLORS) picked for each character. */
+export type ColorChoice = Partial<Record<CharacterId, string>>;
 
 // Swatch of each skin: 135° diagonal with two colours
 const SKIN_SWATCH: Record<SkinId, (c: string) => [string, string]> = {
@@ -34,6 +41,11 @@ const SKIN_SWATCH: Record<SkinId, (c: string) => [string, string]> = {
   noche: (c) => ['#16181f', c],
   artico: () => ['#eef2f6', '#9aa8b6'],
   oro: () => ['#ffd34d', '#a8780f'],
+  urbano: () => ['#7a7e84', '#3c3f44'],
+  desierto: () => ['#d2bc94', '#8f7450'],
+  bosque: () => ['#4b5a32', '#2a2f1e'],
+  carbono: (c) => ['#26282c', c],
+  neon: (c) => ['#16131f', c],
 };
 
 function WeaponCard({ id, slot }: { id: WeaponId; slot: string }) {
@@ -100,9 +112,10 @@ interface CharacterSelectProps {
   info: RoomView;
   current: CharacterId | null;
   skins: SkinChoice;
+  colors: ColorChoice;
   respawnIn?: number;
   fromDeath: boolean;
-  onPick: (id: CharacterId, skin: SkinId) => void;
+  onPick: (id: CharacterId, skin: SkinId, color: string) => void;
   onKeep: (() => void) | null;
   onLeave: () => void;
   mode: ModeId;
@@ -115,6 +128,7 @@ export default function CharacterSelect({
   info,
   current,
   skins,
+  colors,
   respawnIn = 0,
   fromDeath,
   onPick,
@@ -128,9 +142,15 @@ export default function CharacterSelect({
   const [sel, setSel] = useState<CharacterId>(current ?? CHARACTERS[0]!.id);
   const [skinBy, setSkinBy] = useState(skins);
   const c = CHAR_BY_ID[sel];
+  const [colorBy, setColorBy] = useState(colors);
   const skin: SkinId = skinBy[sel] ?? 'base';
-  const live = useRef({ sel, skin });
-  live.current = { sel, skin };
+  const colorOf = (id: CharacterId) => {
+    const picked = colorBy[id];
+    return isOutfitColor(picked) ? picked : CHAR_BY_ID[id].color;
+  };
+  const color = colorOf(sel);
+  const live = useRef({ sel, skin, color });
+  live.current = { sel, skin, color };
 
   // Atajos: 1–5 elige personaje, Enter juega
   useEffect(() => {
@@ -138,7 +158,7 @@ export default function CharacterSelect({
       const n = Number(e.key);
       const pick = CHARACTERS[n - 1];
       if (n >= 1 && pick) setSel(pick.id);
-      if (e.key === 'Enter') onPick(live.current.sel, live.current.skin);
+      if (e.key === 'Enter') onPick(live.current.sel, live.current.skin, live.current.color);
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
@@ -168,7 +188,7 @@ export default function CharacterSelect({
                 className={`char-card ${ch.id === sel ? 'on' : ''}`}
                 style={{ '--c': ch.color }}
                 onClick={() => setSel(ch.id)}
-                onDoubleClick={() => onPick(ch.id, skinBy[ch.id] || 'base')}
+                onDoubleClick={() => onPick(ch.id, skinBy[ch.id] || 'base', colorOf(ch.id))}
               >
                 <span className="sq" />
                 <span>
@@ -186,22 +206,55 @@ export default function CharacterSelect({
           <div className="char-stage">
             <div className="who">
               <b>{c.name}</b>
-              <small>Skin {SKINS.find((k) => k.id === skin)?.name}</small>
+              <small>
+                Skin {SKINS.find((k) => k.id === skin)?.name}
+                {!isTeamMode(mode) && ` · ${OUTFIT_COLORS.find((o) => o.hex === color)?.name ?? ''}`}
+              </small>
+              {/* Outfit colour: only seen in free for all (team modes wear the team colour).
+                  Inline sizes until styles.css gets .outfit-colors rules. */}
+              {!isTeamMode(mode) && (
+                <div
+                  className="outfit-colors"
+                  style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}
+                >
+                  {OUTFIT_COLORS.map((o) => (
+                    <button
+                      key={o.hex}
+                      className={color === o.hex ? 'on' : ''}
+                      title={o.name}
+                      aria-label={`Color ${o.name}`}
+                      onClick={() => setColorBy({ ...colorBy, [sel]: o.hex })}
+                      style={{
+                        width: SWATCH_PX,
+                        height: SWATCH_PX,
+                        padding: 0,
+                        borderRadius: 6,
+                        cursor: 'pointer',
+                        background: o.hex,
+                        border: color === o.hex ? '3px solid var(--sol)' : '2px solid rgba(247, 249, 252, 0.3)',
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
             <span className="drag">↔ Arrastra para girar</span>
             <span className="peana" />
-            <CharacterPreview charId={sel} skin={skin} />
-            <div className="skins">
+            <CharacterPreview charId={sel} skin={skin} color={color} />
+            {/* One row of swatches (the name of the chosen skin is shown above) */}
+            <div className="skins" style={{ gridTemplateColumns: `repeat(${SKINS.length}, minmax(0, 1fr))`, gap: 4 }}>
               {SKINS.map((k) => {
-                const [a, b] = SKIN_SWATCH[k.id](c.color);
+                const [a, b] = SKIN_SWATCH[k.id](color);
                 return (
                   <button
                     key={k.id}
                     className={skin === k.id ? 'on' : ''}
+                    title={k.name}
+                    aria-label={`Skin ${k.name}`}
+                    style={{ padding: 0 }}
                     onClick={() => setSkinBy({ ...skinBy, [sel]: k.id })}
                   >
                     <i style={{ background: `linear-gradient(135deg, ${a} 50%, ${b} 50%)` }} />
-                    {k.name}
                   </button>
                 );
               })}
@@ -233,7 +286,7 @@ export default function CharacterSelect({
             </div>
             <WeaponCard id={c.primary} slot="Principal · 1" />
             <WeaponCard id={c.secondary} slot="Secundaria · 2" />
-            <button className="btn primary lg play" onClick={() => onPick(sel, skin)}>
+            <button className="btn primary lg play" onClick={() => onPick(sel, skin, color)}>
               Jugar como {c.name}
             </button>
           </div>

@@ -173,25 +173,25 @@ function skinPalette(color: string, skin: string): SkinColors {
         ...common,
         main: '#ffffff',
         pants: '#1a1b1e',
-        camo: { colors: ['#202226', '#2c2f34', '#16171a'], pattern: 'weave' },
-        vest: '#151619',
+        camo: { colors: ['#25272c', '#3c4048', '#17181b'], pattern: 'weave' },
+        vest: '#2c3036',
         gear: '#0f1012',
         boot: '#121315',
         glove: '#18191c',
-        metal: '#8d949d',
-        glow: 0.35,
+        metal: '#a3abb5',
       };
     case 'neon':
       return {
         ...common,
-        main: '#16131f',
-        pants: '#0e0c14',
-        vest: '#1e1a2a',
+        // Black suit tinted with the outfit colour and glowing accents
+        main: mix('#16131f', color, 0.08),
+        pants: mix('#0e0c14', color, 0.04),
+        vest: mix('#1e1a2a', color, 0.12),
         gear: '#100e17',
         boot: '#0c0b10',
         glove: '#14121b',
         visor: color,
-        glow: 1.3,
+        glow: 1.6,
       };
     default:
       return {
@@ -589,7 +589,7 @@ function drawShin(k: Kit, look: CharacterLook, side: number): void {
   k.box(w, 0.3, w + 0.01, 0, -0.16, 0, 'pants'); // shin
   if (look.build !== 'light') {
     k.box(0.15, 0.12, 0.05, 0, -0.03, -0.11, 'vest'); // knee pad
-    k.box(w + 0.01, 0.025, w + 0.02, 0, -0.03, 0, 'gear'); // strap
+    k.box(w + 0.01, 0.025, w + 0.02, 0, -0.03, 0, 'accent'); // strap
   }
   k.box(w + 0.02, 0.1, w + 0.04, 0, -0.29, 0, 'boot'); // boot shaft
   k.box(w + 0.02, 0.1, 0.3, 0, -0.345, -0.05, 'boot'); // foot

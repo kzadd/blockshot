@@ -11,7 +11,7 @@ import {
   type SkinId,
 } from '@blockshot/shared';
 import type { Session } from '../app/App';
-import type { SkinChoice } from '../characters/CharacterSelect';
+import type { ColorChoice, SkinChoice } from '../characters/CharacterSelect';
 import Manual from '../manual/Manual';
 import { markGameLost } from '../network/connection';
 import { socket } from '../network/socket';
@@ -32,6 +32,7 @@ let feedId = 0;
 
 const CHAR_KEY = 'blockshot:char';
 const SKINS_KEY = 'blockshot:skins';
+const COLORS_KEY = 'blockshot:colors';
 /** Killfeed keeps the last few lines, each for FEED_LIFE_MS (fading out from FEED_FADE_AT_MS). */
 const FEED_MAX = 5;
 const FEED_LIFE_MS = 6000;
@@ -48,13 +49,15 @@ const loadChar = (): CharacterId | null => {
     return null;
   }
 };
-const loadSkins = (): SkinChoice => {
+const loadChoice = <T,>(key: string): T => {
   try {
-    return (JSON.parse(localStorage.getItem(SKINS_KEY) ?? 'null') as SkinChoice | null) ?? {};
+    return (JSON.parse(localStorage.getItem(key) ?? 'null') as T | null) ?? ({} as T);
   } catch {
-    return {};
+    return {} as T;
   }
 };
+const loadSkins = () => loadChoice<SkinChoice>(SKINS_KEY);
+const loadColors = () => loadChoice<ColorChoice>(COLORS_KEY);
 
 type Menu = 'settings' | 'manual' | null;
 type NewFeedItem = FeedItem extends infer F ? (F extends FeedItem ? Omit<F, 'key' | 't'> : never) : never;
@@ -68,6 +71,7 @@ export default function Game({ session, onLeave }: { session: Session; onLeave: 
   const [match, setMatch] = useState<MatchState | null>(null);
   const [charId, setCharId] = useState(loadChar);
   const [skins, setSkins] = useState(loadSkins); // chosen skin for each character
+  const [colors, setColors] = useState(loadColors); // chosen outfit colour for each character
   const [selecting, setSelecting] = useState(true); // the character is chosen when entering
   const [menu, setMenu] = useState<Menu>(null);
   const [banner, setBanner] = useState<KillBanner | null>(null); // centre notice when you kill someone
@@ -125,8 +129,9 @@ export default function Game({ session, onLeave }: { session: Session; onLeave: 
   // While choosing a character there is no automatic respawn
   useEffect(() => {
     if (engine.current)
-      engine.current.autoChar = selecting || !charId ? null : { id: charId, skin: skins[charId] ?? 'base' };
-  }, [selecting, charId, skins]);
+      engine.current.autoChar =
+        selecting || !charId ? null : { id: charId, skin: skins[charId] ?? 'base', color: colors[charId] };
+  }, [selecting, charId, skins, colors]);
 
   // Block curtain when spawning / respawning
   const wasAlive = useRef(false);
@@ -248,17 +253,20 @@ export default function Game({ session, onLeave }: { session: Session; onLeave: 
     };
   }, [onLeave, you, room.mode]);
 
-  const pick = (characterId: CharacterId, skin: SkinId) => {
+  const pick = (characterId: CharacterId, skin: SkinId, color: string) => {
     const next = { ...skins, [characterId]: skin };
+    const nextColors = { ...colors, [characterId]: color };
     try {
       localStorage.setItem(CHAR_KEY, characterId);
       localStorage.setItem(SKINS_KEY, JSON.stringify(next));
+      localStorage.setItem(COLORS_KEY, JSON.stringify(nextColors));
     } catch {}
     setCharId(characterId);
     setSkins(next);
+    setColors(nextColors);
     setSelecting(false);
     engine.current?.requestLock(); // must happen inside the click
-    engine.current?.spawn(characterId, skin); // spawns now, or when the countdown ends
+    engine.current?.spawn(characterId, skin, color); // spawns now, or when the countdown ends
   };
   const keep = () => {
     setSelecting(false);
@@ -309,6 +317,7 @@ export default function Game({ session, onLeave }: { session: Session; onLeave: 
           info={info}
           current={charId}
           skins={skins}
+          colors={colors}
           mode={room.mode}
           onPick={pick}
           onKeep={keep}

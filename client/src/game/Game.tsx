@@ -333,6 +333,7 @@ export default function Game({ session, onLeave }: { session: Session; onLeave: 
           onManual={() => setMenu('manual')}
           onSwitchTeam={switchTeam}
           onLeave={leave}
+          admin={!!session.admin}
         />
       )}
 

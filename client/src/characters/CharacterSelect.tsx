@@ -25,7 +25,7 @@ import { Icon } from '../ui/icons';
 import CharacterPreview from './CharacterPreview';
 
 /** Bar scales of the character sheet. */
-const MAX_HP_BAR = 150;
+const MAX_HP_BAR = 140;
 const SPEED_BAR_MIN = 5;
 const SPEED_BAR_RANGE = 5.5;
 

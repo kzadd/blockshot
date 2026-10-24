@@ -32,7 +32,8 @@ export interface RoomInfo {
   max: number;
 }
 
-export type JoinResult = { ok: true; you: string; room: RoomInfo } | { ok: false; error: string };
+/** `admin`: the player opened the game on the server's own PC (practice bots and other test tools). */
+export type JoinResult = { ok: true; you: string; room: RoomInfo; admin?: boolean } | { ok: false; error: string };
 
 export interface CreateRoomRequest {
   nickname: string;
@@ -227,4 +228,7 @@ export interface ClientToServerEvents {
   'player:switch': (d: { slot: number }) => void;
   'player:reload': () => void;
   'player:shoot': (d: ShootMessage) => void;
+  /** server PC only: practice bots */
+  'bot:add': () => void;
+  'bot:clear': () => void;
 }

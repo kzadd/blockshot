@@ -139,6 +139,16 @@ export class InputController {
 
   requestLock(): void {
     sfx.unlock();
+    // Pointer lock first: requestFullscreen consumes the click's user activation, and Chrome then refuses the
+    // lock ("A user gesture is required"), which left players on the pause screen when entering the game
+    try {
+      const p = (this.el.requestPointerLock as (opts?: { unadjustedMovement?: boolean }) => Promise<void> | void)({
+        unadjustedMovement: true,
+      });
+      if (p && 'catch' in p) p.catch(() => this.el.requestPointerLock());
+    } catch {
+      this.el.requestPointerLock();
+    }
     // Always fullscreen: that is what lets the browser block Ctrl+W and the other shortcuts
     if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
       document.documentElement
@@ -147,14 +157,6 @@ export class InputController {
           (navigator as Navigator & { keyboard?: { lock(keys: string[]): Promise<void> } }).keyboard?.lock(LOCK_KEYS),
         )
         .catch(() => {});
-    }
-    try {
-      const p = (this.el.requestPointerLock as (opts?: { unadjustedMovement?: boolean }) => Promise<void> | void)({
-        unadjustedMovement: true,
-      });
-      if (p && 'catch' in p) p.catch(() => this.el.requestPointerLock());
-    } catch {
-      this.el.requestPointerLock();
     }
   }
 

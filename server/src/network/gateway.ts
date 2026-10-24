@@ -27,6 +27,7 @@ import {
 } from '@blockshot/shared';
 import { handleReload, handleShoot, handleSwitch } from '../combat/shooting';
 import type { Logger } from '../logger';
+import { addBot, removeBots } from '../players/bot';
 import { queueInputs } from '../players/movement';
 import type { Player } from '../players/player';
 import { spawnPlayer } from '../players/spawn';
@@ -47,12 +48,26 @@ export type GameServer = Server<ClientToServerEvents, ServerToClientEvents, Reco
 type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;
 
 type Schema = v.GenericSchema;
+
+const LOOPBACK = /^(::1|127\.\d+\.\d+\.\d+|::ffff:127\.\d+\.\d+\.\d+)$/;
+
+/**
+ * True when the socket comes from the server's own PC. Behind a local proxy (Vite in development) the real
+ * client is the last X-Forwarded-For entry; that header is only trusted when the proxy itself is local.
+ */
+export function isLocalSocket(address: string, forwardedFor: string | string[] | undefined): boolean {
+  if (!LOOPBACK.test(address)) return false;
+  const fwd = Array.isArray(forwardedFor) ? forwardedFor.join(',') : forwardedFor;
+  const client = fwd?.split(',').pop()?.trim();
+  return !client || LOOPBACK.test(client);
+}
 type Callback = (...args: never[]) => void;
 
 export function attachGateway(io: GameServer, rooms: RoomRegistry, log: Logger): void {
   io.on('connection', (socket: GameSocket) => {
     socket.join(LOBBY_CHANNEL);
     socket.data.roomId = null;
+    const admin = isLocalSocket(socket.handshake.address, socket.handshake.headers['x-forwarded-for']);
     socket.emit('rooms', rooms.list());
     log.debug({ socket: socket.id }, 'connected');
 
@@ -108,7 +123,7 @@ export function attachGateway(io: GameServer, rooms: RoomRegistry, log: Logger):
       socket.leave(LOBBY_CHANNEL);
       socket.join(room.id);
       socket.data.roomId = room.id;
-      (cb as (res: unknown) => void)(rooms.addPlayer(room, socket.id, nickname));
+      (cb as (res: unknown) => void)({ ...rooms.addPlayer(room, socket.id, nickname), admin });
     };
 
     // ------------------------------------------------------------ Lobby
@@ -195,6 +210,19 @@ export function attachGateway(io: GameServer, rooms: RoomRegistry, log: Logger):
     on('player:shoot', 'combat', ShootSchema, (d) => {
       const c = ctx();
       if (c?.p.alive && !c.room.matchOver) handleShoot(c.room, c.p, d);
+    });
+
+    // ------------------------------------------------------------ Server PC only
+    on('bot:add', 'lobby', EmptySchema, () => {
+      const c = ctx();
+      if (!admin || !c) return;
+      const error = addBot(rooms, c.room);
+      if (error) socket.emit('notice', error);
+    });
+
+    on('bot:clear', 'lobby', EmptySchema, () => {
+      const c = ctx();
+      if (admin && c && !removeBots(rooms, c.room)) socket.emit('notice', 'No hay bots en la sala.');
     });
 
     socket.on('disconnect', (reason) => {

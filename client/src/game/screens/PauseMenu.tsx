@@ -1,5 +1,6 @@
 import { canSwitchTeam, teamName, type ModeId, type SideTeam } from '@blockshot/shared';
 import { Icon } from '../../ui/icons';
+import { socket } from '../../network/socket';
 import { Keys } from '../../ui/ui';
 import { useHud } from '../hud/hudStore';
 
@@ -23,9 +24,11 @@ interface Props {
   onManual: () => void;
   onSwitchTeam: (team: SideTeam) => void;
   onLeave: () => void;
+  /** server PC only: practice bot tools */
+  admin: boolean;
 }
 
-export default function PauseMenu({ mode, onResume, onSettings, onManual, onSwitchTeam, onLeave }: Props) {
+export default function PauseMenu({ mode, onResume, onSettings, onManual, onSwitchTeam, onLeave, admin }: Props) {
   const myTeam = useHud((s) => s.myTeam) ?? 0;
   const other: SideTeam = myTeam === 1 ? 2 : 1;
   return (
@@ -61,6 +64,22 @@ export default function PauseMenu({ mode, onResume, onSettings, onManual, onSwit
               Salir de la sala
             </button>
           </div>
+          {admin && (
+            <div className="admin-row" onClick={(e) => e.stopPropagation()}>
+              <span className="kicker">
+                <Icon name="lock" />
+                Solo en el PC del servidor
+              </span>
+              <button className="btn sm" onClick={() => socket.emit('bot:add')}>
+                <Icon name="plus" />
+                Añadir bot que dispara
+              </button>
+              <button className="btn sm ghost" onClick={() => socket.emit('bot:clear')}>
+                <Icon name="x" />
+                Quitar bots
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

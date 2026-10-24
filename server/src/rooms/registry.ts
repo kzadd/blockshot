@@ -19,6 +19,7 @@ import {
   type RoomSummary,
 } from '@blockshot/shared';
 import { createMode } from '../modes';
+import { BOT_PREFIX } from '../players/bot';
 import { createPlayer } from '../players/player';
 import { notice, type Room, type RoomChannel } from './room';
 
@@ -142,7 +143,8 @@ export class RoomRegistry {
     if (!p) return;
     room.players.delete(socketId);
     notice(room, `${p.name} salió de la sala`);
-    if (room.players.size === 0) {
+    // Bots alone do not keep a room open
+    if ([...room.players.keys()].every((id) => id.startsWith(BOT_PREFIX))) {
       if (room.restartTimer) clearTimeout(room.restartTimer);
       this.rooms.delete(room.id);
     }

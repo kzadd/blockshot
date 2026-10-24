@@ -10,6 +10,8 @@ const Game = lazy(() => import('../game/Game'));
 export interface Session {
   you: string;
   room: RoomInfo;
+  /** opened on the server's own PC: shows the practice bot tools */
+  admin?: boolean;
 }
 
 export default function App() {

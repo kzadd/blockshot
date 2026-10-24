@@ -23,6 +23,7 @@ export default defineConfig({
     host: true,
     port: 5173,
     fs: { allow: ['..'] },
-    proxy: { '/socket.io': { target: 'http://localhost:3000', ws: true } },
+    // xfwd: the server sees the real client address (only the server's own PC gets the practice bots)
+    proxy: { '/socket.io': { target: 'http://localhost:3000', ws: true, xfwd: true } },
   },
 });

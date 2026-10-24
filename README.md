@@ -20,14 +20,6 @@ pnpm install
 pnpm clase      # compila cliente y servidor y arranca en el puerto 3000
 ```
 
-La consola muestra algo así:
-
-```
-  Tú:         http://localhost:3000
-  La clase:   http://blockshot.local:3000
-              (si no carga: http://192.168.1.35:3000)
-```
-
 Comparte `http://blockshot.local:3000` con la clase: el servidor anuncia ese nombre en la red local (mDNS),
 así no hace falta dictar la IP. Si en algún equipo no carga (redes que bloquean multicast), usa la IP de debajo.
 Si hay dos servidores en la misma red, cambia el nombre: `NOMBRE=aula2 pnpm clase` (Windows PowerShell:
@@ -118,7 +110,7 @@ No hay en Infectados.
 
 **Armas:** las pesadas (francotirador, ametralladora) frenan al llevarlas en la mano; saca la secundaria para correr.
 Apuntar tarda un momento (más con las pesadas) y la precisión llega al terminar de subir el arma. Casi todas pierden
-daño con la distancia. El francotirador hace 120 al cuerpo y 240 a la cabeza: de un tiro al cuerpo mata a todos menos al Tanque (150 de vida), al que hay que darle en la cabeza; tras
+daño con la distancia. El francotirador hace 120 al cuerpo y 240 a la cabeza: de un tiro al cuerpo mata a todos menos al Tanque (140 de vida), al que hay que darle en la cabeza; tras
 cada disparo hay que volver a apuntar (cerrojo), y si te mueves o saltas con la mira puesta el tiro se desvía.
 
 En pantalla: **minimapa** (aliados en verde; los enemigos solo aparecen en rojo 2 s después de disparar),
@@ -129,13 +121,13 @@ del daño y el **ping** arriba. En el marcador (Tab) se ven bajas, muertes, rach
 
 Más vida = más lento. La velocidad (m/s) es con la principal / con la secundaria en la mano.
 
-| Personaje | Vida | Velocidad   | Principal       | Secundaria |
-| --------- | ---- | ----------- | --------------- | ---------- |
-| Rayo      | 85   | 10.4 / 10.7 | Subfusil        | Pistola    |
-| Cazador   | 90   | 7.2 / 7.8   | Francotirador   | Pistola    |
-| Soldado   | 100  | 7.1 / 7.5   | Rifle de asalto | Pistola    |
-| Bastión   | 120  | 6.6 / 7.3   | Ametralladora   | Revólver   |
-| Tanque    | 150  | 6.5 / 6.8   | Escopeta        | Revólver   |
+| Personaje | Vida | Velocidad | Principal       | Secundaria |
+| --------- | ---- | --------- | --------------- | ---------- |
+| Rayo      | 90   | 8.6 / 8.9 | Subfusil        | Pistola    |
+| Cazador   | 90   | 7.2 / 7.8 | Francotirador   | Pistola    |
+| Soldado   | 100  | 7.1 / 7.5 | Rifle de asalto | Pistola    |
+| Bastión   | 120  | 6.6 / 7.3 | Ametralladora   | Revólver   |
+| Tanque    | 140  | 6.5 / 6.8 | Escopeta        | Revólver   |
 
 ## Estructura
 

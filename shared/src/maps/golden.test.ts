@@ -29,8 +29,10 @@ const MAP_HASHES: Record<string, string> = {
 };
 
 const TABLE_HASHES = {
-  WEAPONS: '21f5599b47a110a7',
-  CHARACTERS: '2009178fe674681e',
+  // Balance pass (2026-10-24, checked with server/src/combat/duel.sim.test.ts): Rayo 8.6 m/s and 90 hp, Tanque 140 hp,
+  // slower sniper aim, rifle 105 ms, more falloff on rifle and LMG, longer SMG range
+  WEAPONS: 'd1ba1521e4a96c96',
+  CHARACTERS: 'ee946d556cf3f25f',
   MODES: '87ca9b7c1b43670c',
   PLAYER: '0bf57b8a7e2429af',
   MAPS: '64018304e6c9b34c', // sixth map: Obra

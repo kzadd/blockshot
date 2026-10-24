@@ -141,7 +141,7 @@ export function attachGateway(io: GameServer, rooms: RoomRegistry, log: Logger):
       const { room, p } = c;
       if (p.alive) return;
       if (p.deathTime && Date.now() - p.deathTime < PLAYER.respawnDelay - SPAWN_REQUEST_GRACE_MS) return;
-      spawnPlayer(room, p, CHAR_BY_ID[data.characterId], data.skin);
+      spawnPlayer(room, p, CHAR_BY_ID[data.characterId], data.skin, data.color);
     });
 
     // Team modes: pick or change team. Alive players respawn on their new team's side
@@ -162,7 +162,7 @@ export function attachGateway(io: GameServer, rooms: RoomRegistry, log: Logger):
       p.teamAt = now;
       p.streak = 0;
       notice(room, `${p.name} se cambió al equipo ${teamName(room.modeId, team)}`);
-      if (p.alive && p.characterId) spawnPlayer(room, p, CHAR_BY_ID[p.characterId], p.skin);
+      if (p.alive && p.characterId) spawnPlayer(room, p, CHAR_BY_ID[p.characterId], p.skin, p.color);
     });
 
     // Movement commands: simulated by the server at a fixed rate (players/movement.ts)

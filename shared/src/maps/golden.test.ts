@@ -31,7 +31,7 @@ const TABLE_HASHES = {
   PLAYER: '0bf57b8a7e2429af',
   MAPS: 'b76607c240b9cebc',
   MAP_SIZES: '0cd287561039dcb2',
-  SKINS: 'da7c934da2871503',
+  SKINS: '376855100cbba893', // five cosmetic skins added (urbano, desierto, bosque, carbono, neon)
   GUN_LADDERS: '8f9323383a0b8d4b',
   STREAKS: 'c5eac1deecda3aac',
   STREAK_REWARDS: 'a57d0b99f6cfdc4d',

@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import {
   CHAR_BY_ID,
   VIEW_DELAY_MS,
+  isOutfitColor,
   isTeamMode,
   loadoutOf,
   type CharacterId,
@@ -37,6 +38,11 @@ const WALK_CYCLE = 2.2;
 const WALK_FULL_SPEED = 7;
 const LEG_SWING = 0.7;
 const LEG_SWING_CROUCHED = 0.35;
+/** Knee bend per radian of the leg swinging back while walking. */
+const KNEE_BEND = 1.3;
+/** Crouched: front shin vertical, back knee on the floor. */
+const KNEE_CROUCH_FRONT = -1.1;
+const KNEE_CROUCH_BACK = -1.25;
 /** A running enemy (not crouched, not in the air) this close leaves a footstep mark. */
 const FOOTSTEP_SPEED = 3;
 const FOOTSTEP_EVERY_M = 4.5;
@@ -64,6 +70,8 @@ export interface Remote {
   bubble: THREE.Mesh | null;
   charId: CharacterId | null;
   skin: SkinId | null;
+  /** outfit colour picked by the player */
+  co: string;
   team: Team | -1;
   color: string;
   weaponId: WeaponId | null;
@@ -80,12 +88,12 @@ export interface Remote {
   lastShot: number;
 }
 
-/** In team modes everybody wears its team colour; in free for all, the character colour and skin. */
-export function outfitFor(mode: ModeId, charId: CharacterId, skin: string, team: Team): Outfit {
+/** In team modes everybody wears its team colour; in free for all, the colour the player picked and its skin. */
+export function outfitFor(mode: ModeId, charId: CharacterId, skin: string, team: Team, color?: string): Outfit {
   const ch = CHAR_BY_ID[charId];
   if (mode === 'infect' && team === 2) return { color: INFECTED_COLOR, skin: 'base' };
   if (isTeamMode(mode) && team) return { color: teamColor(team, ch.color), skin: 'base' };
-  return { color: ch.color, skin };
+  return { color: isOutfitColor(color) ? color : ch.color, skin };
 }
 
 export class RemotePlayers {
@@ -120,6 +128,7 @@ export class RemotePlayers {
           bubble: null,
           charId: null,
           skin: null,
+          co: '',
           team: -1,
           color: '#ffffff',
           weaponId: null,
@@ -136,7 +145,7 @@ export class RemotePlayers {
         };
         this.all.set(p.id, r);
       }
-      if (p.c && (r.charId !== p.c || r.skin !== p.sk || r.team !== p.tm)) this.build(r, p);
+      if (p.c && (r.charId !== p.c || r.skin !== p.sk || r.co !== p.co || r.team !== p.tm)) this.build(r, p);
       r.name = p.n;
       r.rx = p.rx;
       r.sl = p.sl;
@@ -165,7 +174,7 @@ export class RemotePlayers {
   private build(r: Remote, p: PlayerSnapshot): void {
     if (!p.c) return;
     if (r.model) this.scene.remove(r.model.group);
-    const { color, skin } = outfitFor(this.mode, p.c, p.sk, p.tm);
+    const { color, skin } = outfitFor(this.mode, p.c, p.sk, p.tm, p.co);
     r.model = buildCharacter(p.c, skin, color);
     r.color = color;
     // Team modes: name in the team colour (teammates are seen through walls); otherwise the enemy colour
@@ -184,6 +193,7 @@ export class RemotePlayers {
     this.scene.add(r.model.group);
     r.charId = p.c;
     r.skin = p.sk;
+    r.co = p.co;
     r.team = p.tm;
     r.weaponId = null;
     r.buffer.length = 0;
@@ -191,10 +201,9 @@ export class RemotePlayers {
 
   private setGun(r: Remote, wid: WeaponId): void {
     if (!r.model) return;
-    r.model.hand.clear();
     const g = buildGun(wid, false, r.color);
     g.scale.setScalar(REMOTE_GUN_SCALE);
-    r.model.hand.add(g);
+    r.model.holdGun(g);
     r.weaponId = wid;
   }
 
@@ -267,6 +276,10 @@ export class RemotePlayers {
       const low = r.sl || r.cr;
       r.model.legL.rotation.x = r.sl ? 1.2 : r.cr ? 1.1 + swing : swing;
       r.model.legR.rotation.x = r.sl ? 1.2 : r.cr ? -0.35 - swing : -swing;
+      const kneeL = r.sl ? 0 : r.cr ? KNEE_CROUCH_FRONT : -Math.max(0, -swing) * KNEE_BEND;
+      const kneeR = r.sl ? 0 : r.cr ? KNEE_CROUCH_BACK : -Math.max(0, swing) * KNEE_BEND;
+      r.model.kneeL.rotation.x += (kneeL - r.model.kneeL.rotation.x) * k;
+      r.model.kneeR.rotation.x += (kneeR - r.model.kneeR.rotation.x) * k;
       r.model.legL.position.y = r.model.legR.position.y += ((low ? 0.5 : 0.8) - r.model.legR.position.y) * k;
       r.model.upper.position.y += ((low ? -0.5 : 0) - r.model.upper.position.y) * k;
     }

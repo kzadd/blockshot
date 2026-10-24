@@ -18,6 +18,7 @@ const playerSnapshot = (p: Player, now: number): PlayerSnapshot => ({
   n: p.name,
   c: p.characterId,
   sk: p.skin,
+  co: p.color,
   x: round2(p.x),
   y: round2(p.y),
   z: round2(p.z),

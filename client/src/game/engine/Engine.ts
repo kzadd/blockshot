@@ -89,8 +89,8 @@ interface SoundTick {
 export type HudListener = (hud: HudState) => void;
 
 export class Engine implements MinimapSource {
-  /** character and skin to respawn with automatically (null while choosing) */
-  autoChar: { id: string; skin: string } | null = null;
+  /** character, skin and outfit colour to respawn with automatically (null while choosing) */
+  autoChar: { id: string; skin: string; color?: string } | null = null;
 
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
@@ -114,6 +114,7 @@ export class Engine implements MinimapSource {
   // Our player
   private character: Character | null = null;
   private skin: SkinId = 'base';
+  private color = '';
   private alive = false;
   private everSpawned = false;
   private hp = 0;
@@ -248,7 +249,7 @@ export class Engine implements MinimapSource {
 
   private setGun(): void {
     if (!this.character) return;
-    const { color, skin } = outfitFor(this.mode, this.character.id, this.skin, this.myTeam);
+    const { color, skin } = outfitFor(this.mode, this.character.id, this.skin, this.myTeam, this.color);
     this.vm.setGun(this.weapons.weaponId(), color, skin);
   }
 
@@ -330,12 +331,12 @@ export class Engine implements MinimapSource {
   }
 
   /** Spawn now (first time, or after picking a character once the countdown ended). */
-  spawn(characterId: string, skin: string): void {
-    this.autoChar = { id: characterId, skin };
+  spawn(characterId: string, skin: string, color?: string): void {
+    this.autoChar = { id: characterId, skin, color };
     const now = performance.now();
     if (this.alive || (this.deathAt && now - this.deathAt < PLAYER.respawnDelay)) return;
     this.spawnReqAt = now;
-    this.net.spawn(characterId, skin);
+    this.net.spawn(characterId, skin, color);
   }
 
   requestLock(): void {
@@ -368,6 +369,7 @@ export class Engine implements MinimapSource {
   private onSpawned(d: SpawnedMessage): void {
     this.character = CHAR_BY_ID[d.characterId];
     this.skin = d.skin || 'base';
+    this.color = d.color;
     this.life = d.life;
     this.damageDirs = [];
     this.local.reset(d.x, d.y, d.z);
@@ -483,7 +485,7 @@ export class Engine implements MinimapSource {
       ) {
         // Automatic respawn with the chosen character
         this.spawnReqAt = now;
-        this.net.spawn(this.autoChar.id, this.autoChar.skin);
+        this.net.spawn(this.autoChar.id, this.autoChar.skin, this.autoChar.color);
       }
       if (this.deathPos) this.rig.dead(dt, this.deathPos, this.remotes.position(this.killerId));
       else this.rig.orbit(now, this.map.half);

@@ -40,8 +40,8 @@ export class NetClient {
   switchSlot(slot: number): void {
     this.socket.emit('player:switch', { slot });
   }
-  spawn(characterId: string, skin: string): void {
-    this.socket.emit('player:spawn', { characterId, skin });
+  spawn(characterId: string, skin: string, color?: string): void {
+    this.socket.emit('player:spawn', { characterId, skin, color });
   }
 
   dispose(): void {

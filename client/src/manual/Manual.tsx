@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CHARACTERS, WEAPONS, MODE_BY_ID, PLAYER, weightName, damageAt, speedWith } from '@blockshot/shared';
+import { Icon } from '../ui/icons';
 import { Keys } from '../ui/ui';
 
 export const CONTROLS: [string[], string][] = [
@@ -80,6 +81,12 @@ const TRICKS: [string, string][] = [
 ];
 
 const TABS = ['Controles', 'Cómo jugar', 'Personajes', 'Armas', 'Trucos'];
+const CARD_COLS = 4;
+/** Cards of an incomplete last row widen to fill it, so the grid stays symmetric (when they divide it evenly). */
+const lastRowSpan = (count: number, i: number): string | undefined => {
+  const rest = count % CARD_COLS;
+  return rest && CARD_COLS % rest === 0 && i >= count - rest ? `span ${CARD_COLS / rest}` : undefined;
+};
 
 export default function Manual({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState(0);
@@ -93,21 +100,19 @@ export default function Manual({ onClose }: { onClose: () => void }) {
   return (
     <div className="modal-bg" onClick={onClose}>
       <div className="modal manual" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head" style={{ marginBottom: 0 }}>
+        <div className="modal-head">
           <h2>Manual de BLOCKSHOT</h2>
-          <button className="btn ghost icon" onClick={onClose} aria-label="Cerrar">
-            ✕
+          <button className="btn icon" onClick={onClose} aria-label="Cerrar">
+            <Icon name="x" size={18} />
           </button>
         </div>
-        <div>
-          <nav className="seg tabs">
-            {TABS.map((t, i) => (
-              <button key={t} className={tab === i ? 'on' : ''} onClick={() => setTab(i)}>
-                {t}
-              </button>
-            ))}
-          </nav>
-        </div>
+        <nav className="seg tabs">
+          {TABS.map((t, i) => (
+            <button key={t} className={tab === i ? 'on' : ''} onClick={() => setTab(i)}>
+              {t}
+            </button>
+          ))}
+        </nav>
 
         <div className="manual-body">
           {tab === 0 && (
@@ -124,7 +129,7 @@ export default function Manual({ onClose }: { onClose: () => void }) {
           {tab === 1 && (
             <div className="steps">
               {STEPS.map(([t, d], i) => (
-                <div className="step" key={t}>
+                <div className="step" key={t} style={{ gridColumn: lastRowSpan(STEPS.length, i) }}>
                   <span className="n">{i + 1}</span>
                   <div>
                     <b>{t}</b>
@@ -186,14 +191,14 @@ export default function Manual({ onClose }: { onClose: () => void }) {
                 {Object.values(WEAPONS).map((w) => (
                   <tr key={w.name}>
                     <td className="b">{w.name}</td>
-                    <td>
+                    <td className="n">
                       {w.pellets > 1 ? `${w.damage}×${w.pellets}` : w.damage}
                       {w.falloff && ` → ${Math.round(damageAt(w, w.falloff[1]))}`}
                     </td>
                     <td className="head">×{w.headMult}</td>
-                    <td>{(1000 / w.fireRate).toFixed(1)}</td>
-                    <td>{w.melee ? '—' : w.mag}</td>
-                    <td>{w.melee ? '—' : `${(w.reload / 1000).toFixed(1)} s`}</td>
+                    <td className="n">{(1000 / w.fireRate).toFixed(1)}</td>
+                    <td className="n">{w.melee ? '—' : w.mag}</td>
+                    <td className="n">{w.melee ? '—' : `${(w.reload / 1000).toFixed(1)} s`}</td>
                     <td>{weightName(w)}</td>
                     <td>
                       {w.melee ? `Cuerpo a cuerpo · espalda ${w.backstab}` : w.auto ? 'Automática' : 'Semiautomática'}
@@ -206,8 +211,8 @@ export default function Manual({ onClose }: { onClose: () => void }) {
 
           {tab === 4 && (
             <div className="tricks">
-              {TRICKS.map(([t, d]) => (
-                <div className="trick" key={t}>
+              {TRICKS.map(([t, d], i) => (
+                <div className="trick" key={t} style={{ gridColumn: lastRowSpan(TRICKS.length, i) }}>
                   <b>{t}</b>
                   <p>{d}</p>
                 </div>

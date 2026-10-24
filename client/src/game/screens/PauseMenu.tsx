@@ -1,4 +1,5 @@
 import { canSwitchTeam, teamName, type ModeId, type SideTeam } from '@blockshot/shared';
+import { Icon } from '../../ui/icons';
 import { Keys } from '../../ui/ui';
 import { useHud } from '../hud/hudStore';
 
@@ -56,6 +57,7 @@ export default function PauseMenu({ mode, onResume, onSettings, onManual, onSwit
               </button>
             )}
             <button className="btn ghost danger" onClick={onLeave}>
+              <Icon name="logout" />
               Salir de la sala
             </button>
           </div>

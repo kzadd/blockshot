@@ -3,7 +3,7 @@ import { getSettings, subscribe, type ColorblindMode, type Settings } from './se
 // Colourblind modes: ally, enemy, team and health bar colours.
 // Red-green swaps green/red for blue/orange; blue-yellow uses turquoise/pink.
 export const COLORBLIND: { id: ColorblindMode; name: string; help?: string }[] = [
-  { id: 'off', name: 'Desactivado' },
+  { id: 'off', name: 'Desactivado', help: 'Colores normales' },
   { id: 'rg', name: 'Rojo-verde', help: 'Protanopía y deuteranopía (lo más común)' },
   { id: 'by', name: 'Azul-amarillo', help: 'Tritanopía' },
 ];

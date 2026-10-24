@@ -31,7 +31,7 @@ export interface HudState {
   locked: boolean;
   hp: number;
   maxHp: number;
-  // TODO(review): posible código muerto: published since the original version, no screen reads it
+  /** the health block shows the character's name and colour */
   characterId: CharacterId | undefined;
   // TODO(review): posible código muerto: the v3 HUD no longer shows the character name
   charName: string | undefined;

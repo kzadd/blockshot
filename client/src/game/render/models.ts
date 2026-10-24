@@ -1229,6 +1229,7 @@ export function buildGun(id: WeaponId, withFlash = false, tint = '#ffc93c'): Gun
 
 // ------------------------------------------------------------ Name tag and health bar
 // Health bar colours: green > 50 %, yellow 25–50 %, red ≤ 25 % (they follow the colourblind mode)
+// TODO(review): posible código muerto: the HUD health blocks no longer use hpColor
 export { hpColor } from '../../settings/palette';
 
 // throughWalls: visible behind walls (teammates)

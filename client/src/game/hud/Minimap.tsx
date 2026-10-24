@@ -15,14 +15,14 @@ export interface MinimapSource {
   minimap(now: number): MinimapView;
 }
 
-const SIZE = 164; // inside of the 170 box with a 3 px border
+const SIZE = 168; // inside of the 180 frame with 6 px padding
 const PAD = 6;
 const REDRAW_MS = 50;
 const BACKGROUND_ALPHA = 0.5;
 /** Roofs are see-through so the rooms under them can be read. */
 const ROOF_ALPHA = 0.35;
 const DOT_R = 5.5;
-const INK = '#0b1426';
+const INK = '#12171c';
 
 // North-up minimap: you (yellow arrow), allies always in green, enemies in red only after shooting
 // (or always, with the streak radar)
@@ -131,8 +131,8 @@ export default function Minimap({
         g.save();
         g.translate(toPx(view.me.x), toPx(view.me.z));
         g.rotate(-view.me.yaw);
-        arrow(22, 24, '#1b2a4a');
-        arrow(14, 16, '#ffc93c');
+        arrow(22, 24, INK);
+        arrow(14, 16, '#ffc531');
         g.restore();
       }
     };

@@ -1,3 +1,4 @@
+// TODO(review): posible código muerto: the lobby now shows map screenshots (mapImage) instead of this plan
 import { useEffect, useRef } from 'react';
 import { INDOOR_FLOOR_KINDS, ROOF_KINDS, getMap } from '@blockshot/shared';
 import { uiScale } from '../ui/ui';

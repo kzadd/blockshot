@@ -4,6 +4,7 @@ import {
   MAP_SIZES,
   MODES,
   MODE_BY_ID,
+  NICKNAME_MAX,
   ROOM_MAX_PLAYERS,
   ROOM_MIN_PLAYERS,
   type JoinResult,
@@ -19,12 +20,14 @@ import Manual from '../manual/Manual';
 import { clearGameLost, useConnection } from '../network/connection';
 import { socket } from '../network/socket';
 import Settings from '../settings/SettingsDialog';
-import { Slider } from '../ui/ui';
-import MapPreview from './MapPreview';
+import { Icon, MODE_ICON } from '../ui/icons';
+import { mapImage } from './mapImage';
 
 const NICK_KEY = 'blockshot:nick';
 /** Show the "cannot connect" toast after this long without a connection. */
 const OFFLINE_NOTICE_MS = 3000;
+/** More players than this × the size's recommendation gets a warning. */
+const CROWDED_FACTOR = 1.5;
 
 const loadNick = (): string => {
   try {
@@ -34,8 +37,6 @@ const loadNick = (): string => {
   }
 };
 
-const EMPTY_COLORS = ['#2b3a4f', '#ffc93c', '#2b3a4f', '#3fa7ff', '#ff4f5e', '#3ddc84'];
-
 interface RoomForm {
   name: string;
   password: string;
@@ -44,6 +45,22 @@ interface RoomForm {
   mode: ModeId;
   scoreLimit: number;
   max: number;
+}
+
+type Tab = 'rooms' | 'create';
+
+/** Two-by-two summary of a room (create preview and selected room). */
+function Summary({ rows }: { rows: [string, string][] }) {
+  return (
+    <dl className="lb-summary">
+      {rows.map(([k, v]) => (
+        <div key={k}>
+          <dt>{k}</dt>
+          <dd>{v}</dd>
+        </div>
+      ))}
+    </dl>
+  );
 }
 
 export default function Lobby({ onJoined }: { onJoined: (s: Session) => void }) {
@@ -62,19 +79,19 @@ export default function Lobby({ onJoined }: { onJoined: (s: Session) => void }) 
     scoreLimit: MODE_BY_ID.ffa.def,
     max: MAP_SIZES.m.players,
   });
-  const [joining, setJoining] = useState<RoomSummary | null>(null);
+  const [tab, setTab] = useState<Tab | null>(null);
+  const [selId, setSelId] = useState<string | null>(null);
   const [pass, setPass] = useState('');
   const [passError, setPassError] = useState('');
   const [toast, setToast] = useState('');
   const [menu, setMenu] = useState<'settings' | 'manual' | null>(null);
-  const roomNameRef = useRef<HTMLInputElement>(null);
+  const nickRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const onRooms = (r: RoomSummary[]) => setRooms(r);
-    socket.on('rooms', onRooms);
-    if (connected) socket.emit('rooms:list', onRooms); // also on every reconnection
+    socket.on('rooms', setRooms);
+    if (connected) socket.emit('rooms:list', setRooms); // also on every reconnection
     return () => {
-      socket.off('rooms', onRooms);
+      socket.off('rooms', setRooms);
     };
   }, [connected]);
 
@@ -97,6 +114,7 @@ export default function Lobby({ onJoined }: { onJoined: (s: Session) => void }) 
       return false;
     }
     setNickError(true);
+    nickRef.current?.focus();
     return true;
   };
 
@@ -112,301 +130,418 @@ export default function Lobby({ onJoined }: { onJoined: (s: Session) => void }) 
     socket.emit('room:create', { ...form, nickname }, handle);
   };
 
-  const join = (room: RoomSummary, password = '') => {
+  const join = (room: RoomSummary) => {
     sfx.unlock();
-    if (needNick()) return;
-    if (room.locked && !password) {
-      setJoining(room);
-      setPass('');
-      setPassError('');
-      return;
-    }
-    socket.emit('room:join', { roomId: room.id, password, nickname }, (res) => {
-      if (res.ok) {
-        setJoining(null);
-        onJoined(res);
-      } else if (password && /contraseña/i.test(res.error || ''))
-        setPassError(`Contraseña incorrecta. Pídesela a ${room.host}.`);
-      else {
-        setJoining(null);
-        setToast(res.error || 'No se pudo entrar a la sala.');
-      }
+    if (needNick() || room.players >= room.max) return;
+    if (room.locked && !pass) return setPassError('Escribe la contraseña para entrar');
+    socket.emit('room:join', { roomId: room.id, password: pass, nickname }, (res) => {
+      if (res.ok) onJoined(res);
+      else if (room.locked && /contraseña/i.test(res.error || ''))
+        setPassError(`Contraseña incorrecta. Pídesela a ${room.host}`);
+      else setToast(res.error || 'No se pudo entrar a la sala.');
     });
   };
 
+  // Opens on the room list when there are rooms and on «Crear sala» when there are none
+  const shown: Tab = tab ?? (rooms.length ? 'rooms' : 'create');
   const mapInfo = MAPS.find((m) => m.id === form.mapId);
   const mode = MODE_BY_ID[form.mode];
+  const size = MAP_SIZES[form.size];
+  const crowded = form.max > size.players * CROWDED_FACTOR;
+  const sel = rooms.find((r) => r.id === selId) ?? rooms[0];
+  const pick = (r: RoomSummary) => {
+    setSelId(r.id);
+    setPass('');
+    setPassError('');
+  };
+  const bgMap = shown === 'rooms' && sel ? sel.mapId : form.mapId;
 
   return (
     <div className="lobby">
+      <div className="menu-bg" style={{ backgroundImage: `url(${mapImage(bgMap)})` }} />
       <div className="stage">
-        <div className="lobby-inner">
-          <header className="lobby-head">
-            <div>
-              <h1 className="logo">BLOCKSHOT</h1>
-              <p>Arena de bloques para la clase. Crea una sala, comparte la contraseña y a jugar.</p>
-            </div>
-            <div className="head-actions">
-              <label className="field relative">
-                <span>Tu nombre</span>
-                <input
-                  className={`input ${nickError ? 'error' : ''}`}
-                  value={nick}
-                  maxLength={16}
-                  placeholder="Ej. Ricardo"
-                  onChange={(e) => {
-                    setNick(e.target.value);
-                    setNickError(false);
-                  }}
-                  onKeyDown={(e) => e.key === 'Enter' && roomNameRef.current?.focus()}
-                />
-                {nickError && <span className="name-error">Escribe tu nombre antes de entrar.</span>}
-              </label>
-              <button className="btn" onClick={() => setMenu('manual')}>
-                📖 Manual del juego
-              </button>
-              <button className="btn" onClick={() => setMenu('settings')}>
-                ⚙️ Ajustes y mira
-              </button>
-            </div>
-          </header>
+        <header className="lb-nav">
+          <div className="lb-logo">
+            <span className="lb-mark" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+              <i />
+            </span>
+            <h1>BLOCKSHOT</h1>
+          </div>
+          <div className="seg lb-tabs" role="tablist">
+            <button role="tab" aria-selected={shown === 'rooms'} onClick={() => setTab('rooms')}>
+              Salas abiertas
+              <span className="lb-count">{rooms.length}</span>
+            </button>
+            <button role="tab" aria-selected={shown === 'create'} onClick={() => setTab('create')}>
+              Crear sala
+            </button>
+          </div>
+          <div className="lb-grow" />
+          <label className="with-icon lb-nick">
+            <Icon name="user" />
+            <span className="sr-only">Tu nombre</span>
+            <input
+              ref={nickRef}
+              className={`input ${nickError ? 'error' : ''}`}
+              value={nick}
+              maxLength={NICKNAME_MAX}
+              placeholder="Tu nombre"
+              onChange={(e) => {
+                setNick(e.target.value);
+                setNickError(false);
+              }}
+              onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+            />
+            {nickError && (
+              <span className="bubble-error" role="alert">
+                <Icon name="alert" />
+                <span>Escribe tu nombre antes de entrar</span>
+              </span>
+            )}
+          </label>
+          <button className="btn" onClick={() => setMenu('manual')}>
+            <Icon name="book" size={18} />
+            Manual
+          </button>
+          <button className="btn" onClick={() => setMenu('settings')}>
+            <Icon name="sliders" size={18} />
+            Ajustes y mira
+          </button>
+        </header>
 
-          <div className="lobby-grid">
-            <form className="panel create" onSubmit={create}>
-              <h2 className="panel-title">Crear sala</h2>
-              <div className="row-2">
-                <label className="field">
-                  <span>Nombre de la sala</span>
-                  <input
-                    ref={roomNameRef}
-                    className="input"
-                    value={form.name}
-                    maxLength={24}
-                    placeholder={`Sala de ${nickname || 'Ricardo'}`}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  />
-                </label>
-                <label className="field">
-                  <span>Contraseña (opcional)</span>
-                  <span className="with-icon">
-                    <i>{form.password ? '🔒' : '🔓'}</i>
-                    <input
-                      className="input"
-                      value={form.password}
-                      maxLength={32}
-                      placeholder="Sin contraseña"
-                      onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    />
-                  </span>
-                </label>
-              </div>
-
-              <div>
-                <div className="label-row">
-                  <span className="label">Mapa</span>
-                  <span className="hint">{mapInfo?.desc}</span>
+        {shown === 'create' ? (
+          <form className="lb-body" onSubmit={create}>
+            <section className="panel lb-main">
+              <div className="lb-step grow">
+                <div className="lb-step-head">
+                  <span className="lb-n">01</span>
+                  <h2>Mapa</h2>
+                  <span className="lb-hint">{mapInfo?.desc}</span>
                 </div>
-                <div className="maps">
+                <div className="lb-maps">
                   {MAPS.map((m) => (
                     <button
                       type="button"
                       key={m.id}
-                      className={`map-card ${form.mapId === m.id ? 'on' : ''}`}
+                      className={`lb-cell lb-map ${form.mapId === m.id ? 'on' : ''}`}
+                      aria-pressed={form.mapId === m.id}
                       onClick={() => setForm({ ...form, mapId: m.id })}
                     >
-                      <MapPreview mapId={m.id} size={form.size} px={48} className="map-thumb" />
-                      <span>
+                      <img src={mapImage(m.id)} alt="" />
+                      <span className="lb-cell-text">
                         <b>{m.name}</b>
                         <small>{m.tag}</small>
+                      </span>
+                      {form.mapId === m.id && (
+                        <span className="lb-check">
+                          <Icon name="check" size={14} />
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="lb-step">
+                <div className="lb-step-head">
+                  <span className="lb-n">02</span>
+                  <h2>Modo de juego</h2>
+                </div>
+                <div className="lb-modes">
+                  {MODES.map((m) => (
+                    <button
+                      type="button"
+                      key={m.id}
+                      className={`lb-cell lb-mode ${form.mode === m.id ? 'on' : ''}`}
+                      aria-pressed={form.mode === m.id}
+                      onClick={() => setForm({ ...form, mode: m.id, scoreLimit: m.def })}
+                    >
+                      <Icon name={MODE_ICON[m.id]} size={22} />
+                      <span className="lb-cell-text">
+                        <b>{m.name}</b>
+                        <small>{MODE_UI[m.id].sub}</small>
                       </span>
                     </button>
                   ))}
                 </div>
               </div>
 
-              <div>
-                <div className="label-row">
-                  <span className="label">Modo de juego</span>
+              <div className="lb-step">
+                <div className="lb-step-head">
+                  <span className="lb-n">03</span>
+                  <h2>Reglas</h2>
+                  <span className={`lb-hint ${crowded ? 'warn' : ''}`}>
+                    {crowded
+                      ? `Muchos jugadores para este tamaño · recomendado ${size.players}`
+                      : `Recomendado para ${size.name.toLowerCase()}: ${size.players}`}
+                  </span>
                 </div>
-                <div className="seg modes">
-                  {MODES.map((m) => (
-                    <button
-                      type="button"
-                      key={m.id}
-                      className={form.mode === m.id ? 'on' : ''}
-                      onClick={() => setForm({ ...form, mode: m.id, scoreLimit: m.def })}
-                    >
-                      <b>{m.name}</b>
-                      <small>{MODE_UI[m.id].sub}</small>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="row-2">
-                <div>
-                  <div className="label-row">
-                    <span className="label">Para ganar</span>
-                    <span className="hint">{MODE_UI[form.mode].hint(form.scoreLimit)}</span>
+                <div className="lb-rules">
+                  <div className="lb-rule">
+                    <div className="lb-rule-head">
+                      <span>Para ganar</span>
+                      <span>{mode.unit}</span>
+                    </div>
+                    <div className="seg">
+                      {mode.limits.map((n) => (
+                        <button
+                          type="button"
+                          key={n}
+                          className="lb-num"
+                          aria-pressed={form.scoreLimit === n}
+                          onClick={() => setForm({ ...form, scoreLimit: n })}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <div className="seg">
-                    {mode.limits.map((n) => (
+                  <div className="lb-rule">
+                    <div className="lb-rule-head">
+                      <span>Tamaño</span>
+                      <span>{size.half * 2} m</span>
+                    </div>
+                    <div className="seg">
+                      {Object.values(MAP_SIZES).map((z) => (
+                        <button
+                          type="button"
+                          key={z.id}
+                          aria-pressed={form.size === z.id}
+                          onClick={() => setForm({ ...form, size: z.id, max: z.players })}
+                        >
+                          {z.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="lb-rule">
+                    <div className="lb-rule-head">
+                      <span>Jugadores</span>
+                      <span>
+                        {ROOM_MIN_PLAYERS}–{ROOM_MAX_PLAYERS}
+                      </span>
+                    </div>
+                    <div className="lb-stepper">
                       <button
                         type="button"
-                        key={n}
-                        className={`justify-items-center ${form.scoreLimit === n ? 'on' : ''}`}
-                        onClick={() => setForm({ ...form, scoreLimit: n })}
+                        className="btn icon"
+                        title="Menos"
+                        disabled={form.max <= ROOM_MIN_PLAYERS}
+                        onClick={() => setForm({ ...form, max: form.max - 1 })}
                       >
-                        <b>{n}</b>
-                        <small>{mode.unit}</small>
+                        <Icon name="minus" />
                       </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="label-row">
-                    <span className="label">Tamaño</span>
-                  </div>
-                  <div className="seg">
-                    {Object.values(MAP_SIZES).map((z) => (
+                      <b>{form.max}</b>
                       <button
                         type="button"
-                        key={z.id}
-                        className={form.size === z.id ? 'on' : ''}
-                        onClick={() => setForm({ ...form, size: z.id, max: z.players })}
+                        className="btn icon"
+                        title="Más"
+                        disabled={form.max >= ROOM_MAX_PLAYERS}
+                        onClick={() => setForm({ ...form, max: form.max + 1 })}
                       >
-                        <b>{z.name}</b>
-                        <small>{z.half * 2} m</small>
+                        <Icon name="plus" />
                       </button>
-                    ))}
+                    </div>
                   </div>
                 </div>
               </div>
+            </section>
 
-              <div className="create-foot">
-                <Slider
-                  label={`Jugadores máximos · ${ROOM_MIN_PLAYERS}–${ROOM_MAX_PLAYERS}`}
-                  value={form.max}
-                  min={ROOM_MIN_PLAYERS}
-                  max={ROOM_MAX_PLAYERS}
-                  onChange={(v) => setForm({ ...form, max: v })}
+            <aside className="panel lb-side">
+              <span className="lb-kicker">Tu sala</span>
+              <div className="lb-preview">
+                <img src={mapImage(form.mapId)} alt="" />
+                <span>{mapInfo?.name}</span>
+              </div>
+              <label className="field">
+                <span>Nombre de la sala</span>
+                <input
+                  className="input"
+                  value={form.name}
+                  maxLength={24}
+                  placeholder={`Sala de ${nickname || 'tu clase'}`}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
                 />
-                <button className="btn primary lg" disabled={!connected}>
-                  Crear y entrar
-                </button>
+              </label>
+              <label className="field">
+                <span>Contraseña · opcional</span>
+                <span className="with-icon">
+                  <Icon name={form.password ? 'lock' : 'unlock'} />
+                  <input
+                    className="input"
+                    value={form.password}
+                    maxLength={32}
+                    placeholder="Sin contraseña: entra cualquiera"
+                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  />
+                </span>
+              </label>
+              <Summary
+                rows={[
+                  ['Modo', mode.name],
+                  ['Para ganar', MODE_UI[form.mode].hint(form.scoreLimit)],
+                  ['Tamaño', `${size.name} · ${size.half * 2} m`],
+                  ['Jugadores', `Hasta ${form.max}`],
+                ]}
+              />
+              <button className="btn primary lg lb-cta" disabled={!connected}>
+                Crear y entrar
+              </button>
+            </aside>
+          </form>
+        ) : (
+          <div className={`lb-body ${sel ? '' : 'solo'}`}>
+            <section className="panel lb-main">
+              <div className="lb-list-head">
+                <h2>Salas abiertas</h2>
+                <span className={`lb-status ${connected ? '' : 'off'}`}>
+                  <i />
+                  {connected ? 'Conectado · se actualiza sola' : 'Conectando…'}
+                </span>
               </div>
-            </form>
-
-            <section className="panel rooms">
-              <div className="rooms-head">
-                <h2 className="panel-title">
-                  Salas abiertas{rooms.length > 0 && <span className="count">{rooms.length}</span>}
-                </h2>
-                {connected ? (
-                  <span className="status">
-                    <i className="dot" /> Conectado
-                  </span>
-                ) : (
-                  <span className="status off">
-                    <i className="spin" /> Conectando…
-                  </span>
-                )}
-              </div>
-              {rooms.length === 0 ? (
-                <div className="empty">
-                  <div className="empty-icon">
-                    {EMPTY_COLORS.map((c, i) => (
-                      <i key={i} style={{ background: c }} />
-                    ))}
+              {sel ? (
+                <div className="lb-table" role="listbox" aria-label="Salas abiertas">
+                  <div className="lb-row lb-th" aria-hidden="true">
+                    <span>Sala</span>
+                    <span>Modo</span>
+                    <span>Tamaño</span>
+                    <span>Jugadores</span>
                   </div>
-                  <h3>Todavía no hay salas</h3>
-                  <p>Crea la primera desde el panel de la izquierda y dile la contraseña a tu clase.</p>
+                  <div className="lb-rows">
+                    {rooms.map((r) => {
+                      const full = r.players >= r.max;
+                      return (
+                        <div
+                          key={r.id}
+                          role="option"
+                          tabIndex={0}
+                          aria-selected={sel.id === r.id}
+                          className={`lb-row ${sel.id === r.id ? 'on' : ''} ${full ? 'full' : ''}`}
+                          onClick={() => pick(r)}
+                          onDoubleClick={() => join(r)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') join(r);
+                            if (e.key === ' ') {
+                              e.preventDefault();
+                              pick(r);
+                            }
+                          }}
+                        >
+                          <span className="lb-room">
+                            <img src={mapImage(r.mapId)} alt="" />
+                            <span className="lb-cell-text">
+                              <b>
+                                {r.name}
+                                {r.locked && <Icon name="lock" size={14} className="lb-dim" />}
+                              </b>
+                              <small>
+                                {r.map} · de {r.host}
+                              </small>
+                            </span>
+                          </span>
+                          <span className="lb-room-mode">
+                            <Icon name={MODE_ICON[r.modeId]} />
+                            {r.mode}
+                          </span>
+                          <span className="lb-room-size">{r.size}</span>
+                          <span className="lb-players">
+                            <b>
+                              {r.players}/{r.max}
+                            </b>
+                            <i>
+                              <i style={{ width: `${(r.players / r.max) * 100}%` }} />
+                            </i>
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               ) : (
-                <div className="room-list">
-                  {rooms.map((r) => {
-                    const full = r.players >= r.max;
-                    return (
-                      <div key={r.id} className={`room ${full ? 'full' : ''}`}>
-                        <MapPreview mapId={r.mapId} size={r.sizeId} px={44} className="map-thumb" />
-                        <div className="room-name">
-                          <b>
-                            {r.name}
-                            {r.locked ? ' 🔒' : ''}
-                          </b>
-                          <small>
-                            {r.mode} a {r.limit} · {r.map} {r.size.toLowerCase()} · de {r.host}
-                          </small>
-                        </div>
-                        <div className="room-count">
-                          {r.players}/{r.max}
-                          <div className="pbar">
-                            <i style={{ width: `${(r.players / r.max) * 100}%` }} />
-                          </div>
-                        </div>
-                        <button className="btn sm" disabled={full} onClick={() => join(r)}>
-                          {full ? 'Llena' : 'Entrar'}
-                        </button>
-                      </div>
-                    );
-                  })}
+                <div className="lb-empty">
+                  <span className="lb-empty-art" aria-hidden="true">
+                    <i />
+                    <i />
+                    <i />
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                  <h3>Todavía no hay salas</h3>
+                  <p>Crea la primera y dile la contraseña a tu clase. Aparecerá aquí para todos.</p>
+                  <button className="btn primary lg" onClick={() => setTab('create')}>
+                    Crear sala
+                  </button>
                 </div>
               )}
-              <p className="rooms-note">La lista se actualiza sola. 🔒 = pide contraseña al entrar.</p>
             </section>
-          </div>
-        </div>
-      </div>
 
-      {joining && (
-        <div className="modal-bg" onClick={() => setJoining(null)}>
-          <form
-            className="modal pass-modal"
-            onClick={(e) => e.stopPropagation()}
-            onSubmit={(e) => {
-              e.preventDefault();
-              join(joining, pass);
-            }}
-          >
-            <div className="modal-head">
-              <h2 className="text-[20px]">🔒 Sala con contraseña</h2>
-              <button type="button" className="btn ghost icon" onClick={() => setJoining(null)} aria-label="Cerrar">
-                ✕
-              </button>
-            </div>
-            <p className="meta">
-              <b>{joining.name}</b> · de {joining.host} · {joining.players}/{joining.max}
-            </p>
-            <label className="field">
-              <span>Contraseña</span>
-              <input
-                autoFocus
-                type="password"
-                className={`input ${passError ? 'error' : ''}`}
-                value={pass}
-                onChange={(e) => {
-                  setPass(e.target.value);
-                  setPassError('');
-                }}
-              />
-              {passError && <span className="field-error">{passError}</span>}
-            </label>
-            <div className="modal-foot">
-              <button type="button" className="btn ghost md" onClick={() => setJoining(null)}>
-                Cancelar
-              </button>
-              <button className="btn primary md" disabled={!pass}>
-                Entrar
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+            {sel && (
+              <aside className="panel lb-side">
+                <span className="lb-kicker">Sala elegida</span>
+                <div className="lb-preview">
+                  <img src={mapImage(sel.mapId)} alt="" />
+                </div>
+                <div className="lb-room-title">
+                  <h3>{sel.name}</h3>
+                  <span>
+                    {sel.map} · {sel.size} · de {sel.host}
+                  </span>
+                </div>
+                <Summary
+                  rows={[
+                    ['Modo', sel.mode],
+                    ['Para ganar', MODE_UI[sel.modeId].hint(sel.limit)],
+                    ['Jugadores', `${sel.players} de ${sel.max}`],
+                    ['Acceso', sel.locked ? 'Contraseña' : 'Libre'],
+                  ]}
+                />
+                <div className="lb-side-foot">
+                  {sel.locked && sel.players < sel.max && (
+                    <label className="field lb-pass">
+                      <span>Contraseña</span>
+                      <input
+                        type="password"
+                        className={`input ${passError ? 'error' : ''}`}
+                        value={pass}
+                        placeholder={`Pídesela a ${sel.host}`}
+                        onChange={(e) => {
+                          setPass(e.target.value);
+                          setPassError('');
+                        }}
+                        onKeyDown={(e) => e.key === 'Enter' && join(sel)}
+                      />
+                      {passError && (
+                        <span className="field-error" role="alert">
+                          {passError}
+                        </span>
+                      )}
+                    </label>
+                  )}
+                  {sel.players < sel.max ? (
+                    <button className="btn primary lg lb-cta" disabled={!connected} onClick={() => join(sel)}>
+                      Entrar
+                    </button>
+                  ) : (
+                    <button className="btn primary lg lb-cta" disabled>
+                      Sala llena
+                    </button>
+                  )}
+                </div>
+              </aside>
+            )}
+          </div>
+        )}
+      </div>
 
       {offline && !connected && (
         <div className="toast" role="alert">
-          <span className="bang">!</span>
+          <span className="bang">
+            <Icon name="alert" size={18} />
+          </span>
           <span>
             <b>No se pudo conectar con el servidor</b>
             <small>Reintentando automáticamente…</small>
@@ -418,7 +553,9 @@ export default function Lobby({ onJoined }: { onJoined: (s: Session) => void }) 
       )}
       {lostGame && connected && !toast && (
         <div className="toast" role="alert" onClick={clearGameLost}>
-          <span className="bang">!</span>
+          <span className="bang">
+            <Icon name="alert" size={18} />
+          </span>
           <span>
             <b>Se perdió la conexión con la sala</b>
             <small>Ya estás conectado de nuevo: vuelve a entrar · Toca para cerrar</small>
@@ -427,7 +564,9 @@ export default function Lobby({ onJoined }: { onJoined: (s: Session) => void }) 
       )}
       {toast && connected && (
         <div className="toast" role="alert" onClick={() => setToast('')}>
-          <span className="bang">!</span>
+          <span className="bang">
+            <Icon name="alert" size={18} />
+          </span>
           <span>
             <b>{toast}</b>
             <small>Toca para cerrar</small>

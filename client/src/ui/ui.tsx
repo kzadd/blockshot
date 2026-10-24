@@ -199,7 +199,7 @@ export function Curtain() {
         <i
           key={`${run}-${r}-${c}`}
           style={{
-            background: (r + c) % 2 ? '#22355c' : '#1b2a4a',
+            background: (r + c) % 2 ? '#18222f' : '#111923',
             animationDelay: `${CURTAIN_STAGGER_MS * (r + c)}ms`,
           }}
         />,

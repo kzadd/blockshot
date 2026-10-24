@@ -1980,16 +1980,42 @@ kbd.down,
 .char-stage-3d canvas {
   display: block;
 }
+/* Color del uniforme (todos contra todos): columna de muestras bajo el nombre */
+.outfit-colors {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+.outfit-colors button {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25);
+  transition: box-shadow 120ms;
+}
+.outfit-colors button:hover {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6);
+}
+.outfit-colors button.on {
+  box-shadow:
+    0 0 0 2px var(--bg-1),
+    0 0 0 4px var(--accent);
+}
 .skins {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 6px;
+  gap: 4px;
   padding: 10px 12px;
   background: rgba(9, 14, 21, 0.85);
   border-top: 1px solid var(--line);
   z-index: 2;
 }
 .skins button {
+  padding: 0;
   display: grid;
   justify-items: center;
   align-content: center;

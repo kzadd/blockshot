@@ -27,8 +27,6 @@ import CharacterPreview from './CharacterPreview';
 const MAX_HP_BAR = 150;
 const SPEED_BAR_MIN = 5;
 const SPEED_BAR_RANGE = 5.5;
-/** Outfit colour swatch size (px). */
-const SWATCH_PX = 22;
 
 export type SkinChoice = Partial<Record<CharacterId, SkinId>>;
 /** Outfit colour (hex from OUTFIT_COLORS) picked for each character. */
@@ -210,13 +208,9 @@ export default function CharacterSelect({
                 Skin {SKINS.find((k) => k.id === skin)?.name}
                 {!isTeamMode(mode) && ` · ${OUTFIT_COLORS.find((o) => o.hex === color)?.name ?? ''}`}
               </small>
-              {/* Outfit colour: only seen in free for all (team modes wear the team colour).
-                  Inline sizes until styles.css gets .outfit-colors rules. */}
+              {/* Outfit colour: only seen in free for all (team modes wear the team colour) */}
               {!isTeamMode(mode) && (
-                <div
-                  className="outfit-colors"
-                  style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}
-                >
+                <div className="outfit-colors">
                   {OUTFIT_COLORS.map((o) => (
                     <button
                       key={o.hex}
@@ -224,15 +218,7 @@ export default function CharacterSelect({
                       title={o.name}
                       aria-label={`Color ${o.name}`}
                       onClick={() => setColorBy({ ...colorBy, [sel]: o.hex })}
-                      style={{
-                        width: SWATCH_PX,
-                        height: SWATCH_PX,
-                        padding: 0,
-                        borderRadius: 6,
-                        cursor: 'pointer',
-                        background: o.hex,
-                        border: color === o.hex ? '3px solid var(--sol)' : '2px solid rgba(247, 249, 252, 0.3)',
-                      }}
+                      style={{ background: o.hex }}
                     />
                   ))}
                 </div>
@@ -242,7 +228,7 @@ export default function CharacterSelect({
             <span className="peana" />
             <CharacterPreview charId={sel} skin={skin} color={color} />
             {/* One row of swatches (the name of the chosen skin is shown above) */}
-            <div className="skins" style={{ gridTemplateColumns: `repeat(${SKINS.length}, minmax(0, 1fr))`, gap: 4 }}>
+            <div className="skins" style={{ gridTemplateColumns: `repeat(${SKINS.length}, minmax(0, 1fr))` }}>
               {SKINS.map((k) => {
                 const [a, b] = SKIN_SWATCH[k.id](color);
                 return (
@@ -251,7 +237,6 @@ export default function CharacterSelect({
                     className={skin === k.id ? 'on' : ''}
                     title={k.name}
                     aria-label={`Skin ${k.name}`}
-                    style={{ padding: 0 }}
                     onClick={() => setSkinBy({ ...skinBy, [sel]: k.id })}
                   >
                     <i style={{ background: `linear-gradient(135deg, ${a} 50%, ${b} 50%)` }} />

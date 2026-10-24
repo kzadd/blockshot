@@ -1,0 +1,106 @@
+// Authoritative shots: the client sends origin and directions; the server checks fire rate, ammo and
+// reload, rewinds the other players to what the shooter saw, traces the rays and applies the damage.
+import {
+  DIRECTION_LENGTH_TOLERANCE,
+  FIRE_RATE_TOLERANCE,
+  LAG_COMP_MAX_MS,
+  MAX_INPUT_DELAY_S,
+  PLAYER,
+  RELOAD_GRACE_MS,
+  SHOT_ORIGIN_TOLERANCE,
+  clamp,
+  damageAt,
+  round2,
+  type HitTarget,
+  type ShootInput,
+  type Vec3,
+} from '@blockshot/shared';
+import { poseAt } from '../players/history';
+import { weaponIdOf, weaponOf } from '../players/loadout';
+import type { Player } from '../players/player';
+import { sameTeam } from '../players/teams';
+import type { Room } from '../rooms/room';
+import { applyDamage } from './damage';
+import { behaviorOf } from './weaponBehavior';
+
+interface PendingDamage {
+  dmg: number;
+  head: boolean;
+  at: Vec3;
+}
+
+function normalized(dirs: readonly Vec3[]): Vec3[] | null {
+  const out: Vec3[] = [];
+  for (const d of dirs) {
+    const len = Math.hypot(d[0], d[1], d[2]);
+    if (Math.abs(len - 1) > DIRECTION_LENGTH_TOLERANCE) return null;
+    out.push([d[0] / len, d[1] / len, d[2] / len]);
+  }
+  return out;
+}
+
+export function handleShoot(room: Room, p: Player, msg: ShootInput): void {
+  const w = weaponOf(p);
+  const a = p.ammo[p.slot];
+  const now = Date.now();
+  if (!w || !a) return;
+
+  if (a.reloadEnd) {
+    if (now < a.reloadEnd - RELOAD_GRACE_MS) return;
+    a.mag = w.mag;
+    a.reloadEnd = 0;
+  }
+  if (a.mag <= 0 || now - (p.lastShot[p.slot] ?? 0) < w.fireRate * FIRE_RATE_TOLERANCE) return;
+
+  // The client predicts its own movement, so it can be slightly ahead of the server: allow for its speed
+  const o = msg.o;
+  const speed = Math.hypot(p.move.vx, p.move.vy, p.move.vz);
+  const tolerance = SHOT_ORIGIN_TOLERANCE + speed * MAX_INPUT_DELAY_S;
+  if (Math.hypot(o[0] - p.x, o[1] - (p.y + PLAYER.eye), o[2] - p.z) > tolerance) return;
+  if (msg.d.length > w.pellets) return;
+  const dirs = normalized(msg.d);
+  if (!dirs) return;
+
+  const behavior = behaviorOf(w);
+  if (behavior.usesAmmo) a.mag--;
+  p.lastShot[p.slot] = now;
+  p.protUntil = 0; // shooting removes spawn protection
+
+  // Lag compensation: rivals are placed where the shooter saw them when firing
+  const past = now - clamp(msg.lag ?? 0, 0, LAG_COMP_MAX_MS);
+  const targets: HitTarget[] = [...room.players.values()]
+    .filter((t) => t.alive && t.id !== p.id && !sameTeam(room, t, p))
+    .map((t) => ({ ...poseAt(t, past), id: t.id, alive: true }));
+  const ends: Vec3[] = [];
+  const damage = new Map<string, PendingDamage>();
+  for (const d of dirs) {
+    const { t, hit } = behavior.trace(w, { origin: o, dir: d, colliders: room.colliders, targets, shooterId: p.id });
+    ends.push([round2(o[0] + d[0] * t), round2(o[1] + d[1] * t), round2(o[2] + d[2] * t)]);
+    if (hit?.type !== 'player') continue;
+    const e = damage.get(hit.id) ?? { dmg: 0, head: false, at: [o[0] + d[0] * t, o[1] + d[1] * t, o[2] + d[2] * t] };
+    e.dmg += damageAt(w, t) * (hit.head ? w.headMult : 1);
+    e.head ||= hit.head;
+    damage.set(hit.id, e);
+  }
+  p.shots++;
+  if (damage.size) p.hits++;
+  for (const { head } of damage.values()) if (head) p.heads++;
+  room.channel.broadcast('shot', [{ id: p.id, w: weaponIdOf(p), e: ends }], p.id);
+  for (const [id, { dmg, head, at }] of damage) {
+    const victim = room.players.get(id);
+    if (victim) applyDamage(room, p, victim, behavior.damage(w, p, victim, dmg), head, w, at);
+  }
+}
+
+export function handleReload(p: Player): void {
+  const w = weaponOf(p);
+  const a = p.ammo[p.slot];
+  if (w && a && behaviorOf(w).usesAmmo && !a.reloadEnd && a.mag < w.mag) a.reloadEnd = Date.now() + w.reload;
+}
+
+export function handleSwitch(p: Player, slot: number): void {
+  if (slot < 0 || slot >= p.loadout.length) return;
+  const a = p.ammo[p.slot];
+  if (a) a.reloadEnd = 0; // switching weapons cancels the reload
+  p.slot = slot;
+}

@@ -59,6 +59,7 @@ export class WeaponController {
   prevSlot = 1;
   ammo: Ammo[] = [];
   lastShot: number[] = [0, 0, 0];
+  private fireBlockedUntil = 0;
   swapUntil = 0;
   swingAt = 0;
   aimLerp = 0;
@@ -89,6 +90,11 @@ export class WeaponController {
   }
   current(): Ammo {
     return this.ammo[this.slot] ?? { mag: 0, reloadEnd: 0 };
+  }
+
+  /** The trigger is ignored until then (clicks made while dead must not fire, and so drop the protection, on spawning). */
+  holdFire(until: number): void {
+    this.fireBlockedUntil = until;
   }
 
   /** Weapons for the mode and level, with full magazines. */
@@ -172,6 +178,7 @@ export class WeaponController {
       a.reloadEnd = 0;
     }
     if (a.mag === 0 && !a.reloadEnd && !w.melee) this.startReload(now);
+    if (now < this.fireBlockedUntil) this.input.releaseTrigger();
     if ((this.input.mouseDown || this.input.clicked) && this.input.locked) this.tryShoot(now, w, a, move);
     this.input.clicked = false;
     this.recoverRecoil(dt, now);

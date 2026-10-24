@@ -56,6 +56,8 @@ const MAX_FRAME_DT = 1 / 30;
 /** The simulation catches up at most this much real time after a stall (tab in background…). */
 const MAX_SIM_CATCH_UP = 0.25;
 const MS_PER_S = 1000;
+/** After spawning the trigger is ignored this long (clicks made while dead). */
+const SPAWN_FIRE_GRACE_MS = 300;
 /** Automatic respawn requests are retried at most this often. */
 const SPAWN_RETRY_MS = 1000;
 /** After a match restarts the player respawns almost at once. */
@@ -377,6 +379,9 @@ export class Engine implements MinimapSource {
     this.armor = 0;
     this.alive = true;
     this.protUntil = performance.now() + PLAYER.spawnProtection;
+    // Clicking to respawn sooner used to fire on spawning and drop the protection at once
+    this.input.clearButtons();
+    this.weapons.holdFire(performance.now() + SPAWN_FIRE_GRACE_MS);
     this.everSpawned = true;
     this.deathPos = null;
     this.level = d.level;

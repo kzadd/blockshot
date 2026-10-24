@@ -185,8 +185,15 @@ export class InputController {
     return { seq, f, s, yaw: this.yaw, pitch: this.pitch, b, slot };
   }
 
-  clearButtons(): void {
+  /** Forgets the trigger: a click already made (or a held button) does not fire until pressed again. */
+  releaseTrigger(): void {
     this.mouseDown = false;
+    this.clicked = false;
+    this.triggerReleased = true;
+  }
+
+  clearButtons(): void {
+    this.releaseTrigger();
     this.aiming = false;
   }
 

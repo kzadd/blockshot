@@ -1,5 +1,5 @@
 import { BARREL, PALLET, pad, stairs } from '../props';
-import { STORY, house, railing, type HouseSpec } from '../structures';
+import { RAIL_T, STORY, house, railing, type HouseSpec } from '../structures';
 import type { MapBuildContext, StructureKind } from '../types';
 
 /** Depth of the mezzanine offices against the north and south walls (m). */
@@ -11,6 +11,13 @@ const OFFICE_W = 6;
 const OFFICE_D = 10;
 /** Gap left in the mezzanine railing so the jump pad below can land you on the walkway (m). */
 const PAD_GAP = 4;
+/** Catwalk between the two walkways: it runs along z between the centre crates and the first containers. */
+const CATWALK_X0 = -4.6;
+const CATWALK_X1 = -3.3;
+const CATWALK_T = 0.2;
+/** Distance between the catwalk posts (m) and their thickness. */
+const CATWALK_POSTS = 10;
+const POST = 0.15;
 
 // Almacén: rows of containers, narrow aisles, offices under the mezzanines and two-story side offices
 export function buildAlmacen(ctx: MapBuildContext): void {
@@ -38,7 +45,8 @@ export function buildAlmacen(ctx: MapBuildContext): void {
       partitions: centres.slice(1).map((c) => ({ run: 'z' as const, at: c - roomW / 2, door: 0 })),
     });
     const railZ = s * (H - MEZZ_D + 0.06);
-    railing(B, -mL, railZ, -PAD_GAP / 2, railZ, STORY);
+    railing(B, -mL, railZ, CATWALK_X0, railZ, STORY);
+    railing(B, CATWALK_X1, railZ, -PAD_GAP / 2, railZ, STORY);
     railing(B, PAD_GAP / 2, railZ, mL, railZ, STORY);
     for (const t of [1, -1]) stairs(B, t * mL, s * (H - MEZZ_D / 2), 'x', -t, STORY / 0.5, MEZZ_D);
 
@@ -73,6 +81,18 @@ export function buildAlmacen(ctx: MapBuildContext): void {
     B(office.x + s * 0.4, 0, office.z + 2.5, 1.2, 1.2, 1.2, 'crate');
     B(office.x - s * 1.2, STORY, office.z + 3.4, 1.4, 1.1, 1.4, 'crate2');
   }
+  // Catwalk over the aisles from one mezzanine walkway to the other, on thin posts, railings both sides
+  const reach = H - MEZZ_D;
+  const cx = (CATWALK_X0 + CATWALK_X1) / 2;
+  B(cx, STORY - CATWALK_T, 0, CATWALK_X1 - CATWALK_X0, CATWALK_T, 2 * reach, 'platform');
+  for (const x of [CATWALK_X0 + RAIL_T / 2, CATWALK_X1 - RAIL_T / 2]) railing(B, x, -reach, x, reach, STORY);
+  for (let z = 0; z < reach - 2; z += CATWALK_POSTS) {
+    for (const s of z ? [1, -1] : [1]) {
+      for (const x of [CATWALK_X0 + POST / 2, CATWALK_X1 - POST / 2])
+        B(x, 0, s * z, POST, STORY - CATWALK_T, POST, 'metal');
+    }
+  }
+  const underCatwalk = (x: number) => Math.abs(x - cx) < (CATWALK_X1 - CATWALK_X0) / 2 + 1.2;
   const inOffice = (x: number, z: number, margin: number) =>
     offices.some((o) => Math.abs(x - o.x) < o.w / 2 + margin && Math.abs(z - o.z) < o.d / 2 + margin);
 
@@ -121,9 +141,9 @@ export function buildAlmacen(ctx: MapBuildContext): void {
     const x = (rand() * 2 - 1) * (H - 6);
     const z = (rand() * 2 - 1) * (H - 9);
     const prop = rand() < 0.5 ? PALLET : BARREL;
-    if (!inOffice(x, z, 1)) P(x, z, prop);
+    if (!inOffice(x, z, 1) && !underCatwalk(x)) P(x, z, prop);
   }
-  P(-4.6, 2.8, PALLET);
+  P(-1.4, 4.4, PALLET);
   P(-0.2, -4.2, BARREL);
 
   for (const z of [-0.6, 0, 0.6]) {

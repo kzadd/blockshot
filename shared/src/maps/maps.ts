@@ -9,7 +9,7 @@ import { buildDesfiladero } from './builders/desfiladero';
 import { buildPatio } from './builders/patio';
 import { buildPolvo } from './builders/polvo';
 import { PROP_COLORS } from './props';
-import { STRUCTURE_COLORS } from './structures';
+import { ROOF_KINDS, STRUCTURE_COLORS } from './structures';
 import type { BoxKind, GameMap, MapBox, MapDef, MapId, PropPart, SizeId, Spawn } from './types';
 
 export const MAP_SIZES: Record<SizeId, { id: SizeId; name: string; half: number; players: number }> = {
@@ -75,6 +75,10 @@ const MAP_DEFS: Record<MapId, MapDef> = {
       bridge: '#8a6440',
       rock: '#9b8b7a',
       crate: '#d4a24c',
+      concrete: '#d6bc94',
+      stair: '#cdb089',
+      slab: '#a8916f',
+      plaster: '#ecd9b8',
     },
   },
   polvo: {
@@ -189,10 +193,13 @@ const overlaps = (a: Footprint, b: Footprint) =>
   a.y < b.y + b.h - OVERLAP_EPSILON &&
   b.y < a.y + a.h - OVERLAP_EPSILON;
 
-// Places the decoration props that fit: on the ground, not colliding with anything and away from spawns
+// Places the decoration props that fit: on the ground, not colliding with anything, away from spawns and out of buildings
 function placeProps(boxes: MapBox[], points: [number, number][], props: PendingProp[]): void {
   let id = 0;
   for (const { x, z, parts } of props) {
+    // Never inside a building nor on its roof
+    if (boxes.some((b) => ROOF_KINDS.has(b.c) && Math.abs(x - b.x) <= b.w / 2 && Math.abs(z - b.z) <= b.d / 2))
+      continue;
     const y = groundAt(boxes, x, z);
     const list: MapBox[] = parts.map(([dx, dy, dz, w, h, d, c]) => ({
       x: round2(x + dx),

@@ -187,6 +187,9 @@ export interface Hole {
   at?: number;
   story?: number;
   w?: number;
+  /** window sill and top heights above the story floor (defaults WINDOW_SILL and WINDOW_TOP) */
+  sill?: number;
+  top?: number;
 }
 /** Stair flight hugging the inner (or, for `outside`, the outer) face of wall `side`. */
 export interface Flight {
@@ -219,6 +222,8 @@ export interface HouseSpec {
   z: number;
   w: number;
   d: number;
+  /** height the building stands on (default: the map floor) */
+  y?: number;
   stories?: number;
   wall: BoxKind;
   /** upper floors */
@@ -283,7 +288,13 @@ const STEPS_PER_STORY = Math.round(STORY / STEP_RISE);
  * A building you can walk into: walls with doors and windows on every story, floors with stairwells,
  * interior stairs, balconies and a flat roof (with a parapet and a hatch or outside stairs to reach it).
  */
-export function house(ctx: Pick<MapBuildContext, 'B' | 'D'>, h: HouseSpec): void {
+export function house(raw: Pick<MapBuildContext, 'B' | 'D'>, h: HouseSpec): void {
+  const base = h.y ?? 0;
+  const lift =
+    (fn: BoxFn): BoxFn =>
+    (x, y, z, w, hh, d, c) =>
+      fn(x, y + base, z, w, hh, d, c);
+  const ctx = base ? { B: lift(raw.B), D: lift(raw.D) } : raw;
   const { B, D } = ctx;
   const stories = h.stories ?? 1;
   const roofY = stories * STORY;
@@ -338,7 +349,7 @@ export function house(ctx: Pick<MapBuildContext, 'B' | 'D'>, h: HouseSpec): void
           .map((o) => doorAt(g.c + (o.at ?? 0))),
         ...(h.windows ?? [])
           .filter((o) => o.side === side && (o.story ?? 0) === s)
-          .map((o) => windowAt(g.c + (o.at ?? 0), o.w)),
+          .map((o) => ({ ...windowAt(g.c + (o.at ?? 0), o.w), y0: o.sill ?? WINDOW_SILL, y1: o.top ?? WINDOW_TOP })),
       ];
       wall(ctx, g.run, g.at, g.from, g.to, y, wallH, h.wall, holes, { frame, shutter: h.shutter });
       if (h.awning && s === 0) {

@@ -986,6 +986,11 @@ const SKY_LIGHT = 0xdcecff;
 const GROUND_LIGHT = 0xb3a68e;
 const HEMI_INTENSITY = 1.4;
 const SUN_INTENSITY = 2.3;
+/** Step caps: a lighter slab on each step, a hair above it and sticking out a little (a nosing). */
+const STEP_CAP_H = 0.05;
+const STEP_CAP_LIFT = 0.005;
+const STEP_NOSING = 0.03;
+const STEP_CAP_TINT = 1.18;
 export function buildWorld(scene: THREE.Scene, map: GameMap): void {
   const H = map.half;
   const theme = THEMES[map.id];
@@ -1006,9 +1011,9 @@ export function buildWorld(scene: THREE.Scene, map: GameMap): void {
   const rand = rng(H * 97 + map.id.length);
   const arena = new Batch(skyShade(map.boxes));
   const props = new Batch();
-  const solid = (b: MapBox) => {
+  const solid = (b: MapBox, tint?: string) => {
     const [texName, tile] = theme[b.c] || COMMON[b.c] || theme.wall;
-    const color = map.colors[b.c] || map.colors.wall;
+    const color = tint ?? (map.colors[b.c] || map.colors.wall);
     const geo = tile ? worldBox(b, tile) : tiledBox(b.w, b.h, b.d, tile);
     arena.add(geo, mat(color, texName, { vertexColors: true }), b.x, b.y + b.h / 2, b.z);
   };
@@ -1030,6 +1035,14 @@ export function buildWorld(scene: THREE.Scene, map: GameMap): void {
     if (b.c.startsWith('bld'))
       props.add(BOX, mat('#7d7f84', 'concrete'), b.x, b.y + b.h + 0.15, b.z, 0, b.w + 0.3, 0.3, b.d + 0.3);
     solid(b);
+    // Steps: a lighter cap on top so every step reads on its own
+    if (b.c === 'stair' || b.c === 'step') {
+      const cap = new THREE.Color(map.colors[b.c] ?? map.colors.wall).multiplyScalar(STEP_CAP_TINT).getStyle();
+      solid(
+        { ...b, y: b.y + b.h + STEP_CAP_LIFT - STEP_CAP_H, h: STEP_CAP_H, w: b.w + STEP_NOSING, d: b.d + STEP_NOSING },
+        cap,
+      );
+    }
   }
   for (const b of map.decor) solid(b);
   arena.build(scene, { cast: true, receive: true });

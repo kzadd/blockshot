@@ -281,7 +281,6 @@ export default function Game({ session, onLeave }: { session: Session; onLeave: 
 
       {ready && !choosing && !dead && (
         <HUD
-          info={info}
           engine={engine}
           map={map}
           mode={room.mode}

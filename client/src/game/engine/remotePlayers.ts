@@ -16,7 +16,14 @@ import {
   type WeaponId,
 } from '@blockshot/shared';
 import { palette, teamColor } from '../../settings/palette';
-import { buildCharacter, buildGun, makeNameTag, type CharacterModel, type NameTag } from '../render/models';
+import {
+  buildCharacter,
+  buildGun,
+  makeNameTag,
+  type CharacterModel,
+  type GunModel,
+  type NameTag,
+} from '../render/models';
 import { damp, dampAngle } from './util';
 
 const INFECTED_COLOR = '#6fcf3a';
@@ -24,6 +31,10 @@ const INFECTED_COLOR = '#6fcf3a';
 const BUFFER_SIZE = 20;
 const NAME_TAG_Y = 2.3;
 const REMOTE_GUN_SCALE = 1.3;
+/** Muzzle flash of remote guns (ms) and the shot origin when the gun is not drawn yet. */
+const REMOTE_FLASH_MS = 60;
+const MUZZLE_Y_STANDING = 1.35;
+const MUZZLE_Y_SLIDING = 0.85;
 const BUBBLE_Y = 0.95;
 // Spawn protection bubble
 const bubbleGeo = new THREE.SphereGeometry(1, 18, 12);
@@ -67,6 +78,7 @@ export interface Remote {
   team: Team | -1;
   color: string;
   weaponId: WeaponId | null;
+  gun: GunModel | null;
   buffer: Sample[];
   rx: number;
   sl: number;
@@ -123,6 +135,7 @@ export class RemotePlayers {
           team: -1,
           color: '#ffffff',
           weaponId: null,
+          gun: null,
           buffer: [],
           rx: 0,
           sl: 0,
@@ -186,16 +199,18 @@ export class RemotePlayers {
     r.skin = p.sk;
     r.team = p.tm;
     r.weaponId = null;
+    r.gun = null;
     r.buffer.length = 0;
   }
 
   private setGun(r: Remote, wid: WeaponId): void {
     if (!r.model) return;
     r.model.hand.clear();
-    const g = buildGun(wid, false, r.color);
+    const g = buildGun(wid, true, r.color);
     g.scale.setScalar(REMOTE_GUN_SCALE);
     r.model.hand.add(g);
     r.weaponId = wid;
+    r.gun = g;
   }
 
   private remove(id: string): void {
@@ -235,6 +250,8 @@ export class RemotePlayers {
     for (const r of this.all.values()) {
       if (!r.model || !r.alive) continue;
       if (r.bubble) r.bubble.visible = r.prot;
+      const flash = r.gun?.userData.flash;
+      if (flash) flash.visible = now - r.lastShot < REMOTE_FLASH_MS;
       const g = r.model.group;
       const s = this.sample(r, renderTime);
       if (!s) continue;
@@ -292,14 +309,24 @@ export class RemotePlayers {
 
   markShot(id: string, now: number): Remote | undefined {
     const r = this.all.get(id);
-    if (r) r.lastShot = now;
+    if (!r) return r;
+    r.lastShot = now;
+    const flash = r.gun?.userData.flash;
+    if (flash) {
+      flash.rotation.z = Math.random() * Math.PI * 2;
+      flash.visible = true;
+    }
     return r;
   }
 
-  /** Shot origin of a remote (its gun height). */
+  /** Shot origin of a remote: the muzzle of the gun it holds (or its gun height while not drawn). */
   muzzle(r: Remote, out = this.tmp): THREE.Vector3 | null {
+    if (r.gun && r.model) {
+      r.model.group.updateMatrixWorld(true);
+      return r.gun.localToWorld(out.set(0, r.gun.userData.muzzleY, r.gun.userData.muzzleZ));
+    }
     const g = r.model?.group.position;
-    return g ? out.set(g.x, g.y + (r.sl ? 0.85 : 1.35), g.z) : null;
+    return g ? out.set(g.x, g.y + (r.sl ? MUZZLE_Y_SLIDING : MUZZLE_Y_STANDING), g.z) : null;
   }
 
   dispose(): void {

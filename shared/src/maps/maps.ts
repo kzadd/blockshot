@@ -97,6 +97,13 @@ const MAP_DEFS: Record<MapId, MapDef> = {
       step: '#b9a27c',
       crate: '#c99a55',
       crate2: '#8f7a52',
+      plaster: '#e2c79c',
+      slab: '#b39a74',
+      stair: '#c9b08a',
+      tile: '#d9a77a',
+      frame: '#5b3d26',
+      awning: '#b5553a',
+      trim: '#f0e2c6',
     },
   },
   ciudad: {

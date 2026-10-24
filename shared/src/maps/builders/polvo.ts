@@ -1,23 +1,118 @@
 import { BARREL, TREE, pad, sandbags } from '../props';
+import { facade, house, mirrorHouse, type HouseSpec } from '../structures';
 import type { BoxKind, MapBuildContext } from '../types';
+
+/** Common look of the adobe houses. */
+const ADOBE = {
+  stories: 2,
+  wall: 'plaster',
+  ground: 'tile',
+  awning: 'awning',
+  parapet: true,
+} as const satisfies Partial<HouseSpec>;
 
 // Polvo: desert town with three routes (tunnel, mid and long hall) and two bomb sites in the north.
 // Coordinates are designed for the medium size (80 m) and scaled for the others.
-export function buildPolvo({ B, S, P, H }: MapBuildContext): void {
+export function buildPolvo(ctx: MapBuildContext): void {
+  const { B, S, P, H } = ctx;
   const k = H / 40;
   // Rectangle [x1,x2] × [z1,z2] of height h, resting on y
   const R = (x1: number, x2: number, z1: number, z2: number, h: number, c: BoxKind = 'wall2', y = 0) =>
     B(((x1 + x2) / 2) * k, y, ((z1 + z2) / 2) * k, (x2 - x1) * k, h, (z2 - z1) * k, c);
-  // Houses: the corridors are left between them
-  R(-22, -6, -12, -2, 7);
-  R(-22, -6, 2, 12, 7);
-  R(6, 22, -12, -8, 7);
-  R(6, 22, -4, 12, 7);
-  R(-22, -6, 18, 28, 7);
-  R(6, 22, 18, 28, 7);
-  R(30, 40, -10, 26, 8, 'wall');
-  R(-40, -30, -10, 26, 8, 'wall');
-  R(-8, 8, -30, -24, 4);
+  // Adobe house over the rectangle [x1,x2] × [z1,z2]; `spec` places the openings knowing the real size
+  const RH = (x1: number, x2: number, z1: number, z2: number, spec: (w: number, d: number) => Partial<HouseSpec>) => {
+    const w = (x2 - x1) * k;
+    const d = (z2 - z1) * k;
+    const box = { x: ((x1 + x2) / 2) * k, z: ((z1 + z2) / 2) * k, w, d };
+    return { ...ADOBE, ...box, ...spec(w, d) };
+  };
+  // Houses: the corridors are left between them. Most can be entered: they open side routes and
+  // first-floor windows over the streets, but keep their old silhouette (roof + parapet = 7 m)
+  house(
+    ctx,
+    RH(-22, -6, -12, -2, (w, d) => ({
+      doors: [
+        { side: 'e', at: 0.2 * d },
+        { side: 'w', at: -0.2 * d },
+        { side: 's', at: -0.25 * w },
+      ],
+      windows: [
+        { side: 'e', at: -0.25 * d },
+        { side: 'n', at: 0.25 * w, story: 1 },
+        { side: 'n', at: -0.25 * w, story: 1 },
+        { side: 'e', at: 0.25 * d, story: 1 },
+        { side: 'w', at: 0.2 * d, story: 1 },
+        { side: 's', at: 0.25 * w, story: 1 },
+      ],
+      stairs: [{ side: 'n', at: 0.15 * w, dir: -1 }],
+    })),
+  );
+  // Solid blocks: closed shutters and a cornice
+  const RF = (x1: number, x2: number, z1: number, z2: number, h: number, c: BoxKind = 'wall2') => {
+    R(x1, x2, z1, z2, h, c);
+    facade(ctx.D, ((x1 + x2) / 2) * k, ((z1 + z2) / 2) * k, (x2 - x1) * k, (z2 - z1) * k, h, 'shutter');
+  };
+  RF(-22, -6, 2, 12, 7);
+  RF(6, 22, -12, -8, 7);
+  const houseD = RH(6, 22, -4, 12, (w, d) => ({
+    doors: [
+      { side: 'w', at: -0.25 * d },
+      { side: 'e', at: 0.25 * d },
+      { side: 's', at: 0 },
+    ],
+    windows: [
+      { side: 'e', at: -0.25 * d },
+      { side: 'w', at: 0.25 * d },
+      { side: 'w', at: -0.25 * d, story: 1 },
+      { side: 'w', at: 0.25 * d, story: 1 },
+      { side: 'n', at: -0.25 * w, story: 1 },
+      { side: 'e', at: 0.25 * d, story: 1 },
+      { side: 's', at: 0.25 * w, story: 1 },
+      { side: 's', at: -0.25 * w, story: 1 },
+    ],
+    partitions: [{ run: 'x', at: 0, door: -0.25 * w }],
+    stairs: [{ side: 'n', at: 0.3 * w, dir: -1 }],
+  }));
+  house(ctx, houseD);
+  B(houseD.x - 0.2 * houseD.w, 0, houseD.z + 0.25 * houseD.d, 1.4, 1.2, 1.4, 'crate');
+  // The two houses by the south spawn have a hatch up to a roof terrace
+  const houseE = RH(-22, -6, 18, 28, (w, d) => ({
+    doors: [
+      { side: 's', at: -0.2 * w },
+      { side: 'n', at: 0.2 * w },
+    ],
+    windows: [
+      { side: 's', at: 0.2 * w },
+      { side: 'n', at: -0.2 * w },
+      { side: 'n', at: 0.25 * w, story: 1 },
+      { side: 'n', at: -0.25 * w, story: 1 },
+      { side: 's', at: 0.25 * w, story: 1 },
+      { side: 's', at: -0.25 * w, story: 1 },
+      { side: 'w', at: 0, story: 1 },
+    ],
+    stairs: [
+      { side: 'w', at: 0.35 * d, dir: -1 },
+      { side: 'e', at: -0.35 * d, dir: 1, story: 1 },
+    ],
+  }));
+  house(ctx, houseE);
+  house(ctx, mirrorHouse({ ...houseE, x: -houseE.x }, -1, 1));
+  RF(30, 40, -10, 26, 8, 'wall');
+  RF(-40, -30, -10, 26, 8, 'wall');
+  // Low house between the sites, with outside stairs to its roof
+  house(
+    ctx,
+    RH(-8, 8, -30, -24, (w) => ({
+      stories: 1,
+      doors: [
+        { side: 'n', at: 0.25 * w },
+        { side: 's', at: -0.3 * w },
+        { side: 's', at: 0.3 * w },
+      ],
+      windows: [{ side: 'e' }, { side: 'w' }],
+      outside: { side: 'n', at: -0.45 * w, dir: 1 },
+    })),
+  );
   // Mid and long hall doors, with lintel
   R(-14, -2, -17, -15, 5);
   R(2, 14, -17, -15, 5);

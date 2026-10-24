@@ -36,6 +36,8 @@ const FRAME_OUT = 0.05;
 const CORNICE_H = 0.25;
 const CORNICE_OUT = 0.12;
 const SHUTTER_W = 0.45;
+/** Distance between the closed windows of a facade (m). */
+const FACADE_SPACING = 4;
 /** How deep decoration bands sink into the wall they hug (hidden, avoids gaps). */
 const BAND_INSET = 0.05;
 /** Awnings over doors: height, depth, thickness and overhang past the door sides (decoration). */
@@ -450,6 +452,41 @@ function band(D: BoxFn, h: Rect2, y: number, height: number, out: number, kind: 
   }
 }
 type Rect2 = Pick<HouseSpec, 'x' | 'z' | 'w' | 'd'>;
+
+/**
+ * Facade for a solid block you cannot enter: closed shutters in rows (one per story) on every side and a
+ * cornice at the top. Decoration only.
+ */
+export function facade(
+  D: BoxFn,
+  x: number,
+  z: number,
+  w: number,
+  d: number,
+  h: number,
+  shutter: BoxKind,
+  trim: BoxKind | null = 'trim',
+  spacing = FACADE_SPACING,
+): void {
+  const sh = WINDOW_TOP - WINDOW_SILL;
+  for (let y = WINDOW_SILL; y + sh < h - CORNICE_H; y += STORY) {
+    for (const s of [1, -1]) {
+      const nx = Math.floor(w / spacing);
+      for (let i = 0; i < nx; i++) {
+        const a = x - w / 2 + (i + 0.5) * (w / nx);
+        D(a, y, z + s * (d / 2 + FRAME_OUT / 2), WINDOW_W, sh, FRAME_OUT, shutter);
+        if (trim) D(a, y - FRAME, z + s * (d / 2 + FRAME_OUT), WINDOW_W + 2 * FRAME, FRAME, 2 * FRAME_OUT, trim);
+      }
+      const nz = Math.floor(d / spacing);
+      for (let i = 0; i < nz; i++) {
+        const a = z - d / 2 + (i + 0.5) * (d / nz);
+        D(x + s * (w / 2 + FRAME_OUT / 2), y, a, FRAME_OUT, sh, WINDOW_W, shutter);
+        if (trim) D(x + s * (w / 2 + FRAME_OUT), y - FRAME, a, 2 * FRAME_OUT, FRAME, WINDOW_W + 2 * FRAME, trim);
+      }
+    }
+  }
+  if (trim) band(D, { x, z, w, d }, h - CORNICE_H, CORNICE_H, CORNICE_OUT, trim);
+}
 
 /** Mirrors a house spec written for the (+x, +z) corner into the (sx, sz) one; x and z are left as given. */
 export function mirrorHouse(h: HouseSpec, sx: number, sz: number): HouseSpec {

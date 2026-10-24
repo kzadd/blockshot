@@ -10,6 +10,7 @@ import {
   type HitTarget,
   type MoveState,
   type ShootMessage,
+  type ShotHit,
   type Vec3,
   type Weapon,
   type WeaponId,
@@ -19,7 +20,7 @@ import type { InputController } from './input';
 import { damp, spreadDir } from './util';
 
 const H = WEAPON_HANDLING;
-/** Hip-fire tracers leave the gun on the right; aiming, from the centre. */
+/** Fallback tracer origin when the gun is not drawn (scoped): hip fire on the right, aiming from the centre. */
 const MUZZLE_HIP: Vec3 = [0.22, -0.16, -0.7];
 const MUZZLE_AIM_X = 0;
 /** A shot counts as missed if no hit marker arrives within this time. */
@@ -47,8 +48,10 @@ export interface Shooter {
   fired(): void;
   sendReload(): void;
   sendSwitch(slot: number): void;
-  tracer(from: THREE.Vector3, to: THREE.Vector3): void;
-  impact(at: THREE.Vector3, onPlayer: boolean): void;
+  /** draws a bullet and its impact; `pellet` = one of several (shotgun), drawn lighter */
+  bullet(from: THREE.Vector3, to: THREE.Vector3, hit: ShotHit['type'] | null, pellet: boolean): void;
+  /** where the first-person gun's muzzle is drawn (null while scoped or hidden) */
+  muzzle(out: THREE.Vector3): THREE.Vector3 | null;
 }
 
 const round = (v: number) => +v.toFixed(DIRECTION_DECIMALS);
@@ -233,21 +236,19 @@ export class WeaponController {
     const sp = this.spread(w, move);
     const o: Vec3 = [cam.position.x, cam.position.y, cam.position.z];
     const targets = this.shooter.targets();
-    const muzzle = new THREE.Vector3(
-      this.aimLerp > AIM_HALF ? MUZZLE_AIM_X : MUZZLE_HIP[0],
-      MUZZLE_HIP[1],
-      MUZZLE_HIP[2],
-    )
-      .applyQuaternion(cam.quaternion)
-      .add(cam.position);
+    const muzzle =
+      this.shooter.muzzle(new THREE.Vector3()) ??
+      new THREE.Vector3(this.aimLerp > AIM_HALF ? MUZZLE_AIM_X : MUZZLE_HIP[0], MUZZLE_HIP[1], MUZZLE_HIP[2])
+        .applyQuaternion(cam.quaternion)
+        .add(cam.position);
+    const pellet = w.pellets > 1;
     const dirs: Vec3[] = [];
     for (let i = 0; i < w.pellets; i++) {
       const d = spreadDir(base, sp);
       dirs.push([round(d.x), round(d.y), round(d.z)]);
       const { t, hit } = castShot(o, [d.x, d.y, d.z], this.shooter.colliders, targets, '', w.range);
       const end = cam.position.clone().addScaledVector(d, t);
-      this.shooter.tracer(muzzle, end);
-      if (hit) this.shooter.impact(end, hit.type === 'player');
+      this.shooter.bullet(muzzle, end, hit?.type ?? null, pellet);
     }
     this.shooter.send({ o, d: dirs, lag: this.lag() });
     this.bloom = Math.min(w.bloomMax ?? 0, this.bloom + (w.bloom ?? 0));

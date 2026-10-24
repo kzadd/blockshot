@@ -390,21 +390,21 @@ function TopCenter({ mode, scoreLimit, you }: { mode: ModeId; scoreLimit: number
   const pos = sorted.findIndex((p) => p.id === you) + 1;
   const me = sorted[pos - 1];
   const second = sorted[1];
-  // When you lead, the right side shows who follows you
+  // When you lead, the right side shows who follows you (nothing when you are alone)
   const right =
-    pos === 1
-      ? second
-        ? `2º ${second.n} · ${second.k}`
-        : `Tú · ${me?.k ?? 0}/${scoreLimit}`
-      : `Tú ${pos}º · ${me?.k ?? 0}/${scoreLimit}`;
+    pos === 1 ? (second ? `2º ${second.n} · ${second.k}` : null) : `Tú ${pos}º · ${me?.k ?? 0}/${scoreLimit}`;
   return (
     <div className="leader">
       <span className="first">
         1º {pos === 1 ? 'Tú' : first.n} · {first.k}
         {pos === 1 ? `/${scoreLimit}` : ''}
       </span>
-      <span className="sep" />
-      <span>{right}</span>
+      {right && (
+        <>
+          <span className="sep" />
+          <span>{right}</span>
+        </>
+      )}
     </div>
   );
 }

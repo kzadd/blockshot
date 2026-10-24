@@ -47,7 +47,7 @@ export default function DeathScreen({ lastDeath, current, feed, you, mode, info,
               {killer.name}
             </span>
             <span>
-              {lastDeath.weapon} · le quedaban <b>{lastDeath.hp}</b> de vida
+              {lastDeath.weapon} · {lastDeath.name} tenía <b>{lastDeath.hp}</b> de vida
             </span>
           </div>
         )}

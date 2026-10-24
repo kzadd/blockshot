@@ -336,7 +336,7 @@ export default function Lobby({ onJoined }: { onJoined: (s: Session) => void }) 
                             {r.locked ? ' 🔒' : ''}
                           </b>
                           <small>
-                            {r.map} · {r.size} · {r.mode} a {r.limit} · de {r.host}
+                            {r.mode} a {r.limit} · {r.map} {r.size.toLowerCase()} · de {r.host}
                           </small>
                         </div>
                         <div className="room-count">

@@ -337,7 +337,14 @@ export default function Game({ session, onLeave }: { session: Session; onLeave: 
       )}
 
       {ready && (showScores || match) && (
-        <ScoresLayer match={match} you={you} info={info} scoreLimit={room.scoreLimit} mode={room.mode} />
+        <ScoresLayer
+          match={match}
+          you={you}
+          info={info}
+          scoreLimit={room.scoreLimit}
+          mode={room.mode}
+          onLeave={leave}
+        />
       )}
 
       {menu === 'settings' && <Settings onClose={() => setMenu(null)} />}

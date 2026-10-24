@@ -72,7 +72,7 @@ export default function Settings({ onClose }: { onClose: () => void }) {
                           thickness: 2,
                           dynamic: false,
                           outline: false,
-                          color: ch.style === c.id ? '#ffc93c' : '#eef2f7',
+                          color: ch.style === c.id ? '#ffc93c' : '#0f1923',
                         }}
                         className="crosshair mini"
                         half={10}

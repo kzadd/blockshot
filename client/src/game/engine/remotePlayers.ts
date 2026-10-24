@@ -37,6 +37,11 @@ const WALK_CYCLE = 2.2;
 const WALK_FULL_SPEED = 7;
 const LEG_SWING = 0.7;
 const LEG_SWING_CROUCHED = 0.35;
+/** Knee bend per radian of the leg swinging back while walking. */
+const KNEE_BEND = 1.3;
+/** Crouched: front shin vertical, back knee on the floor. */
+const KNEE_CROUCH_FRONT = -1.1;
+const KNEE_CROUCH_BACK = -1.25;
 /** A running enemy (not crouched, not in the air) this close leaves a footstep mark. */
 const FOOTSTEP_SPEED = 3;
 const FOOTSTEP_EVERY_M = 4.5;
@@ -191,10 +196,9 @@ export class RemotePlayers {
 
   private setGun(r: Remote, wid: WeaponId): void {
     if (!r.model) return;
-    r.model.hand.clear();
     const g = buildGun(wid, false, r.color);
     g.scale.setScalar(REMOTE_GUN_SCALE);
-    r.model.hand.add(g);
+    r.model.holdGun(g);
     r.weaponId = wid;
   }
 
@@ -267,6 +271,10 @@ export class RemotePlayers {
       const low = r.sl || r.cr;
       r.model.legL.rotation.x = r.sl ? 1.2 : r.cr ? 1.1 + swing : swing;
       r.model.legR.rotation.x = r.sl ? 1.2 : r.cr ? -0.35 - swing : -swing;
+      const kneeL = r.sl ? 0 : r.cr ? KNEE_CROUCH_FRONT : -Math.max(0, -swing) * KNEE_BEND;
+      const kneeR = r.sl ? 0 : r.cr ? KNEE_CROUCH_BACK : -Math.max(0, swing) * KNEE_BEND;
+      r.model.kneeL.rotation.x += (kneeL - r.model.kneeL.rotation.x) * k;
+      r.model.kneeR.rotation.x += (kneeR - r.model.kneeR.rotation.x) * k;
       r.model.legL.position.y = r.model.legR.position.y += ((low ? 0.5 : 0.8) - r.model.legR.position.y) * k;
       r.model.upper.position.y += ((low ? -0.5 : 0) - r.model.upper.position.y) * k;
     }

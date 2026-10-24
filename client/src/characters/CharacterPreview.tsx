@@ -122,7 +122,7 @@ export default function CharacterPreview({ charId, skin }: { charId: CharacterId
     });
     const gun = buildGun(ch.primary, false, ch.color);
     gun.scale.setScalar(GUN_SCALE);
-    model.hand.add(gun);
+    model.holdGun(gun);
     model.aim.rotation.x = AIM_TILT;
     v.holder.add(model.group);
   }, [charId, skin]);

@@ -32,6 +32,8 @@ export const HITBOX = {
 } as const;
 
 const EPSILON = 1e-9;
+/** Collider kinds that bullets go through (railings are mostly gaps between bars). */
+export const SHOOT_THROUGH: ReadonlySet<string> = new Set(['railing']);
 
 export function rayAABB(o: Vec3, d: Vec3, min: Vec3, max: Vec3): number {
   let tmin = 0;
@@ -94,7 +96,7 @@ export interface ShotResult {
 export function castShot(
   o: Vec3,
   d: Vec3,
-  colliders: readonly Pick<Collider, 'min' | 'max'>[],
+  colliders: readonly (Pick<Collider, 'min' | 'max'> & { c?: string })[],
   players: readonly HitTarget[],
   ignoreId: string,
   range: number,
@@ -102,6 +104,7 @@ export function castShot(
   let t = range;
   let hit: ShotHit | null = null;
   for (const b of colliders) {
+    if (b.c !== undefined && SHOOT_THROUGH.has(b.c)) continue;
     const bt = rayAABB(o, d, b.min, b.max);
     if (bt < t) {
       t = bt;

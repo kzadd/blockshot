@@ -21,9 +21,21 @@ export type StructureKind =
   | 'bld2'
   | 'bld3'
   | 'bld4'
-  | 'pad';
+  | 'pad'
+  // building materials
+  | 'brick'
+  | 'plaster'
+  | 'concrete'
+  | 'metal'
+  | 'wood'
+  | 'slab'
+  | 'stair'
+  | 'tile'
+  | 'railing';
 export type PropKind = 'barrel' | 'planter' | 'trunk' | 'lamp' | 'sandbag' | 'pallet' | 'cactus' | 'car' | 'carTop';
-export type BoxKind = StructureKind | PropKind;
+/** Decoration that never collides (window and door frames, eaves, shutters, awnings). */
+export type DecorKind = 'trim' | 'frame' | 'shutter' | 'awning';
+export type BoxKind = StructureKind | PropKind | DecorKind;
 
 /** Axis-aligned box. x, z = centre · y = base · w, h, d = size. `p` = prop id (decoration). */
 export interface MapBox {
@@ -45,6 +57,8 @@ export type BoxFn = (x: number, y: number, z: number, w: number, h: number, d: n
 export interface MapBuildContext {
   /** add a box */
   B: BoxFn;
+  /** add a decoration box: drawn by the client but it never collides nor blocks bullets */
+  D: BoxFn;
   /** add a spawn point */
   S: (x: number, z: number) => void;
   /** add a decoration prop on whatever ground is at (x, z); dropped if it collides or covers a spawn */
@@ -83,6 +97,8 @@ export interface GameMap {
   sky: string;
   colors: MapColors;
   boxes: MapBox[];
+  /** decoration only (no collision): trims, frames, eaves */
+  decor: MapBox[];
   spawns: Spawn[];
   /** Capture the flag bases */
   bases: Record<SideTeam, Vec3>;

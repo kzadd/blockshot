@@ -9,6 +9,7 @@ import { buildDesfiladero } from './builders/desfiladero';
 import { buildPatio } from './builders/patio';
 import { buildPolvo } from './builders/polvo';
 import { PROP_COLORS } from './props';
+import { STRUCTURE_COLORS } from './structures';
 import type { BoxKind, GameMap, MapBox, MapDef, MapId, PropPart, SizeId, Spawn } from './types';
 
 export const MAP_SIZES: Record<SizeId, { id: SizeId; name: string; half: number; players: number }> = {
@@ -238,6 +239,10 @@ export function getMap(mapId: string, sizeId: string): GameMap {
   const B = (x: number, y: number, z: number, w: number, h: number, d: number, c: BoxKind = 'wall') => {
     boxes.push({ x: round2(x), y: round2(y), z: round2(z), w: round2(w), h: round2(h), d: round2(d), c });
   };
+  const decor: MapBox[] = [];
+  const D = (x: number, y: number, z: number, w: number, h: number, d: number, c: BoxKind = 'trim') => {
+    decor.push({ x: round2(x), y: round2(y), z: round2(z), w: round2(w), h: round2(h), d: round2(d), c });
+  };
   // Floor and outer walls
   B(0, -1, 0, 2 * H, 1, 2 * H, 'floor');
   B(0, 0, -H - 0.5, 2 * H + 2, def.wallH, 1);
@@ -247,6 +252,7 @@ export function getMap(mapId: string, sizeId: string): GameMap {
   const props: PendingProp[] = [];
   def.build({
     B,
+    D,
     S: (x, z) => points.push([round2(x), round2(z)]),
     P: (x, z, parts) => props.push({ x, z, parts }),
     H,
@@ -271,8 +277,9 @@ export function getMap(mapId: string, sizeId: string): GameMap {
     bounds: H - BOUNDS_MARGIN,
     wallH: def.wallH,
     sky: def.sky,
-    colors: { ...PROP_COLORS, ...def.colors },
+    colors: { ...PROP_COLORS, ...STRUCTURE_COLORS, ...def.colors },
     boxes,
+    decor,
     spawns,
     bases: { 1: base(side(1)), 2: base(side(-1)) },
   };

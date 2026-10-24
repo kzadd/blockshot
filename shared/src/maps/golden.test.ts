@@ -7,21 +7,21 @@ import * as shared from '../index';
 const hash = (v: unknown) => createHash('sha256').update(JSON.stringify(v)).digest('hex').slice(0, 16);
 
 const MAP_HASHES: Record<string, string> = {
-  'patio:s': 'ef18d7dca8bb0386',
-  'patio:m': 'd012305acf7b7033',
-  'patio:l': '9d777c357ea21b8d',
-  'almacen:s': '5a86a92fb635548e',
-  'almacen:m': '3c4d1c44e6c5b4a2',
-  'almacen:l': 'f296f4f7cf5b5d6f',
-  'desfiladero:s': '55aa8cb484847c5d',
-  'desfiladero:m': 'aae0d1a0b01a572d',
-  'desfiladero:l': 'd6ea89c9edefe2e2',
-  'polvo:s': '63eca244324e473f',
-  'polvo:m': '348d515cae5d2c7d',
-  'polvo:l': '5d0f94050b7d1d7b',
-  'ciudad:s': '46d921cb3bf3b553',
-  'ciudad:m': 'abd87e6174468458',
-  'ciudad:l': '11d9d65f2b727f73',
+  'patio:s': '737f7e71f7dfdf2d',
+  'patio:m': 'cd5ea14e1182c1be',
+  'patio:l': 'fcf39f3182d26936',
+  'almacen:s': '9d3c8f537545f749',
+  'almacen:m': 'f53acec140361bde',
+  'almacen:l': 'de3bc230a78565dc',
+  'desfiladero:s': 'ac41c132a2da7698',
+  'desfiladero:m': 'e0f30e8b9e8c1c10',
+  'desfiladero:l': '0d87db5b0434b0d7',
+  'polvo:s': '63489419317c867e',
+  'polvo:m': '2be33816dceb0b40',
+  'polvo:l': 'e355fcc13d02ef34',
+  'ciudad:s': '827ebbd0d0b00f9d',
+  'ciudad:m': 'df2c8f08300f2e3b',
+  'ciudad:l': '2b19f199dd2305f8',
 };
 
 const TABLE_HASHES = {

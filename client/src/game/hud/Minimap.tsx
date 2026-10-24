@@ -1,5 +1,5 @@
 import { useEffect, useRef, type RefObject } from 'react';
-import type { GameMap, SideTeam } from '@blockshot/shared';
+import { ROOF_KINDS, type GameMap, type SideTeam } from '@blockshot/shared';
 import { palette, teamColor } from '../../settings/palette';
 import { uiScale } from '../../ui/ui';
 
@@ -19,6 +19,8 @@ const SIZE = 164; // inside of the 170 box with a 3 px border
 const PAD = 6;
 const REDRAW_MS = 50;
 const BACKGROUND_ALPHA = 0.5;
+/** Roofs are see-through so the rooms under them can be read. */
+const ROOF_ALPHA = 0.35;
 const DOT_R = 5.5;
 const INK = '#0b1426';
 
@@ -53,6 +55,7 @@ export default function Minimap({
     for (const box of [...map.boxes].sort((p, q) => p.y + p.h - (q.y + q.h))) {
       if (box.c === 'floor') continue;
       b.fillStyle = map.colors[box.c] ?? map.colors.wall;
+      b.globalAlpha = ROOF_KINDS.has(box.c) ? BACKGROUND_ALPHA * ROOF_ALPHA : BACKGROUND_ALPHA;
       b.fillRect(toPx(box.x - box.w / 2), toPx(box.z - box.d / 2), box.w * world, box.d * world);
     }
 

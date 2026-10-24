@@ -51,6 +51,8 @@ import { WeaponController } from './weapons';
 
 const HUD_MS = 1000 / 15;
 const MAX_PIXEL_RATIO = 1.5;
+/** Filmic tone mapping keeps bright sunlit walls from clipping; exposure compensates its darker mid-tones. */
+const TONE_EXPOSURE = 1.15;
 /** Frame-based animations never step more than this (s), like a 30 fps frame. */
 const MAX_FRAME_DT = 1 / 30;
 /** The simulation catches up at most this much real time after a stall (tab in background…). */
@@ -164,6 +166,9 @@ export class Engine implements MinimapSource {
     r.setSize(container.clientWidth, container.clientHeight);
     r.shadowMap.enabled = true;
     r.shadowMap.type = THREE.PCFSoftShadowMap;
+    r.outputColorSpace = THREE.SRGBColorSpace;
+    r.toneMapping = THREE.ACESFilmicToneMapping;
+    r.toneMappingExposure = TONE_EXPOSURE;
     r.autoClear = false;
     container.appendChild(r.domElement);
 

@@ -6,6 +6,7 @@ export * from './characters/characters';
 export * from './modes/modes';
 export * from './maps/types';
 export * from './maps/maps';
+export { ROOF_KINDS } from './maps/structures';
 export * from './net/constants';
 export * from './net/events';
 export * from './net/schemas';

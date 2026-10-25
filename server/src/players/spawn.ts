@@ -1,4 +1,12 @@
-import { PLAYER, createMoveState, isOutfitColor, isSkinId, type Character, type Spawn } from '@blockshot/shared';
+import {
+  PLAYER,
+  createMoveState,
+  grenadesFor,
+  isOutfitColor,
+  isSkinId,
+  type Character,
+  type Spawn,
+} from '@blockshot/shared';
 import type { Room } from '../rooms/room';
 import { recordPosition } from './history';
 import { equip } from './loadout';
@@ -59,6 +67,8 @@ export function spawnPlayer(room: Room, p: Player, ch: Character, skin: string |
     simBudget: 0,
     life: p.life + 1,
   });
+  p.picks[ch.id] = (p.picks[ch.id] ?? 0) + 1;
+  p.grenades = grenadesFor(room.modeId, p.team);
   equip(room, p);
   recordPosition(p, now);
   room.channel.to(p.id, 'player:spawned', [

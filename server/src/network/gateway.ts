@@ -3,20 +3,27 @@
 import type { Server, Socket } from 'socket.io';
 import {
   CHAR_BY_ID,
+  BotAddSchema,
   COMBAT_LOCK_MS,
+  DIRECTION_LENGTH_TOLERANCE,
   CreateRoomSchema,
   EmptySchema,
+  GrenadeSchema,
   InputSchema,
   JoinRoomSchema,
   MAX_PING_MS,
   PLAYER,
   PingSchema,
+  QUICK_CHAT,
+  QUICK_CHAT_COOLDOWN_MS,
+  QuickChatSchema,
   SPAWN_REQUEST_GRACE_MS,
   ShootSchema,
   SpawnSchema,
   SwitchSchema,
   TEAM_SWITCH_COOLDOWN,
   TeamSetSchema,
+  VoteSchema,
   canSwitchTeam,
   clamp,
   isCharacterId,
@@ -25,13 +32,17 @@ import {
   type ClientToServerEvents,
   type ServerToClientEvents,
 } from '@blockshot/shared';
-import { handleReload, handleShoot, handleSwitch } from '../combat/shooting';
+import { throwGrenade } from '../combat/grenades';
+import { handleReload, handleShoot, handleSwitch, validOrigin } from '../combat/shooting';
 import type { Logger } from '../logger';
+import { castVote } from '../match/vote';
 import { addBot, removeBots } from '../players/bot';
 import { queueInputs } from '../players/movement';
 import type { Player } from '../players/player';
+import { isTeamRoom } from '../players/teams';
 import { spawnPlayer } from '../players/spawn';
 import { cleanNickname, type RoomRegistry } from '../rooms/registry';
+import { sessionStats } from '../stats/sessionStats';
 import { notice, type Room } from '../rooms/room';
 import { MESSAGE_LIMITS, RateLimiter, type MessageCategory } from './rateLimiter';
 
@@ -165,7 +176,7 @@ export function attachGateway(io: GameServer, rooms: RoomRegistry, log: Logger):
       const c = ctx();
       if (!c || c.room.matchOver || !isCharacterId(data.characterId)) return;
       const { room, p } = c;
-      if (p.alive) return;
+      if (p.alive || room.mode.canSpawn?.(room, p) === false) return;
       if (p.deathTime && Date.now() - p.deathTime < PLAYER.respawnDelay - SPAWN_REQUEST_GRACE_MS) return;
       spawnPlayer(room, p, CHAR_BY_ID[data.characterId], data.skin, data.color);
     });
@@ -178,7 +189,8 @@ export function attachGateway(io: GameServer, rooms: RoomRegistry, log: Logger):
       const team = d.team === 1 || d.team === 2 ? d.team : 0;
       if (!team || team === p.team) return;
       const now = Date.now();
-      if (now - p.teamAt < TEAM_SWITCH_COOLDOWN) {
+      // The cooldown stops team hopping mid-game; on the character screen (not alive) you switch at once
+      if (p.alive && now - p.teamAt < TEAM_SWITCH_COOLDOWN) {
         return socket.emit('notice', 'Espera unos segundos para volver a cambiar de equipo.');
       }
       if (p.alive && now - p.lastDamage < COMBAT_LOCK_MS) {
@@ -207,22 +219,50 @@ export function attachGateway(io: GameServer, rooms: RoomRegistry, log: Logger):
       if (c?.p.alive) handleReload(c.p);
     });
 
+    on('player:grenade', 'combat', GrenadeSchema, (d) => {
+      const c = ctx();
+      if (!c?.p.alive || c.room.matchOver || c.p.grenades <= 0 || !validOrigin(c.room, c.p, d.o)) return;
+      const len = Math.hypot(...d.d);
+      if (Math.abs(len - 1) > DIRECTION_LENGTH_TOLERANCE) return;
+      throwGrenade(c.room, c.p, d.o, [d.d[0] / len, d.d[1] / len, d.d[2] / len], Date.now());
+    });
+
     on('player:shoot', 'combat', ShootSchema, (d) => {
       const c = ctx();
       if (c?.p.alive && !c.room.matchOver) handleShoot(c.room, c.p, d);
     });
 
     // ------------------------------------------------------------ Server PC only
-    on('bot:add', 'lobby', EmptySchema, () => {
+    on('bot:add', 'lobby', BotAddSchema, (d) => {
       const c = ctx();
       if (!admin || !c) return;
-      const error = addBot(rooms, c.room);
+      const error = addBot(rooms, c.room, d?.level);
       if (error) socket.emit('notice', error);
     });
 
     on('bot:clear', 'lobby', EmptySchema, () => {
       const c = ctx();
       if (admin && c && !removeBots(rooms, c.room)) socket.emit('notice', 'No hay bots en la sala.');
+    });
+
+    // Quick chat: tactical phrases only reach the team in team modes
+    on('chat:quick', 'misc', QuickChatSchema, (d) => {
+      const c = ctx();
+      const now = Date.now();
+      if (!c || now - c.p.chatAt < QUICK_CHAT_COOLDOWN_MS) return;
+      c.p.chatAt = now;
+      const msg = { name: c.p.name, team: c.p.team, i: d.i };
+      if (QUICK_CHAT[d.i]!.all || !isTeamRoom(c.room)) return c.room.channel.broadcast('chat', [msg]);
+      for (const mate of c.room.players.values()) if (mate.team === c.p.team) c.room.channel.to(mate.id, 'chat', [msg]);
+    });
+
+    on('vote', 'misc', VoteSchema, (d) => {
+      const c = ctx();
+      if (c) castVote(c.room, c.p.id, d.i);
+    });
+
+    on('admin:stats', 'lobby', EmptySchema, (_d, cb) => {
+      if (admin && cb) (cb as (rows: unknown) => void)(sessionStats(rooms.all()));
     });
 
     socket.on('disconnect', (reason) => {

@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import {
   CHAR_BY_ID,
+  MEDALS,
+  QUICK_CHAT,
+  ZONE_NAMES,
   STREAK_REWARDS,
   WEAPONS,
   gunLadder,
@@ -27,6 +30,7 @@ export type FeedItem = { key: number; t: number; out?: boolean } & (
   | ({ type: 'kill' } & KillEvent)
   | { type: 'streak'; name: string; team: Team; label: string; n: number }
   | { type: 'notice'; text: string }
+  | { type: 'chat'; name: string; team: Team; text: string }
 );
 
 export interface KillBanner {
@@ -36,6 +40,7 @@ export interface KillBanner {
   label: string | undefined;
   n: number;
   reward: string | undefined;
+  medals: string[];
 }
 
 const ARMOR_MAX = Object.values(STREAK_REWARDS).find((r) => r.id === 'armor')?.amount ?? 50;
@@ -76,6 +81,11 @@ export function Feed({ feed, you, mode }: { feed: FeedItem[]; you: string; mode:
               <span className="w">{f.weapon}</span>
               {f.head && <HeadIcon />}
               <b style={{ color: color(f.victimTeam) }}>{f.victimName}</b>
+              {f.medals.map((m) => (
+                <span key={m} className="medal">
+                  {MEDALS[m]}
+                </span>
+              ))}
             </div>
           );
         }
@@ -87,6 +97,15 @@ export function Feed({ feed, you, mode }: { feed: FeedItem[]; you: string; mode:
               <span className="lbl">
                 {f.label} ({f.n})
               </span>
+            </div>
+          );
+        }
+        if (f.type === 'chat') {
+          return (
+            <div key={f.key} className={`feed-item chat${out}`}>
+              <Icon name="message" size={14} />
+              <b style={{ color: color(f.team) }}>{f.name}</b>
+              <span>{f.text}</span>
             </div>
           );
         }
@@ -251,6 +270,7 @@ function Ammo() {
     gunLevel: s.gunLevel,
     gunTotal: s.gunTotal,
     scoped: s.scoped,
+    grenades: s.grenades,
   }));
   if (!h) return null;
   const low = h.mag > 0 && h.mag <= h.magSize * LOW_AMMO;
@@ -284,6 +304,10 @@ function Ammo() {
               {h.slot === i && n}
             </span>
           ))}
+          <span className={`gren ${h.grenades ? '' : 'used'}`} title="Granada">
+            <em>G</em>
+            <Icon name="bomb" size={14} />
+          </span>
         </div>
       )}
     </div>
@@ -306,6 +330,8 @@ function TopCenter({ mode, scoreLimit, you }: { mode: ModeId; scoreLimit: number
     infect: s.infect,
     teamScore: s.teamScore,
     flags: s.flags,
+    zones: s.zones,
+    round: s.round,
   }));
   if (!h) return null;
   const players = h.players;
@@ -337,26 +363,46 @@ function TopCenter({ mode, scoreLimit, you }: { mode: ModeId; scoreLimit: number
   const teamScore = h.teamScore;
   if (top === 'teams' && teamScore) {
     return (
-      <div className="team-score">
-        {SIDES.map((t) => (
-          <div
-            key={t}
-            className={`ts ${h.myTeam === t ? 'mine' : ''}`}
-            style={{ '--t': teamVar(t), '--tt': TEAM_TXT[t], order: t === 1 ? 0 : 2 }}
-          >
-            <small>
-              {teamName(mode, t).toUpperCase()}
-              {h.myTeam === t ? ' · TÚ' : ''}
-            </small>
-            <b>{teamScore[t]}</b>
-            <span className="bar">
-              <i style={{ width: `${(teamScore[t] / scoreLimit) * 100}%` }} />
-            </span>
-            {h.flags && <span className="flag-st">{flagStatus(h.flags[t], players, you)}</span>}
+      <>
+        <div className="team-score">
+          {SIDES.map((t) => (
+            <div
+              key={t}
+              className={`ts ${h.myTeam === t ? 'mine' : ''}`}
+              style={{ '--t': teamVar(t), '--tt': TEAM_TXT[t], order: t === 1 ? 0 : 2 }}
+            >
+              <small>
+                {teamName(mode, t).toUpperCase()}
+                {h.myTeam === t ? ' · TÚ' : ''}
+              </small>
+              <b>{teamScore[t]}</b>
+              <span className="bar">
+                <i style={{ width: `${(teamScore[t] / scoreLimit) * 100}%` }} />
+              </span>
+              {h.flags && <span className="flag-st">{flagStatus(h.flags[t], players, you)}</span>}
+            </div>
+          ))}
+          <span className="ts-limit">/ {scoreLimit}</span>
+        </div>
+        {h.zones && (
+          <div className="top-sub zones">
+            {h.zones.map(([owner, v, contested], i) => (
+              <span
+                key={ZONE_NAMES[i]}
+                className={`zone ${owner ? 'owned' : ''} ${contested ? 'contested' : ''}`}
+                style={{
+                  '--t': owner ? teamVar(owner) : undefined,
+                  '--p': `${Math.abs(v)}%`,
+                  '--pc': v ? teamVar(v > 0 ? 1 : 2) : undefined,
+                }}
+              >
+                {ZONE_NAMES[i]}
+              </span>
+            ))}
           </div>
-        ))}
-        <span className="ts-limit">/ {scoreLimit}</span>
-      </div>
+        )}
+        {h.round && <span className="top-sub round-st">{roundStatus(h.round)}</span>}
+      </>
     );
   }
   if (top === 'ladder') {
@@ -406,6 +452,13 @@ function TopCenter({ mode, scoreLimit, you }: { mode: ModeId; scoreLimit: number
       )}
     </div>
   );
+}
+
+/** Rounds: what the round is doing, for the team score widget. */
+function roundStatus(r: { p: number; n: number; t: number }): string {
+  if (r.p === 0) return 'Esperando a un rival';
+  if (r.p === 2) return `Ronda ${r.n + 1} en ${Math.ceil(r.t / MS_PER_S)} s`;
+  return `Ronda ${r.n} · ${clock(r.t)}`;
 }
 
 function Vignette() {
@@ -517,6 +570,12 @@ function Banner({ banner }: { banner: KillBanner | null }) {
           {banner.label} · {banner.n} seguidas
         </span>
       )}
+      {banner.medals.length > 0 && (
+        <span className="line2 medals">
+          <Icon name="award" size={14} />
+          {banner.medals.join(' · ')}
+        </span>
+      )}
       {banner.reward && (
         <span className="line2">
           <Icon name="gift" size={14} />
@@ -540,6 +599,30 @@ function CarryingFlag({ you }: { you: string }) {
         Llevas la bandera
       </span>
       <small>{h.ownHome ? 'Llévala a tu base' : 'Tu bandera no está en tu base: recupérala para capturar'}</small>
+    </div>
+  );
+}
+
+// Quick chat menu (V): numbered phrases, picked with the number keys
+function QuickChat() {
+  const open = useHud((s) => s.chatOpen);
+  if (!open) return null;
+  return (
+    <div className="quick-chat">
+      <span className="kicker">
+        <Icon name="message" size={13} />
+        Chat rápido
+      </span>
+      {QUICK_CHAT.map((c, i) => (
+        <div key={c.text} className="qc-row">
+          <kbd>{i + 1}</kbd>
+          <span>{c.text}</span>
+          {c.all && <small>todos</small>}
+        </div>
+      ))}
+      <span className="qc-hint">
+        <kbd>V</kbd> cerrar
+      </span>
     </div>
   );
 }
@@ -591,6 +674,7 @@ export default function HUD({ engine, map, mode, scoreLimit, you, feed, banner }
           )}
           {!scoped && <CarryingFlag you={you} />}
           {!scoped && <SpawnProtection />}
+          {!scoped && <QuickChat />}
           <Health />
           <Ammo />
         </>

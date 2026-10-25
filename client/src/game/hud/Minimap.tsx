@@ -10,6 +10,8 @@ export interface MinimapView {
   dots: { x: number; z: number; mate: boolean; alpha: number }[];
   tags: { x: number; z: number; team: SideTeam }[];
   flags: { x: number; z: number; team: SideTeam }[];
+  /** Domination zones: letter in the owner's colour */
+  zones: { x: number; z: number; owner: number; letter: string }[];
 }
 export interface MinimapSource {
   minimap(now: number): MinimapView;
@@ -114,6 +116,24 @@ export default function Minimap({
         g.lineWidth = 1.5;
         g.strokeStyle = INK;
         g.stroke();
+      }
+
+      // Domination: zone letters in their owner's colour
+      for (const zn of view.zones) {
+        const x = toPx(zn.x);
+        const y = toPx(zn.z);
+        g.beginPath();
+        g.arc(x, y, 8, 0, Math.PI * 2);
+        g.fillStyle = zn.owner ? teamColor(zn.owner, INK) : '#ece3cf';
+        g.fill();
+        g.lineWidth = 2;
+        g.strokeStyle = INK;
+        g.stroke();
+        g.fillStyle = INK;
+        g.font = '700 10px Bungee, sans-serif';
+        g.textAlign = 'center';
+        g.textBaseline = 'middle';
+        g.fillText(zn.letter, x, y + 1);
       }
 
       // Capture the flag: flags always visible (they follow their carrier)

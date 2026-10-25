@@ -1,4 +1,13 @@
-import type { Collider, GameMap, ModeId, ServerToClientEvents, SideTeam } from '@blockshot/shared';
+import type {
+  Collider,
+  GameMap,
+  ModeId,
+  RoomInfo,
+  ServerToClientEvents,
+  SideTeam,
+  VoteOption,
+} from '@blockshot/shared';
+import type { Grenade } from '../combat/grenades';
 import type { GameMode } from '../modes/gameMode';
 import type { Player } from '../players/player';
 
@@ -31,8 +40,25 @@ export interface Room {
   scoreLimit: number;
   teamScore: Record<SideTeam, number>;
   matchOver: boolean;
+  /** someone already scored this match's first kill */
+  firstBlood: boolean;
   restartTimer: ReturnType<typeof setTimeout> | null;
   channel: RoomChannel;
+  /** end of match vote: options and each player's choice */
+  vote: { options: VoteOption[]; choice: Map<string, number> } | null;
+  /** tells the lobby the room list changed (map / mode after a vote) */
+  lobbyChanged: () => void;
+  grenades: Grenade[];
 }
+
+export const roomInfo = (room: Room): RoomInfo => ({
+  id: room.id,
+  name: room.name,
+  scoreLimit: room.scoreLimit,
+  mapId: room.map.id,
+  size: room.map.size,
+  mode: room.modeId,
+  max: room.max,
+});
 
 export const notice = (room: Room, text: string): void => room.channel.broadcast('notice', [text]);

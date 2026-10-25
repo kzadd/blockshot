@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import type { CharacterId, WeaponId } from '@blockshot/shared';
+import type { CharacterId, SkinId, WeaponId } from '@blockshot/shared';
 
 /** Guns whose muzzle is further than this (m) are held with the left hand on the handguard. */
 const LONG_GUN_MUZZLE_Z = -0.4;
@@ -87,6 +87,23 @@ const VISOR_DARK = '#1b2a4a';
 function skinPalette(color: string, skin: string): SkinColors {
   const common = { accent: color, boot: BOOT_DARK, glove: GLOVE_DARK, metal: METAL, visor: VISOR_DARK };
   switch (skin) {
+    // Creatures wear the classic uniform; the robot's visor glows in the outfit colour, the astronaut's is gold
+    case 'robot':
+      return { ...skinPalette(color, 'base'), visor: color, glow: 1.4 };
+    case 'astronauta':
+      // White suit; the outfit colour moves to the vest and the stripes so the player stays recognisable
+      return {
+        ...common,
+        main: '#e9edf1',
+        pants: '#d5dbe2',
+        vest: color,
+        gear: '#9aa3ad',
+        boot: '#c3c9d2',
+        glove: '#dfe4ea',
+        visor: '#d9a53a',
+      };
+    // TODO(review): posible código muerto: the pattern skins below (camo … neon) are no longer in SKINS
+
     case 'camo':
       return {
         ...common,
@@ -356,8 +373,10 @@ interface CharacterLook {
   hair: string;
   /** bare forearms (t-shirt) */
   shortSleeves?: boolean;
-  /** head gear, back pack and anything particular on the upper body */
-  upper(k: Kit): void;
+  /** helmet, hood or hair: only on the human skin (creatures bring their own head) */
+  hat(k: Kit): void;
+  /** back pack, armour and anything particular on the upper body (every skin) */
+  upper?(k: Kit): void;
   thigh?(k: Kit, side: number): void;
   shin?(k: Kit, side: number): void;
 }
@@ -419,7 +438,7 @@ const EXTRAS: Record<CharacterId, CharacterLook> = {
     build: 'standard',
     skinTone: '#d9a77c',
     hair: '#3a2a1e',
-    upper(k) {
+    hat(k) {
       k.box(0.34, 0.12, 0.36, 0, 1.79, 0.01, 'vest'); // helmet shell
       k.box(0.3, 0.04, 0.32, 0, 1.86, 0.01, 'vest');
       k.pair(0.04, 0.12, 0.3, 0.17, 1.72, 0.03, 'vest'); // sides
@@ -429,6 +448,8 @@ const EXTRAS: Record<CharacterId, CharacterLook> = {
       k.box(0.07, 0.05, 0.04, 0, 1.79, -0.19, 'metal'); // NVG mount
       k.pair(0.05, 0.1, 0.1, 0.18, 1.63, 0.01, 'gear'); // headset
       k.pair(0.012, 0.11, 0.012, 0.15, 1.56, -0.06, 'gear', 0.5); // chin strap
+    },
+    upper(k) {
       k.box(0.16, 0.06, 0.1, 0, 1.15, 0.2, 'gear'); // hydration pack
     },
     thigh(k, s) {
@@ -443,7 +464,7 @@ const EXTRAS: Record<CharacterId, CharacterLook> = {
     build: 'standard',
     skinTone: '#b07b52',
     hair: '#1e1612',
-    upper(k) {
+    hat(k) {
       k.box(0.34, 0.07, 0.36, 0, 1.81, 0.02, 'main'); // hood top
       k.pair(0.04, 0.3, 0.32, 0.17, 1.68, 0.02, 'main'); // hood sides
       k.box(0.34, 0.34, 0.05, 0, 1.66, 0.18, 'main'); // hood back
@@ -451,6 +472,8 @@ const EXTRAS: Record<CharacterId, CharacterLook> = {
       k.box(0.26, 0.022, 0.13, 0, 1.765, -0.2, 'accent'); // cap brim
       k.box(0.27, 0.1, 0.27, 0, 1.53, -0.02, 'gear'); // scarf over the jaw
       k.box(0.3, 0.06, 0.24, 0, 1.46, 0, 'gear');
+    },
+    upper(k) {
       k.box(0.34, 0.42, 0.18, 0, 1.15, 0.24, 'vest'); // pack
       k.box(0.3, 0.12, 0.05, 0, 1.0, 0.34, 'gear');
       k.cyl(0.06, 0.38, 0, 1.4, 0.26, 'pants', 8, 0, Math.PI / 2); // bedroll
@@ -465,7 +488,7 @@ const EXTRAS: Record<CharacterId, CharacterLook> = {
     build: 'heavy',
     skinTone: '#8a5a3c',
     hair: '#141414',
-    upper(k) {
+    hat(k) {
       k.box(0.37, 0.16, 0.38, 0, 1.79, 0.01, 'vest'); // helmet
       k.pair(0.05, 0.22, 0.34, 0.18, 1.68, 0.02, 'vest');
       k.box(0.36, 0.2, 0.05, 0, 1.69, 0.18, 'vest');
@@ -474,6 +497,8 @@ const EXTRAS: Record<CharacterId, CharacterLook> = {
       k.box(0.28, 0.1, 0.05, 0, 1.53, -0.15, 'metal'); // jaw guard
       k.pair(0.025, 0.06, 0.02, 0.07, 1.53, -0.178, 'gear');
       k.box(0.36, 0.025, 0.02, 0, 1.87, -0.05, 'accent'); // crest
+    },
+    upper(k) {
       k.pair(0.26, 0.1, 0.32, 0.33, 1.47, 0, 'vest', 0, 0, -0.25); // pauldrons
       k.pair(0.22, 0.08, 0.28, 0.35, 1.39, 0, 'metal', 0, 0, -0.3);
       k.pair(0.2, 0.02, 0.3, 0.34, 1.53, 0, 'accent', 0, 0, -0.25);
@@ -495,7 +520,7 @@ const EXTRAS: Record<CharacterId, CharacterLook> = {
     skinTone: '#efc49c',
     hair: '#d9a520',
     shortSleeves: true,
-    upper(k) {
+    hat(k) {
       k.box(0.3, 0.08, 0.32, 0, 1.8, 0.01, 'hair'); // hair
       k.pair(0.035, 0.12, 0.26, 0.15, 1.74, 0.03, 'hair');
       k.box(0.3, 0.14, 0.05, 0, 1.72, 0.16, 'hair');
@@ -521,7 +546,7 @@ const EXTRAS: Record<CharacterId, CharacterLook> = {
     build: 'heavy',
     skinTone: '#a06c46',
     hair: '#2a1d14',
-    upper(k) {
+    hat(k) {
       k.box(0.35, 0.36, 0.37, 0, 1.66, 0.01, 'vest'); // closed helmet
       k.box(0.31, 0.04, 0.33, 0, 1.855, 0.01, 'vest');
       k.box(0.27, 0.05, 0.02, 0, 1.675, -0.185, 'visor'); // slit
@@ -530,6 +555,8 @@ const EXTRAS: Record<CharacterId, CharacterLook> = {
       k.box(0.07, 0.07, 0.05, 0, 1.55, -0.195, 'gear');
       k.box(0.04, 0.3, 0.02, 0, 1.7, -0.19, 'accent', 0, 0, 0); // ridge
       k.box(0.04, 0.02, 0.36, 0, 1.86, 0.01, 'accent');
+    },
+    upper(k) {
       k.box(0.46, 0.5, 0.24, 0, 1.15, 0.27, 'gear'); // ammo backpack
       k.box(0.47, 0.06, 0.25, 0, 1.33, 0.27, 'accent');
       k.box(0.4, 0.04, 0.03, 0, 1.0, 0.4, 'metal');
@@ -543,6 +570,160 @@ const EXTRAS: Record<CharacterId, CharacterLook> = {
     },
     shin(k) {
       k.box(0.19, 0.16, 0.08, 0, -0.04, -0.1, 'vest'); // big knee guard
+    },
+  },
+};
+
+// ------------------------------------------------------------ Creature skins
+// A skin is who you are: Humano keeps each class's face and headgear; the others swap the head and the bare
+// skin (neck, forearms) for a creature. The class still dresses the body (vest, armour, pack) and holds its
+// gun, so a Tank still reads as a Tank. Every head stays inside the head hitbox (sphere at y=1.64).
+interface Creature {
+  /** bare skin (head, neck, bare forearms) and the second colour (muzzle, ears, details) */
+  skin: string;
+  fur: string;
+  head(k: Kit): void;
+  tail?(k: Kit): void;
+}
+
+const CREATURES: Record<Exclude<SkinId, 'base'>, Creature> = {
+  alien: {
+    skin: '#86d46c',
+    fur: '#5fae49',
+    head(k) {
+      k.box(0.3, 0.3, 0.3, 0, 1.69, 0, 'skin'); // tall cranium
+      k.box(0.21, 0.1, 0.22, 0, 1.53, -0.02, 'skin'); // narrow chin
+      k.pair(0.095, 0.06, 0.02, 0.068, 1.665, -0.155, 'eye', 0, 0, 0.35); // big slanted eyes
+      k.box(0.04, 0.01, 0.01, 0, 1.555, -0.135, 'eye'); // mouth
+      k.pair(0.02, 0.14, 0.02, 0.07, 1.88, 0, 'hair', 0, 0, 0.3); // antennae
+      k.pair(0.05, 0.05, 0.05, 0.095, 1.96, 0, 'accent');
+      k.box(0.11, 0.1, 0.11, 0, 1.43, 0, 'skin'); // neck
+    },
+  },
+  mapache: {
+    skin: '#8d9095',
+    fur: '#ece8df',
+    head(k) {
+      k.box(0.3, 0.26, 0.3, 0, 1.66, 0.01, 'skin'); // head
+      k.box(0.31, 0.07, 0.02, 0, 1.67, -0.152, 'eye'); // mask
+      k.pair(0.035, 0.035, 0.012, 0.07, 1.67, -0.164, 'hair'); // eye shine
+      k.box(0.16, 0.09, 0.1, 0, 1.57, -0.17, 'hair'); // muzzle
+      k.box(0.05, 0.035, 0.03, 0, 1.605, -0.225, 'eye'); // nose
+      k.pair(0.06, 0.06, 0.02, 0.1, 1.575, -0.15, 'hair'); // cheeks
+      k.pair(0.08, 0.09, 0.04, 0.11, 1.83, 0.02, 'skin'); // ears
+      k.pair(0.04, 0.05, 0.01, 0.11, 1.825, -0.003, 'eye');
+      k.box(0.12, 0.1, 0.12, 0, 1.43, 0, 'skin'); // neck
+    },
+    tail(k) {
+      // Ringed tail, short enough to stay close to the body
+      for (let i = 0; i < 4; i++)
+        k.box(0.1, 0.1, 0.09, 0, 0.8 - i * 0.04, 0.18 + i * 0.08, i % 2 ? 'eye' : 'skin', -0.5);
+    },
+  },
+  robot: {
+    skin: '#9aa3ad',
+    fur: '#5d636b',
+    head(k) {
+      k.box(0.3, 0.28, 0.3, 0, 1.67, 0, 'skin'); // head
+      k.box(0.26, 0.06, 0.02, 0, 1.68, -0.155, 'visor'); // glowing visor (outfit colour)
+      k.box(0.18, 0.06, 0.02, 0, 1.56, -0.152, 'hair'); // speaker grille
+      for (const y of [1.545, 1.56, 1.575]) k.box(0.16, 0.006, 0.006, 0, y, -0.164, 'eye');
+      k.pair(0.05, 0.07, 0.07, 0.17, 1.66, 0, 'hair'); // ear bolts
+      k.box(0.02, 0.12, 0.02, 0.08, 1.87, 0, 'hair'); // antenna
+      k.box(0.04, 0.04, 0.04, 0.08, 1.945, 0, 'visor');
+      k.box(0.1, 0.1, 0.1, 0, 1.43, 0, 'hair'); // neck
+    },
+  },
+  oso: {
+    skin: '#8a5a36',
+    fur: '#d8b88a',
+    head(k) {
+      k.box(0.32, 0.28, 0.3, 0, 1.66, 0.01, 'skin'); // head
+      k.box(0.15, 0.1, 0.1, 0, 1.57, -0.17, 'hair'); // snout
+      k.box(0.06, 0.04, 0.03, 0, 1.61, -0.225, 'eye'); // nose
+      k.pair(0.035, 0.035, 0.012, 0.075, 1.7, -0.153, 'eye'); // eyes
+      k.pair(0.09, 0.08, 0.05, 0.13, 1.82, 0.02, 'skin'); // round ears
+      k.pair(0.05, 0.045, 0.01, 0.13, 1.815, -0.006, 'hair');
+      k.box(0.13, 0.1, 0.12, 0, 1.43, 0, 'skin'); // neck
+    },
+  },
+  astronauta: {
+    skin: '#eef1f4',
+    fur: '#c3c9d2',
+    head(k) {
+      k.box(0.34, 0.33, 0.34, 0, 1.68, 0.01, 'skin'); // helmet
+      k.box(0.28, 0.18, 0.02, 0, 1.68, -0.17, 'visor'); // gold visor
+      k.box(0.35, 0.03, 0.35, 0, 1.79, 0.01, 'accent'); // stripe in the outfit colour
+      k.box(0.3, 0.06, 0.3, 0, 1.49, 0.01, 'hair'); // neck ring
+      k.box(0.03, 0.12, 0.03, -0.16, 1.82, 0.08, 'hair'); // antenna
+      k.pair(0.04, 0.06, 0.06, 0.175, 1.68, 0.02, 'hair'); // side lamps
+    },
+  },
+  zombi: {
+    skin: '#7fa36a',
+    fur: '#d9d2b8',
+    head(k) {
+      k.box(0.29, 0.28, 0.29, 0, 1.66, 0, 'skin'); // head
+      k.box(0.2, 0.04, 0.2, -0.03, 1.815, 0.02, 'eye'); // patchy hair
+      k.box(0.08, 0.06, 0.08, 0.08, 1.82, 0.07, 'eye');
+      k.box(0.065, 0.065, 0.012, -0.07, 1.68, -0.15, 'eye'); // uneven eyes
+      k.box(0.04, 0.04, 0.012, 0.075, 1.67, -0.15, 'eye');
+      k.box(0.15, 0.035, 0.012, 0, 1.575, -0.15, 'eye'); // mouth
+      for (const x of [-0.045, 0, 0.045]) k.box(0.025, 0.02, 0.012, x, 1.59, -0.153, 'hair'); // teeth
+      k.box(0.012, 0.11, 0.012, 0.115, 1.72, -0.151, 'eye'); // stitched scar
+      for (const y of [1.69, 1.72, 1.75]) k.box(0.04, 0.008, 0.01, 0.115, y, -0.153, 'eye');
+      k.box(0.11, 0.1, 0.11, 0, 1.43, 0, 'skin'); // neck
+    },
+  },
+  rana: {
+    skin: '#5cb85c',
+    fur: '#ece6a6',
+    head(k) {
+      k.box(0.32, 0.22, 0.3, 0, 1.63, 0, 'skin'); // wide flat head
+      k.pair(0.1, 0.09, 0.1, 0.09, 1.775, -0.06, 'skin'); // eye bumps
+      k.pair(0.07, 0.06, 0.012, 0.09, 1.775, -0.112, 'hair'); // eye whites
+      k.pair(0.035, 0.04, 0.01, 0.09, 1.77, -0.12, 'eye'); // pupils
+      k.box(0.26, 0.012, 0.012, 0, 1.585, -0.151, 'eye'); // wide mouth
+      k.box(0.26, 0.05, 0.02, 0, 1.545, -0.145, 'hair'); // pale chin
+      k.pair(0.02, 0.012, 0.01, 0.035, 1.66, -0.152, 'eye'); // nostrils
+      k.box(0.12, 0.1, 0.12, 0, 1.43, 0, 'skin'); // neck
+    },
+  },
+  gato: {
+    skin: '#e08a3c',
+    fur: '#f4e6d0',
+    head(k) {
+      k.box(0.3, 0.27, 0.29, 0, 1.66, 0.01, 'skin'); // head
+      k.pair(0.09, 0.1, 0.05, 0.1, 1.82, 0.02, 'skin'); // pointy ears
+      k.pair(0.05, 0.05, 0.05, 0.1, 1.89, 0.02, 'skin');
+      k.pair(0.045, 0.06, 0.01, 0.1, 1.825, -0.006, 'hair');
+      for (const x of [-0.07, 0, 0.07]) k.box(0.03, 0.012, 0.16, x, 1.796, 0.03, 'eye'); // stripes
+      k.pair(0.05, 0.055, 0.012, 0.075, 1.69, -0.152, 'eye'); // eyes
+      k.pair(0.018, 0.018, 0.01, 0.065, 1.7, -0.159, 'hair'); // eye shine
+      k.box(0.14, 0.07, 0.05, 0, 1.585, -0.165, 'hair'); // muzzle
+      k.box(0.04, 0.03, 0.02, 0, 1.615, -0.192, 'eye'); // nose
+      k.pair(0.1, 0.008, 0.008, 0.12, 1.585, -0.18, 'eye'); // whiskers
+      k.box(0.12, 0.1, 0.12, 0, 1.43, 0, 'skin'); // neck
+    },
+    tail(k) {
+      // Curling up behind, close to the body
+      for (let i = 0; i < 5; i++)
+        k.box(0.07, 0.07, 0.08, 0, 0.8 + i * 0.05, 0.18 + i * 0.05, i === 4 ? 'hair' : 'skin');
+    },
+  },
+  calabaza: {
+    skin: '#e8781e',
+    fur: '#3f7a2a',
+    head(k) {
+      k.box(0.34, 0.3, 0.3, 0, 1.66, 0, 'skin'); // pumpkin
+      k.pair(0.07, 0.28, 0.33, 0.1, 1.66, 0, 'skin'); // ribs
+      k.pair(0.07, 0.06, 0.012, 0.075, 1.7, -0.168, 'brass', 0, 0, 0.5); // carved, glowing face
+      k.box(0.04, 0.04, 0.012, 0, 1.64, -0.168, 'brass', 0, 0, 0.78);
+      k.box(0.2, 0.045, 0.012, 0, 1.575, -0.168, 'brass');
+      k.pair(0.03, 0.022, 0.014, 0.045, 1.588, -0.17, 'skin'); // teeth
+      k.box(0.05, 0.08, 0.05, 0, 1.85, 0, 'hair'); // stem
+      k.box(0.09, 0.015, 0.05, 0.06, 1.83, 0, 'hair', 0, 0, 0.3); // leaf
+      k.box(0.11, 0.1, 0.11, 0, 1.43, 0, 'skin'); // neck
     },
   },
 };
@@ -618,16 +799,24 @@ const HIP_Y = 0.8;
 const KNEE_Y = -0.4;
 const HIP_X = 0.12;
 
+const creatureOf = (skin: string): Creature | undefined => CREATURES[skin as Exclude<SkinId, 'base'>];
+
 function bodyMaterials(charId: CharacterId, color: string, skin: string): BodyMaterials {
-  const look = EXTRAS[charId];
-  return { ...skinMaterials(color, skin), ...characterMaterials(charId, look) };
+  return { ...skinMaterials(color, skin), ...characterMaterials(charId, skin) };
 }
-const charMatCache = new Map<CharacterId, Pick<BodyMaterials, 'skin' | 'hair'>>();
-function characterMaterials(charId: CharacterId, look: CharacterLook): Pick<BodyMaterials, 'skin' | 'hair'> {
-  let m = charMatCache.get(charId);
+const charMatCache = new Map<string, Pick<BodyMaterials, 'skin' | 'hair'>>();
+/** Bare skin and hair: the class's own for the human, the creature's fur / metal otherwise. */
+function characterMaterials(charId: CharacterId, skin: string): Pick<BodyMaterials, 'skin' | 'hair'> {
+  const creature = creatureOf(skin);
+  const key = creature ? skin : charId;
+  let m = charMatCache.get(key);
   if (!m) {
-    m = { skin: std(look.skinTone, { roughness: 0.65 }), hair: std(look.hair, { roughness: 0.95 }) };
-    charMatCache.set(charId, m);
+    const look = EXTRAS[charId];
+    m = {
+      skin: std(creature?.skin ?? look.skinTone, { roughness: 0.65 }),
+      hair: std(creature?.fur ?? look.hair, { roughness: 0.95 }),
+    };
+    charMatCache.set(key, m);
   }
   return m;
 }
@@ -654,10 +843,17 @@ export function buildCharacter(charId: CharacterId, skin: string = 'base', color
 
   const upper = new THREE.Group();
   group.add(upper);
-  addKit(upper, `${charId}:upper`, mats, (k) => {
+  const creature = creatureOf(skin);
+  addKit(upper, `${charId}:${creature ? skin : 'base'}:upper`, mats, (k) => {
     drawTorso(k, look.build);
-    drawHead(k);
-    look.upper(k);
+    if (creature) {
+      creature.head(k);
+      creature.tail?.(k);
+    } else {
+      drawHead(k);
+      look.hat(k);
+    }
+    look.upper?.(k);
   });
 
   const aim = new THREE.Group();
@@ -693,7 +889,7 @@ export function buildCharacter(charId: CharacterId, skin: string = 'base', color
 
 // First-person arms: added to the gun so it looks held. Sleeves and gloves follow the skin.
 export function buildArms(gun: GunModel, skin: string = 'base', color = '#3f7fe0'): THREE.Group {
-  const mats = { ...skinMaterials(color, skin), ...characterMaterials('soldado', EXTRAS.soldado) };
+  const mats = { ...skinMaterials(color, skin), ...characterMaterials('soldado', skin) };
   const g = new THREE.Group();
   const long = gun.userData.muzzleZ < LONG_GUN_MUZZLE_Z;
   // Left hand: on the handguard of long guns, next to the right one on short guns

@@ -55,6 +55,7 @@ export function makeRoom(mode: ModeId, scoreLimit?: number, mapId = 'patio', siz
   const place = (p: Player, x: number, z: number, y = 0) => {
     Object.assign(p, { x, y, z });
     p.move = createMoveState(x, y, z);
+    p.move.grounded = true; // standing on the floor
     p.hist = [];
   };
   return { room, channel, registry, join, place };

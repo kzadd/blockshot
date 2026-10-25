@@ -33,11 +33,11 @@ const TABLE_HASHES = {
   // slower sniper aim, rifle 105 ms, more falloff on rifle and LMG, longer SMG range
   WEAPONS: 'd1ba1521e4a96c96',
   CHARACTERS: 'ee946d556cf3f25f',
-  MODES: '87ca9b7c1b43670c',
+  MODES: '7b0e3729e18e0ee7', // two new modes: Dominio and Rondas
   PLAYER: '0bf57b8a7e2429af',
   MAPS: '64018304e6c9b34c', // sixth map: Obra
   MAP_SIZES: '0cd287561039dcb2',
-  SKINS: '376855100cbba893', // five cosmetic skins added (urbano, desierto, bosque, carbono, neon)
+  SKINS: '9808ff7d018a973e', // creatures: Humano, Alien, Mapache, Robot, Oso, Astronauta, Zombi, Rana, Gato, Calabaza
   GUN_LADDERS: '8f9323383a0b8d4b',
   STREAKS: 'c5eac1deecda3aac',
   STREAK_REWARDS: 'a57d0b99f6cfdc4d',

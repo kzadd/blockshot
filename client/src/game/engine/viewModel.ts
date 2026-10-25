@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { WEAPON_HANDLING, type Weapon, type WeaponId } from '@blockshot/shared';
 import { buildArms, buildGun, type GunModel } from '../render/models';
+import { damp } from './util';
 
 const VM_FOV = 60;
 const HOLDER_SCALE = 0.72;
@@ -54,6 +55,11 @@ const RELOAD_DIP_RX = 0.7;
 const SWAP_DROP = 0.25;
 const SLIDE_RX = 0.08;
 const SLIDE_RZ = 0.25;
+/** The slide tilt goes away while aiming and almost away while firing, so the sight and the tracers line up
+ * with the crosshair; it eases in and out at this rate (1/s). */
+const SLIDE_TILT_FIRING = 0.15;
+const SLIDE_TILT_FOLLOW = 14;
+const FIRING_MS = 350;
 const SPRINT_X = 0.04;
 const SPRINT_Y = 0.05;
 const SPRINT_RX = 0.3;
@@ -89,6 +95,8 @@ export class ViewModel {
   private gun: GunModel | null = null;
   private gunId: WeaponId = 'knife';
   private bobT = 0;
+  /** 0..1: how much of the slide tilt is applied (eased) */
+  private slideTilt = 0;
   private readonly flashLight = new THREE.PointLight(FLASH_LIGHT_COLOR, 0, FLASH_LIGHT_RANGE);
   private lastFlash = 0;
   private readonly tmp = new THREE.Vector3();
@@ -149,14 +157,17 @@ export class ViewModel {
       rx -= dip * RELOAD_DIP_RX;
     }
     if (now < f.swapUntil) y -= ((f.swapUntil - now) / WEAPON_HANDLING.swapMs) * SWAP_DROP;
-    if (f.sliding) rx += SLIDE_RX;
+    const firing = now - f.flashTime < FIRING_MS;
+    const tilt = f.sliding ? (1 - t) * (firing ? SLIDE_TILT_FIRING : 1) : 0;
+    this.slideTilt += (tilt - this.slideTilt) * damp(SLIDE_TILT_FOLLOW, dt);
+    rx += this.slideTilt * SLIDE_RX;
     // Sprinting lowers and tilts the gun
     x -= sp * SPRINT_X;
     y -= sp * SPRINT_Y;
     rx -= sp * SPRINT_RX;
 
     let ry = sp * SPRINT_RY + HIP_RY * (1 - t);
-    let rz = (f.sliding ? SLIDE_RZ : 0) + sp * SPRINT_RZ;
+    let rz = this.slideTilt * SLIDE_RZ + sp * SPRINT_RZ;
     // Knife: right-to-left slash
     const sw = (now - f.swingAt) / SWING_MS;
     if (w.melee && sw < 1) {

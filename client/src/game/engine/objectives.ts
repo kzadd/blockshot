@@ -1,6 +1,17 @@
-// Mode objects drawn in the world: Capture the flag flags and bases, Kill confirmed tags.
+// Mode objects drawn in the world: Capture the flag flags and bases, Kill confirmed tags, Domination zones.
 import * as THREE from 'three';
-import { FLAG, type GameMap, type ModeId, type SideTeam, type FlagSnapshot, type TagSnapshot } from '@blockshot/shared';
+import {
+  DOM,
+  FLAG,
+  ZONE_NAMES,
+  dominationZones,
+  type DomSnapshot,
+  type FlagSnapshot,
+  type GameMap,
+  type ModeId,
+  type SideTeam,
+  type TagSnapshot,
+} from '@blockshot/shared';
 import { teamColor } from '../../settings/palette';
 import { damp } from './util';
 
@@ -17,6 +28,9 @@ const TAG_BOB_SPEED = 0.005;
 const TAG_BOB = 0.12;
 const tagGeo = new THREE.OctahedronGeometry(0.32, 0);
 const INK = '#1b2a4a';
+const NEUTRAL = '#ece3cf';
+const ZONE_PAD_OPACITY = 0.28;
+const ZONE_RING_WIDTH = 0.25;
 
 // Flag icon that is visible through walls
 function flagMarker(color: string): THREE.Sprite {
@@ -48,6 +62,46 @@ function flagMarker(color: string): THREE.Sprite {
   return s;
 }
 
+/** Domination zone letter, visible through walls, in the owner's colour (neutral: sand). */
+function zoneMarker(): { sprite: THREE.Sprite; paint: (letter: string, color: string, contested: boolean) => void } {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d')!;
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true, sizeAttenuation: false }),
+  );
+  sprite.scale.set(0.05, 0.05, 1);
+  sprite.position.y = 3.2;
+  sprite.renderOrder = 6;
+  const paint = (letter: string, color: string, contested: boolean) => {
+    g.clearRect(0, 0, 64, 64);
+    g.fillStyle = color;
+    g.strokeStyle = contested ? '#ffffff' : INK;
+    g.lineWidth = 6;
+    g.beginPath();
+    g.arc(32, 32, 26, 0, Math.PI * 2);
+    g.fill();
+    g.stroke();
+    g.fillStyle = INK;
+    g.font = '700 32px Bungee, sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(letter, 32, 35);
+    tex.needsUpdate = true;
+  };
+  return { sprite, paint };
+}
+
+interface ZoneObject {
+  pad: THREE.Mesh;
+  ring: THREE.Mesh;
+  marker: ReturnType<typeof zoneMarker>;
+  /** what is painted now: owner + contested (repainted only when it changes) */
+  state: string;
+}
+
 interface FlagObject {
   t: SideTeam;
   group: THREE.Group;
@@ -71,6 +125,8 @@ export class Objectives {
   flags: Record<SideTeam, FlagSnapshot> | null = null;
   private flagObjs: FlagObject[] | null = null;
   readonly tags = new Map<number, TagObject>();
+  zones: DomSnapshot[] | null = null;
+  private zoneObjs: ZoneObject[] | null = null;
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -80,8 +136,39 @@ export class Objectives {
     this.buildFlags();
   }
 
+  /** Domination: a disc and a ring on the floor per zone, and its letter above (rebuilt with the palette). */
+  private buildZones(): void {
+    for (const o of this.zoneObjs ?? []) this.scene.remove(o.pad, o.ring, o.marker.sprite);
+    this.zoneObjs = null;
+    if (this.mode !== 'dom') return;
+    this.zoneObjs = dominationZones(this.map).map(([x, y, z]) => {
+      const pad = new THREE.Mesh(
+        new THREE.CircleGeometry(DOM.radius, 40),
+        new THREE.MeshBasicMaterial({
+          color: NEUTRAL,
+          transparent: true,
+          opacity: ZONE_PAD_OPACITY,
+          depthWrite: false,
+        }),
+      );
+      pad.rotation.x = -Math.PI / 2;
+      pad.position.set(x, y + 0.03, z);
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(DOM.radius - ZONE_RING_WIDTH, DOM.radius, 48),
+        new THREE.MeshBasicMaterial({ color: NEUTRAL }),
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(x, y + 0.04, z);
+      const marker = zoneMarker();
+      marker.sprite.position.set(x, y + 3.2, z);
+      this.scene.add(pad, ring, marker.sprite);
+      return { pad, ring, marker, state: '' };
+    });
+  }
+
   /** Capture the flag: flags and bases in each team's colour (rebuilt when the palette changes). */
   buildFlags(): void {
+    this.buildZones();
     for (const o of this.flagObjs ?? []) this.scene.remove(o.group, o.pad);
     this.flagObjs = null;
     if (this.mode !== 'ctf') return;
@@ -142,6 +229,16 @@ export class Objectives {
   }
 
   update(dt: number, now: number, src: ObjectiveSources): void {
+    this.zoneObjs?.forEach((o, i) => {
+      const [owner, , contested] = this.zones?.[i] ?? [0, 0, 0];
+      const state = `${owner}${contested}`;
+      if (state === o.state) return;
+      o.state = state;
+      const color = owner ? teamColor(owner, NEUTRAL) : NEUTRAL;
+      (o.pad.material as THREE.MeshBasicMaterial).color.set(color);
+      (o.ring.material as THREE.MeshBasicMaterial).color.set(color);
+      o.marker.paint(ZONE_NAMES[i]!, color, !!contested);
+    });
     for (const t of this.tags.values()) {
       t.mesh.rotation.y = now * TAG_SPIN;
       t.mesh.position.y = t.y + Math.sin(now * TAG_BOB_SPEED + t.mesh.id) * TAG_BOB;
@@ -173,6 +270,7 @@ export class Objectives {
   ): {
     tags: { x: number; z: number; team: SideTeam }[];
     flags: { x: number; z: number; team: SideTeam }[];
+    zones: { x: number; z: number; owner: number; letter: string }[];
   } {
     const tags = [...this.tags.values()].map((t) => ({ x: t.mesh.position.x, z: t.mesh.position.z, team: t.team }));
     const flags: { x: number; z: number; team: SideTeam }[] = [];
@@ -183,11 +281,21 @@ export class Objectives {
         flags.push({ x: p.x, z: p.z, team: t });
       }
     }
-    return { tags, flags };
+    const zones =
+      this.mode === 'dom'
+        ? dominationZones(this.map).map(([x, , z], i) => ({
+            x,
+            z,
+            owner: this.zones?.[i]?.[0] ?? 0,
+            letter: ZONE_NAMES[i]!,
+          }))
+        : [];
+    return { tags, flags, zones };
   }
 
   dispose(): void {
     for (const o of this.flagObjs ?? []) this.scene.remove(o.group, o.pad);
+    for (const o of this.zoneObjs ?? []) this.scene.remove(o.pad, o.ring, o.marker.sprite);
     this.syncTags(null);
   }
 }

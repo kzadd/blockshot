@@ -28,24 +28,71 @@ import CharacterPreview from './CharacterPreview';
 const MAX_HP_BAR = 140;
 const SPEED_BAR_MIN = 5;
 const SPEED_BAR_RANGE = 5.5;
+/** A team picked on the character screen shows at once; if the server never confirms, it goes back after this. */
+const PENDING_TEAM_MS = 1500;
 
 export type SkinChoice = Partial<Record<CharacterId, SkinId>>;
 /** Outfit colour (hex from OUTFIT_COLORS) picked for each character. */
 export type ColorChoice = Partial<Record<CharacterId, string>>;
 
-// Swatch of each skin: 135° diagonal with two colours
-const SKIN_SWATCH: Record<SkinId, (c: string) => [string, string]> = {
-  base: (c) => [c, `color-mix(in oklch, ${c} 55%, #12171c)`],
-  camo: () => ['#6b7a3a', '#3d4722'],
-  noche: (c) => ['#16181f', c],
-  artico: () => ['#eef2f6', '#9aa8b6'],
-  oro: () => ['#ffd34d', '#a8780f'],
-  urbano: () => ['#7a7e84', '#3c3f44'],
-  desierto: () => ['#d2bc94', '#8f7450'],
-  bosque: () => ['#4b5a32', '#2a2f1e'],
-  carbono: (c) => ['#26282c', c],
-  neon: (c) => ['#16131f', c],
+// Pixel face of each skin (8×8, "." = empty). Letters are colours; "a" is the outfit colour
+const SKIN_FACES: Record<SkinId, { rows: string[]; colors: Record<string, string> }> = {
+  base: {
+    rows: ['hhhhhhhh', 'hhhhhhhh', 'ssssssss', 'seessees', 'ssssssss', 'ssssssss', 'ssmmmmss', 'ssssssss'],
+    colors: { h: '#3a2a1e', s: '#e0b088', e: '#15171c', m: '#9a5a44' },
+  },
+  alien: {
+    rows: ['a......a', '.g....g.', 'gggggggg', 'geeggeeg', 'geeggeeg', 'gggggggg', '.gggggg.', '..gggg..'],
+    colors: { g: '#86d46c', e: '#15171c' },
+  },
+  mapache: {
+    rows: ['gk....kg', 'gggggggg', 'gggggggg', 'kkkkkkkk', 'kwkkkkwk', 'gwwwwwwg', 'gwwkkwwg', 'ggwwwwgg'],
+    colors: { g: '#8d9095', k: '#1d1f24', w: '#ece8df' },
+  },
+  robot: {
+    rows: ['...d....', '...a....', 'mmmmmmmm', 'maaaaaam', 'mmmmmmmm', 'mmddddmm', 'mmddddmm', 'mmmmmmmm'],
+    colors: { m: '#9aa3ad', d: '#4b5058' },
+  },
+  oso: {
+    rows: ['bb....bb', 'blbbbblb', 'bbbbbbbb', 'bkbbbbkb', 'bbbllbbb', 'bbllllbb', 'bblkklbb', '.bbbbbb.'],
+    colors: { b: '#8a5a36', l: '#d8b88a', k: '#1d1f24' },
+  },
+  astronauta: {
+    rows: ['.wwwwww.', 'wwwwwwww', 'aaaaaaaa', 'woooooow', 'woooooow', 'woooooow', 'wwwwwwww', '.gggggg.'],
+    colors: { w: '#eef1f4', o: '#d9a53a', g: '#9aa3ad' },
+  },
+  zombi: {
+    rows: ['kkkk.kk.', 'kkkkkkkk', 'gggggggk', 'geeggkgk', 'geeggggk', 'gggggggg', 'gkwkwkgg', 'gggggggg'],
+    colors: { g: '#7fa36a', k: '#1d1f24', e: '#15171c', w: '#d9d2b8' },
+  },
+  rana: {
+    rows: ['.gg..gg.', 'gwwggwwg', 'gwkggkwg', 'gggggggg', 'gggggggg', 'kkkkkkkk', 'llllllll', '.llllll.'],
+    colors: { g: '#5cb85c', w: '#f2f2ea', k: '#15171c', l: '#ece6a6' },
+  },
+  gato: {
+    rows: ['o......o', 'oo....oo', 'okokokoo', 'okooooko', 'oooooooo', 'ooowwooo', 'oowkkwoo', '.owwwwo.'],
+    colors: { o: '#e08a3c', k: '#15171c', w: '#f4e6d0' },
+  },
+  calabaza: {
+    rows: ['...s....', '.oooooo.', 'oyyooyyo', 'oooooooo', 'oooyyooo', 'oyyyyyyo', 'ooyoyooo', '.oooooo.'],
+    colors: { s: '#3f7a2a', o: '#e8781e', y: '#ffd24a' },
+  },
 };
+
+function SkinFace({ skin, color }: { skin: SkinId; color: string }) {
+  const { rows, colors } = SKIN_FACES[skin];
+  return (
+    <svg viewBox="0 0 8 8" shapeRendering="crispEdges" aria-hidden="true">
+      {rows.flatMap((row, y) =>
+        [...row].map((ch, x) =>
+          ch === '.' ? null : (
+            <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill={ch === 'a' ? color : colors[ch]} />
+          ),
+        ),
+      )}
+    </svg>
+  );
+}
 
 function WeaponCard({ id, slot }: { id: WeaponId; slot: string }) {
   const w = WEAPONS[id];
@@ -84,7 +131,19 @@ interface TeamPickerProps {
   onTeam: (t: SideTeam) => void;
 }
 function TeamPicker({ myTeam, players = [], onTeam }: TeamPickerProps) {
-  const count = (t: SideTeam) => players.filter((p) => p.tm === t).length;
+  // Shown at once on click; the server's answer (myTeam) takes over when it arrives
+  const [pending, setPending] = useState<SideTeam | null>(null);
+  useEffect(() => {
+    if (pending === myTeam) setPending(null);
+  }, [pending, myTeam]);
+  useEffect(() => {
+    if (!pending) return undefined;
+    const t = setTimeout(() => setPending(null), PENDING_TEAM_MS);
+    return () => clearTimeout(t);
+  }, [pending]);
+  const shown = pending ?? myTeam;
+  const count = (t: SideTeam) =>
+    players.filter((p) => p.tm === t).length + (pending === t ? 1 : 0) - (pending && myTeam === t ? 1 : 0);
   return (
     <div className="team-pick">
       <span className="kicker">Tu equipo</span>
@@ -92,10 +151,14 @@ function TeamPicker({ myTeam, players = [], onTeam }: TeamPickerProps) {
         {SIDES.map((t) => (
           <button
             key={t}
-            className={myTeam === t ? 'on' : ''}
-            aria-pressed={myTeam === t}
+            className={shown === t ? 'on' : ''}
+            aria-pressed={shown === t}
             style={{ '--t': teamVar(t) }}
-            onClick={() => myTeam !== t && onTeam(t)}
+            onClick={() => {
+              if (shown === t) return;
+              setPending(t);
+              onTeam(t);
+            }}
           >
             <b>
               <i />
@@ -252,7 +315,6 @@ export default function CharacterSelect({
             <CharacterPreview charId={sel} skin={skin} color={color} />
             <div className="skins">
               {SKINS.map((k) => {
-                const [a, b] = SKIN_SWATCH[k.id](color);
                 return (
                   <button
                     key={k.id}
@@ -262,7 +324,9 @@ export default function CharacterSelect({
                     aria-pressed={skin === k.id}
                     onClick={() => setSkinBy({ ...skinBy, [sel]: k.id })}
                   >
-                    <i style={{ background: `linear-gradient(135deg, ${a} 50%, ${b} 50%)` }} />
+                    <i style={{ '--c': color }}>
+                      <SkinFace skin={k.id} color={color} />
+                    </i>
                     <span>{k.name}</span>
                   </button>
                 );

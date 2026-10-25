@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import type { MatchEnd, ModeId } from '@blockshot/shared';
+import { MAPS, MODE_BY_ID, type MatchEnd, type ModeId } from '@blockshot/shared';
+import { mapImage } from '../../lobby/mapImage';
+import { Icon, MODE_ICON } from '../../ui/icons';
 import { useHud } from '../hud/hudStore';
 import Scoreboard from '../hud/Scoreboard';
 import { TEAM_TXT } from '../hud/teamStyle';
 import type { RoomView } from '../roomView';
 
-export type MatchState = MatchEnd & { at: number };
+export type MatchState = MatchEnd & { at: number; votes: number[]; myVote: number | null };
 
 const BEST_CARD_STAGGER_MS = 120;
 const MS_PER_S = 1000;
@@ -18,6 +20,7 @@ interface Props {
   scoreLimit: number;
   mode: ModeId;
   onLeave: () => void;
+  onVote: (i: number) => void;
 }
 
 /** Whole seconds until the next match, refreshed a few times per second. */
@@ -32,7 +35,7 @@ function useSecondsLeft(match: MatchState | null): number {
 }
 
 // Scoreboard (Tab) and, when the match ends, the winner, your own result and the "best play" cards
-export default function ScoresLayer({ match, you, info, scoreLimit, mode, onLeave }: Props) {
+export default function ScoresLayer({ match, you, info, scoreLimit, mode, onLeave, onVote }: Props) {
   const h = useHud((s) => ({ players: s.players, teamScore: s.teamScore }));
   const secondsLeft = useSecondsLeft(match);
   if (!h) return null;
@@ -62,6 +65,30 @@ export default function ScoresLayer({ match, you, info, scoreLimit, mode, onLeav
                 Salir de la sala
               </button>
             </div>
+            {match.vote.length > 0 && (
+              <div className="vote">
+                <span className="kicker">Vota la siguiente partida</span>
+                <div className="vote-cards">
+                  {match.vote.map((o, i) => (
+                    <button
+                      key={`${o.mapId}-${o.mode}`}
+                      className={`vote-card ${match.myVote === i ? 'on' : ''}`}
+                      onClick={() => onVote(i)}
+                    >
+                      <img src={mapImage(o.mapId)} alt="" />
+                      <span className="vc-text">
+                        <b>{MAPS.find((m) => m.id === o.mapId)?.name}</b>
+                        <span>
+                          <Icon name={MODE_ICON[o.mode]} size={13} />
+                          {MODE_BY_ID[o.mode].name}
+                        </span>
+                      </span>
+                      <span className="vc-count">{match.votes[i] ?? 0}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {match.best.length > 0 && (
               <div className="best">
                 {match.best.map((b, i) => (

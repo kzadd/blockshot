@@ -81,6 +81,19 @@ export interface Player {
   caps: number;
   /** gun game level */
   level: number;
+  /** medals this match */
+  medals: number;
+  /** kills in a quick row (double / triple kill) and when the last one was */
+  multi: number;
+  lastKillAt: number;
+  /** who killed this player last (revenge medal) */
+  lastKillerId: string | null;
+  /** grenades left this life */
+  grenades: number;
+  /** last quick chat phrase (ms) */
+  chatAt: number;
+  /** spawns per character this match (session stats) */
+  picks: Partial<Record<CharacterId, number>>;
 }
 
 const DEFAULT_MAX_HP = 100;
@@ -130,6 +143,13 @@ export function createPlayer(id: string, name: string, team: Team): Player {
     hits: 0,
     caps: 0,
     level: 0,
+    medals: 0,
+    multi: 0,
+    lastKillAt: 0,
+    lastKillerId: null,
+    picks: {},
+    chatAt: 0,
+    grenades: 0,
   };
 }
 
@@ -148,5 +168,10 @@ export function resetMatchStats(p: Player): void {
     level: 0,
     armor: 0,
     radarUntil: 0,
+    medals: 0,
+    multi: 0,
+    lastKillAt: 0,
+    lastKillerId: null,
+    picks: {},
   });
 }

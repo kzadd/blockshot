@@ -7,6 +7,12 @@
    Las pantallas se diseñan sobre 1280×720 y se escalan con --s (lo calcula ui.tsx).
    ===================================================================== */
 :root {
+  /* HUD glass: the game shows through; used by every in-game panel so the HUD reads as one piece */
+  --glass-bg: linear-gradient(180deg, rgba(14, 18, 22, 0.42), rgba(14, 18, 22, 0.62));
+  --glass-bg-solid: linear-gradient(180deg, rgba(14, 18, 22, 0.66), rgba(14, 18, 22, 0.8));
+  --glass-line: rgba(236, 227, 207, 0.1);
+  --glass-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  --glass-blur: blur(12px) saturate(1.15);
   /* Superficies */
   --bg-0: #0e1216; /* Noche: fondo sin mapa */
   --bg-1: #1d242c; /* Pizarra: paneles, chips del HUD */
@@ -1010,7 +1016,7 @@ kbd.down,
 }
 .lb-modes {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 .lb-mode {
@@ -1428,14 +1434,17 @@ kbd.down,
 /* Chips del HUD: pizarra 94 % con barra de 3 px a la izquierda */
 .hud-chip {
   position: absolute;
-  left: 12px;
+  left: 16px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   height: 26px;
   padding: 0 10px;
-  border-radius: 3px;
-  background: rgba(29, 36, 44, 0.94);
+  border-radius: 8px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-line);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-blur);
   font: 700 12.5px var(--body);
   white-space: nowrap;
   pointer-events: none;
@@ -1443,7 +1452,7 @@ kbd.down,
 }
 /* Aviso de conexión: solo aparece si el ping es malo, bajo el minimapa */
 .net-warn {
-  top: 200px;
+  top: 206px;
   box-shadow: inset 3px 0 0 var(--danger);
   color: var(--danger-txt);
 }
@@ -1451,14 +1460,19 @@ kbd.down,
 /* Minimapa: marco de pizarra de 180 */
 .minimap {
   position: absolute;
-  left: 12px;
-  top: 12px;
+  left: 16px;
+  top: 16px;
   width: 180px;
   height: 180px;
   padding: 6px;
-  border-radius: var(--radius-l);
-  background: rgba(29, 36, 44, 0.94);
-  box-shadow: 0 4px 0 rgba(8, 11, 14, 0.6);
+  border-radius: 14px;
+  background: var(--glass-bg-solid);
+  border: 1px solid var(--glass-line);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-blur);
+}
+.minimap canvas {
+  border-radius: 9px;
 }
 .minimap canvas {
   display: block;
@@ -1492,7 +1506,7 @@ kbd.down,
 /* Arriba al centro: tu puesto (todos contra todos, escalada), infectados */
 .hud-top {
   position: absolute;
-  top: 10px;
+  top: 16px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -1500,9 +1514,12 @@ kbd.down,
   gap: 10px;
   height: 38px;
   padding: 0 6px 0 14px;
-  border-radius: var(--radius);
-  background: rgba(29, 36, 44, 0.94);
-  box-shadow: 0 4px 0 rgba(8, 11, 14, 0.6);
+  border-radius: 12px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-line);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-blur);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
   white-space: nowrap;
 }
 .hud-top .first {
@@ -1520,8 +1537,8 @@ kbd.down,
   align-items: center;
   height: 26px;
   padding: 0 8px;
-  border-radius: 3px;
-  background: var(--field);
+  border-radius: 7px;
+  background: rgba(236, 227, 207, 0.1);
   font: 700 18px var(--display);
 }
 .infect-bar {
@@ -1538,14 +1555,18 @@ kbd.down,
 /* Marcador por equipos: dos bloques con la cifra y el límite en medio */
 .team-score {
   position: absolute;
-  top: 10px;
+  top: 16px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   align-items: stretch;
-  border-radius: var(--radius);
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 4px 0 rgba(8, 11, 14, 0.6);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-line);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-blur);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
 }
 .ts {
   display: flex;
@@ -1553,8 +1574,7 @@ kbd.down,
   align-items: center;
   width: 112px;
   padding: 5px 0 6px;
-  background: rgba(29, 36, 44, 0.94);
-  box-shadow: inset 0 -4px 0 var(--t);
+  box-shadow: inset 0 -3px 0 var(--t);
   white-space: nowrap;
 }
 .ts small {
@@ -1579,7 +1599,7 @@ kbd.down,
   display: grid;
   place-items: center;
   width: 44px;
-  background: var(--field);
+  background: rgba(236, 227, 207, 0.06);
   font: 700 12px var(--body);
   color: var(--txt-3);
 }
@@ -1587,8 +1607,8 @@ kbd.down,
 /* Killfeed: arriba a la derecha, líneas de 30 px; tus bajas con borde Señal */
 .feed {
   position: absolute;
-  right: 12px;
-  top: 12px;
+  right: 16px;
+  top: 16px;
   max-width: 380px;
   display: flex;
   flex-direction: column;
@@ -1601,8 +1621,11 @@ kbd.down,
   gap: 8px;
   height: 30px;
   padding: 0 10px;
-  border-radius: 3px;
-  background: rgba(29, 36, 44, 0.86);
+  border-radius: 8px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-line);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-blur);
   font: 700 13.5px var(--body);
   white-space: nowrap;
   animation: bsSlide 180ms ease-out;
@@ -1625,8 +1648,9 @@ kbd.down,
   box-shadow: inset 0 -3px 0 var(--accent-edge);
 }
 .feed-item.mine {
-  background: rgba(29, 36, 44, 0.96);
-  box-shadow: inset 0 0 0 2px var(--accent);
+  box-shadow:
+    inset 0 0 0 2px var(--accent),
+    var(--glass-shadow);
 }
 .feed-item.died {
   box-shadow: inset 0 0 0 2px var(--danger);
@@ -1639,6 +1663,21 @@ kbd.down,
 }
 .feed-item.streak .lbl {
   color: var(--racha-txt);
+}
+.feed-item .medal {
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(255, 197, 49, 0.16);
+  color: var(--accent);
+  font: 700 10.5px var(--body);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.feed-item.chat {
+  box-shadow: inset 3px 0 0 var(--info);
+}
+.feed-item.chat svg {
+  color: var(--info);
 }
 .feed-item.notice {
   font-weight: 500;
@@ -1789,6 +1828,9 @@ kbd.down,
   color: var(--accent);
   text-shadow: 0 2px 0 var(--field);
 }
+.kill-banner .line2.medals {
+  color: var(--accent-hi);
+}
 .kill-banner .line2.streak {
   color: var(--racha-txt);
 }
@@ -1808,10 +1850,10 @@ kbd.down,
   position: absolute;
   bottom: 16px;
   border-radius: 14px;
-  background: linear-gradient(180deg, rgba(14, 18, 22, 0.42), rgba(14, 18, 22, 0.62));
-  border: 1px solid rgba(236, 227, 207, 0.1);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
-  backdrop-filter: blur(12px) saturate(1.15);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-line);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-blur);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
 }
 
@@ -1932,6 +1974,46 @@ kbd.down,
   background: var(--txt-1);
   animation: bsFall 800ms ease-in forwards;
 }
+/* Chat rápido (V): lista numerada a la izquierda, a media altura */
+.quick-chat {
+  position: absolute;
+  left: 16px;
+  top: 250px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 230px;
+  padding: 12px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(14, 18, 22, 0.55), rgba(14, 18, 22, 0.75));
+  border: 1px solid rgba(236, 227, 207, 0.1);
+  backdrop-filter: blur(12px);
+  animation: bsTab 120ms ease-out;
+}
+.quick-chat .kicker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  color: var(--info);
+}
+.qc-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 28px;
+  font: 600 14px var(--body);
+}
+.qc-row small {
+  margin-left: auto;
+  font: 600 11px var(--body);
+  color: var(--txt-3);
+}
+.qc-hint {
+  margin-top: 6px;
+  font: 500 12px var(--body);
+  color: var(--txt-3);
+}
 /* Protección al aparecer: chip de cielo encima de la vida, no en mitad de la mira */
 .spawn-prot {
   top: auto;
@@ -2049,6 +2131,140 @@ kbd.down,
 .slots span.on em {
   background: var(--accent-ink);
   color: var(--accent);
+}
+
+/* Granada: chip con su tecla junto a las armas; apagado cuando ya la usaste */
+.slots span.gren {
+  padding-right: 7px;
+  color: var(--txt-1);
+}
+/* Barlow Condensed draws G almost like a 6: the key letter uses the body font */
+.slots span.gren em {
+  font: 700 12px var(--body);
+}
+.slots span.gren.used {
+  opacity: 0.35;
+}
+
+/* Dominio: las tres zonas bajo el marcador de equipos; el relleno es el avance de la captura */
+.top-sub {
+  position: absolute;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.top-sub.zones {
+  display: flex;
+  gap: 6px;
+}
+.zone {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  border: 2px solid rgba(236, 227, 207, 0.25);
+  font: 14px var(--title);
+  color: var(--txt-1);
+  overflow: hidden;
+  isolation: isolate;
+}
+.zone::before {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  height: var(--p, 0%);
+  background: var(--pc, transparent);
+  opacity: 0.55;
+  z-index: -1;
+}
+.zone.owned {
+  border-color: var(--t);
+}
+.zone.contested {
+  animation: bsPulse 0.8s ease-in-out infinite;
+}
+.top-sub.round-st {
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-line);
+  backdrop-filter: var(--glass-blur);
+  font: 600 13px var(--body);
+  white-space: nowrap;
+}
+.round-wait {
+  grid-area: count / count / bar / bar;
+  font: 600 15px var(--body);
+  color: var(--txt-2);
+}
+
+/* Repetición de la muerte: etiqueta arriba, como en la tele */
+.replay-tag {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: rgba(14, 18, 22, 0.7);
+  border: 1px solid rgba(236, 227, 207, 0.12);
+  backdrop-filter: blur(10px);
+  font: 600 14px var(--body);
+  color: var(--txt-2);
+}
+.replay-tag svg {
+  color: var(--danger-txt);
+  animation: bsPulse 1s ease-in-out infinite;
+}
+.replay-tag b {
+  color: var(--txt-1);
+}
+
+/* Tras una votación: el navegador pide un clic para capturar el ratón; un aviso ligero en vez de la pausa */
+.click-start {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  background: rgba(10, 13, 16, 0.25);
+  cursor: pointer;
+}
+.cs-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 22px 34px;
+  border-radius: 16px;
+  background: var(--glass-bg-solid);
+  border: 1px solid var(--glass-line);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-blur);
+  animation: bsPop 260ms cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+.cs-card .kicker {
+  color: var(--accent);
+}
+.cs-card b {
+  font: 24px var(--title);
+  text-transform: uppercase;
+}
+.cs-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 600 15px var(--body);
+  color: var(--txt-2);
+  animation: bsPulse 1.4s ease-in-out infinite;
 }
 
 /* Mira telescópica */
@@ -2414,9 +2630,11 @@ kbd.down,
 
 /* Escenario del personaje */
 .char-stage {
+  /* height of the skin picker under the preview (two rows of five) */
+  --skins-h: 128px;
   position: relative;
   display: grid;
-  grid-template-rows: minmax(0, 1fr) 96px;
+  grid-template-rows: minmax(0, 1fr) var(--skins-h);
   min-width: 0;
   border-radius: var(--radius-l);
   overflow: hidden;
@@ -2459,7 +2677,7 @@ kbd.down,
 .char-stage .peana {
   position: absolute;
   left: 50%;
-  top: calc((100% - 96px) * 0.897 - 28px);
+  top: calc((100% - var(--skins-h)) * 0.897 - 28px);
   width: 280px;
   height: 56px;
   margin-left: -140px;
@@ -2512,20 +2730,22 @@ kbd.down,
 .skins {
   position: relative;
   z-index: 2;
-  display: flex;
-  align-items: center;
+  /* two rows of five: ten skins do not fit in one row under the preview */
+  display: grid;
+  grid-template-columns: repeat(5, 64px);
   justify-content: center;
-  gap: 3px;
-  padding: 0 8px;
+  align-content: center;
+  gap: 2px 6px;
+  padding: 4px 8px;
   background: rgba(14, 18, 22, 0.7);
 }
 .skins button {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
-  width: 50px;
-  padding: 7px 0 6px;
+  gap: 3px;
+  width: 64px;
+  padding: 4px 0 3px;
   border: 0;
   border-radius: var(--radius);
   background: transparent;
@@ -2544,10 +2764,18 @@ kbd.down,
   outline-offset: 2px;
 }
 .skins i {
-  width: 38px;
-  height: 38px;
-  border-radius: 3px;
-  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.35);
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  /* the tile wears the outfit colour, so the colour pick shows on every skin */
+  background: color-mix(in oklch, var(--c) 45%, #12171c);
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.3);
+}
+.skins i svg {
+  width: 26px;
+  height: 26px;
 }
 .skins span {
   font: 600 11px var(--body);
@@ -2816,6 +3044,15 @@ kbd.down,
   gap: 12px;
 }
 /* Practice bots: only rendered for the server's own PC, set apart from the player actions */
+.seg.sm {
+  height: 36px;
+  padding: 3px;
+}
+.seg.sm button {
+  align-items: center;
+  padding: 0 10px;
+  font: 600 13px var(--body);
+}
 .admin-row {
   display: flex;
   justify-content: center;
@@ -2826,6 +3063,7 @@ kbd.down,
   cursor: default;
 }
 .admin-row .kicker {
+  white-space: nowrap;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -3025,9 +3263,85 @@ kbd.down,
   font: 700 22px var(--display);
   color: var(--accent);
 }
+/* Votación del siguiente mapa: tres tarjetas horizontales compactas */
+.vote {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+.vote .kicker {
+  color: var(--accent);
+}
+.vote-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 250px);
+  gap: 10px;
+}
+.vote-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 64px;
+  padding: 6px 12px 6px 6px;
+  border-radius: var(--radius);
+  background: var(--bg-2);
+  box-shadow: 0 4px 0 var(--edge);
+  color: var(--txt-1);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 80ms,
+    box-shadow 80ms;
+}
+.vote-card:hover {
+  background: var(--bg-3);
+}
+.vote-card:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--edge);
+}
+.vote-card.on {
+  box-shadow:
+    inset 0 0 0 2px var(--accent),
+    0 4px 0 var(--accent-edge);
+}
+.vote-card img {
+  width: 82px;
+  height: 52px;
+  border-radius: var(--radius-s);
+  object-fit: cover;
+}
+.vc-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.vc-text b {
+  font: 15px var(--title);
+  text-transform: uppercase;
+}
+.vc-text span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font: 600 12.5px var(--body);
+  color: var(--txt-2);
+  white-space: nowrap;
+}
+.vc-count {
+  margin-left: auto;
+  font: 700 26px var(--display);
+  color: var(--accent);
+}
 .best {
   display: grid;
-  grid-template-columns: repeat(3, 220px);
+  /* one, two or three cards, always centred */
+  grid-auto-flow: column;
+  grid-auto-columns: 220px;
   justify-content: center;
   gap: 12px;
   margin-top: 8px;
@@ -3257,6 +3571,64 @@ kbd.down,
 }
 
 /* ================================================================ MANUAL */
+/* Estadísticas de la sesión (solo el PC del servidor) */
+.stats-modal {
+  width: 1040px;
+  max-height: 640px;
+  gap: 16px;
+}
+.stats-modal .modal-head {
+  margin-bottom: 0;
+}
+.stats-picks {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+.stats-pick {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--bg-2);
+}
+.stats-pick .chip-char {
+  justify-self: start;
+}
+.stats-pick b {
+  font: 700 24px/1 var(--display);
+}
+.stats-pick .bar {
+  grid-column: 1 / -1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--field);
+  overflow: hidden;
+}
+.stats-pick .bar i {
+  display: block;
+  height: 100%;
+  background: var(--c);
+}
+.stats-pick small {
+  grid-column: 1 / -1;
+  font: 500 12px var(--body);
+  color: var(--txt-3);
+}
+.stats-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.stats-empty {
+  padding: 40px 0;
+  text-align: center;
+  font: 500 15px var(--body);
+  color: var(--txt-2);
+}
+
 .manual {
   width: 1216px;
   height: 680px;

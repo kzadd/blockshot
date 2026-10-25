@@ -75,21 +75,22 @@ export const CHARACTERS: Character[] = [
 export const CHAR_BY_ID = Object.fromEntries(CHARACTERS.map((c) => [c.id, c])) as Record<CharacterId, Character>;
 export const isCharacterId = (v: unknown): v is CharacterId => typeof v === 'string' && Object.hasOwn(CHAR_BY_ID, v);
 
+/** Who you are (the head and bare skin); `base` is the human. The class still decides the body and stats. */
 export type SkinId =
-  'base' | 'camo' | 'noche' | 'artico' | 'oro' | 'urbano' | 'desierto' | 'bosque' | 'carbono' | 'neon';
+  'base' | 'alien' | 'mapache' | 'robot' | 'oso' | 'astronauta' | 'zombi' | 'rana' | 'gato' | 'calabaza';
 
-/** Skins only change the look (colours and patterns live in the client models). */
+/** Skins only change the look, never the stats (the models live in the client). */
 export const SKINS: { id: SkinId; name: string }[] = [
-  { id: 'base', name: 'Clásico' },
-  { id: 'camo', name: 'Camuflaje' },
-  { id: 'noche', name: 'Nocturno' },
-  { id: 'artico', name: 'Ártico' },
-  { id: 'oro', name: 'Dorado' },
-  { id: 'urbano', name: 'Urbano' },
-  { id: 'desierto', name: 'Desierto' },
-  { id: 'bosque', name: 'Bosque' },
-  { id: 'carbono', name: 'Carbono' },
-  { id: 'neon', name: 'Neón' },
+  { id: 'base', name: 'Humano' },
+  { id: 'alien', name: 'Alien' },
+  { id: 'mapache', name: 'Mapache' },
+  { id: 'robot', name: 'Robot' },
+  { id: 'oso', name: 'Oso' },
+  { id: 'astronauta', name: 'Astronauta' },
+  { id: 'zombi', name: 'Zombi' },
+  { id: 'rana', name: 'Rana' },
+  { id: 'gato', name: 'Gato' },
+  { id: 'calabaza', name: 'Calabaza' },
 ];
 export const isSkinId = (v: unknown): v is SkinId => SKINS.some((k) => k.id === v);
 

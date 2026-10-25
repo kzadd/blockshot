@@ -42,6 +42,8 @@ export interface InputActions {
   /** the player pulled the view down by this much (it cancels recoil) */
   pulledDown(radians: number): void;
   resize(): void;
+  /** gets the key first (quick chat menu, grenade…); true = consumed */
+  intercept(code: string): boolean;
 }
 
 export class InputController {
@@ -109,6 +111,7 @@ export class InputController {
     // Esc with the mouse captured: pause (resuming with Esc is done by the Game screen, which knows about menus)
     if (e.code === 'Escape' && this.locked && !e.repeat) document.exitPointerLock?.();
     if (!this.actions.canAct() || !this.locked || e.repeat) return;
+    if (this.actions.intercept(e.code)) return;
     if (e.code === 'Space') this.jumpPressed = true;
     if (e.code === 'Digit1') this.actions.switchSlot(0);
     if (e.code === 'Digit2') this.actions.switchSlot(1);

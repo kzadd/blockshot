@@ -1,7 +1,7 @@
 import type { Character } from '../characters/characters';
 import type { WeaponId } from '../weapons/weapons';
 
-export type ModeId = 'ffa' | 'teams' | 'ctf' | 'gungame' | 'kc' | 'infect';
+export type ModeId = 'ffa' | 'teams' | 'ctf' | 'gungame' | 'kc' | 'infect' | 'dom' | 'rounds';
 /** 0 = no team (free for all) · 1 = Red / Survivors · 2 = Blue / Infected */
 export type Team = 0 | 1 | 2;
 export type SideTeam = 1 | 2;
@@ -23,6 +23,8 @@ export const MODES: ModeInfo[] = [
   { id: 'gungame', name: 'Escalada de armas', limits: [5, 8], def: 8, unit: 'armas' },
   { id: 'kc', name: 'Confirmar bajas', limits: [15, 30, 50, 75], def: 30, unit: 'placas' },
   { id: 'infect', name: 'Infectados', limits: [2, 3, 5], def: 3, unit: 'min' },
+  { id: 'dom', name: 'Dominio', limits: [100, 150, 250], def: 150, unit: 'puntos' },
+  { id: 'rounds', name: 'Rondas', limits: [3, 5, 7], def: 3, unit: 'rondas' },
 ];
 export const MODE_BY_ID = Object.fromEntries(MODES.map((m) => [m.id, m])) as Record<ModeId, ModeInfo>;
 export const isModeId = (v: unknown): v is ModeId => typeof v === 'string' && Object.hasOwn(MODE_BY_ID, v);
@@ -38,7 +40,7 @@ export const gunLadder = (limit: number): WeaponId[] => GUN_LADDERS[limit] ?? GU
 
 /** Modes with two sides (no friendly fire). In Infected the side is decided by the game, not the player. */
 export const isTeamMode = (mode: ModeId): boolean =>
-  mode === 'teams' || mode === 'ctf' || mode === 'kc' || mode === 'infect';
+  mode === 'teams' || mode === 'ctf' || mode === 'kc' || mode === 'infect' || mode === 'dom' || mode === 'rounds';
 export const canSwitchTeam = (mode: ModeId): boolean => isTeamMode(mode) && mode !== 'infect';
 
 /** Capture the flag: radius to take / return / capture and time until a dropped flag returns. */
@@ -52,6 +54,8 @@ export const PICKUP_MAX_DY = 2.5;
  * faster and tougher. If survivors remain when time runs out (minutes chosen at room creation), they win.
  */
 export const INFECT = { pickDelay: 10000, speed: 1.15, hp: 1.3 };
+/** Rounds: time limit of a round and the break before the next one (ms). */
+export const ROUNDS = { roundMs: 120000, breakMs: 4000 };
 
 // TODO(review): posible código muerto: `color` is never read (team colours come from the client palette, which follows the colourblind mode)
 export const TEAMS: Record<SideTeam, { name: string; color: string }> = {
@@ -75,7 +79,10 @@ export const STREAK_REWARDS: Record<number, StreakReward> = {
   7: { id: 'armor', name: 'Blindaje', amount: 50 },
 };
 
-export const MATCH_RESTART_MS = 8000;
+/** Results screen between matches (long enough to vote for the next map). */
+export const MATCH_RESTART_MS = 12000;
+/** Map/mode options voted at the end of a match. */
+export const VOTE_OPTIONS = 3;
 /** ms between team changes */
 export const TEAM_SWITCH_COOLDOWN = 5000;
 /** a player hit within this many ms is "in combat" and cannot switch teams */

@@ -1,4 +1,14 @@
-import type { FlagSnapshot, InfectSnapshot, SideTeam, Spawn, TagSnapshot, Team, Weapon } from '@blockshot/shared';
+import type {
+  DomSnapshot,
+  FlagSnapshot,
+  InfectSnapshot,
+  RoundSnapshot,
+  SideTeam,
+  Spawn,
+  TagSnapshot,
+  Team,
+  Weapon,
+} from '@blockshot/shared';
 import type { Player } from '../players/player';
 import type { Room } from '../rooms/room';
 
@@ -7,6 +17,8 @@ export interface ModeSnapshot {
   fl: Record<SideTeam, FlagSnapshot> | null;
   tg: TagSnapshot[] | null;
   inf: InfectSnapshot | null;
+  dz: DomSnapshot[] | null;
+  rd: RoundSnapshot | null;
 }
 
 /**
@@ -22,6 +34,8 @@ export interface GameMode {
   readonly streakRewards: boolean;
   /** called every server tick while the match is running */
   tick?(room: Room, now: number): void;
+  /** whether a dead player may respawn now (rounds: not during a round) */
+  canSpawn?(room: Room, player: Player): boolean;
   /** restrict where a player may spawn */
   filterSpawns?(room: Room, player: Player, spawns: Spawn[]): Spawn[];
   /** walking speed multiplier for a player (infected are faster) */

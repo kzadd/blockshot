@@ -50,6 +50,9 @@ function Table({ players, me, numbered, caps, ladder }: TableProps) {
           <th className="num" style={{ width: 64 }}>
             Racha
           </th>
+          <th className="num" style={{ width: 84 }}>
+            Medallas
+          </th>
           <th className="num" style={{ width: 56 }}>
             Ping
           </th>
@@ -91,6 +94,7 @@ function Table({ players, me, numbered, caps, ladder }: TableProps) {
                 p.st
               )}
             </td>
+            <td className="num">{p.md || '—'}</td>
             <td className={`num ping ${p.pg > BAD_PING_MS ? 'bad' : ''}`}>{p.pg || '—'}</td>
           </tr>
         ))}

@@ -21,7 +21,8 @@ import {
 import { createMode } from '../modes';
 import { BOT_PREFIX } from '../players/bot';
 import { createPlayer } from '../players/player';
-import { notice, type Room, type RoomChannel } from './room';
+import { foldPlayer } from '../stats/sessionStats';
+import { notice, roomInfo, type Room, type RoomChannel } from './room';
 
 const ROOM_ID_BYTES = 3;
 const DEFAULT_NICKNAME = 'Jugador';
@@ -101,8 +102,12 @@ export class RoomRegistry {
       scoreLimit: MODE_BY_ID[modeId].limits.includes(limit) ? limit : MODE_BY_ID[modeId].def,
       teamScore: { 1: 0, 2: 0 },
       matchOver: false,
+      firstBlood: false,
       restartTimer: null,
       channel: this.channelFor(id),
+      vote: null,
+      grenades: [],
+      lobbyChanged: () => this.events.changed(),
     };
     room.mode = createMode(modeId, room);
     this.rooms.set(id, room);
@@ -126,21 +131,14 @@ export class RoomRegistry {
     return {
       ok: true,
       you: socketId,
-      room: {
-        id: room.id,
-        name: room.name,
-        scoreLimit: room.scoreLimit,
-        mapId: room.map.id,
-        size: room.map.size,
-        mode: room.modeId,
-        max: room.max,
-      },
+      room: roomInfo(room),
     };
   }
 
   removePlayer(room: Room, socketId: string): void {
     const p = room.players.get(socketId);
     if (!p) return;
+    foldPlayer(p);
     room.players.delete(socketId);
     notice(room, `${p.name} salió de la sala`);
     // Bots alone do not keep a room open

@@ -1,4 +1,12 @@
-import { STREAK_REWARDS, round2, type Vec3, type Weapon } from '@blockshot/shared';
+import {
+  LONGSHOT_M,
+  MULTI_KILL_MS,
+  STREAK_REWARDS,
+  round2,
+  type MedalId,
+  type Vec3,
+  type Weapon,
+} from '@blockshot/shared';
 import type { Player } from '../players/player';
 import { notice, type Room } from '../rooms/room';
 
@@ -12,6 +20,30 @@ function grantStreakReward(room: Room, shooter: Player, now: number): string | u
   if (reward.id === 'radar') shooter.radarUntil = now + reward.ms;
   else shooter.armor = reward.amount;
   return reward.name;
+}
+
+/** Medals earned by this kill (also updates the multi-kill and revenge trackers). */
+function medalsFor(room: Room, shooter: Player, victim: Player, w: Weapon, dmg: number, head: boolean, now: number) {
+  const out: MedalId[] = [];
+  if (!room.firstBlood) {
+    room.firstBlood = true;
+    out.push('first');
+  }
+  shooter.multi = now - shooter.lastKillAt <= MULTI_KILL_MS ? shooter.multi + 1 : 1;
+  shooter.lastKillAt = now;
+  if (shooter.multi === 2) out.push('double');
+  else if (shooter.multi >= 3) out.push('triple');
+  if (shooter.lastKillerId === victim.id) {
+    out.push('revenge');
+    shooter.lastKillerId = null;
+  }
+  if (!shooter.move.grounded) out.push('air');
+  if (w.melee && w.backstab && dmg >= w.backstab) out.push('backstab');
+  if (head && Math.hypot(shooter.x - victim.x, shooter.y - victim.y, shooter.z - victim.z) >= LONGSHOT_M)
+    out.push('longshot');
+  victim.lastKillerId = shooter.id;
+  shooter.medals += out.length;
+  return out;
 }
 
 /** Applies one shot's damage to a victim: armor first, then health; handles the kill. */
@@ -52,6 +84,7 @@ export function applyDamage(
   shooter.streak++;
   shooter.bestStreak = Math.max(shooter.bestStreak, shooter.streak);
   const reward = grantStreakReward(room, shooter, now);
+  const medals = medalsFor(room, shooter, victim, w, dmg, head, now);
   room.channel.to(shooter.id, 'hitmarker', [{ head, kill: true, dmg: Math.round(dmg), at }]);
   room.channel.broadcast('kill', [
     {
@@ -68,6 +101,7 @@ export function applyDamage(
       streak: shooter.streak,
       ended,
       reward,
+      medals,
     },
   ]);
   if (reward) notice(room, `${shooter.name} consiguió ${reward} por su racha`);

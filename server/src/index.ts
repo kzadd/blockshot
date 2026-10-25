@@ -5,6 +5,7 @@ import { Server } from 'socket.io';
 import msgpackParser from 'socket.io-msgpack-parser';
 import { FIXED_DT, SIM_STEPS_PER_TICK } from '@blockshot/shared';
 import { serverConfig } from './config';
+import { tickGrenades } from './combat/grenades';
 import { startFixedLoop } from './game/loop';
 import { snapshotRoom } from './game/tick';
 import { createApp } from './http/app';
@@ -54,6 +55,7 @@ startFixedLoop(FIXED_DT * MS_PER_S, (now) => {
     try {
       tickBots(room, now);
       simulateRoom(room, FIXED_DT, now);
+      tickGrenades(room, FIXED_DT, now);
       if (snapshot) snapshotRoom(room, now);
     } catch (err) {
       logger.error({ err, room: room.id }, 'room tick failed');

@@ -1,4 +1,5 @@
-import { canSwitchTeam, teamName, type ModeId, type SideTeam } from '@blockshot/shared';
+import { useState } from 'react';
+import { BOT_LEVELS, canSwitchTeam, teamName, type BotLevel, type ModeId, type SideTeam } from '@blockshot/shared';
 import { Icon } from '../../ui/icons';
 import { socket } from '../../network/socket';
 import { Keys } from '../../ui/ui';
@@ -12,8 +13,10 @@ const PAUSE_KEYS: [string[], string][] = [
   [['Clic izq.'], 'Disparar'],
   [['Clic der.'], 'Apuntar'],
   [['R'], 'Recargar'],
+  [['G'], 'Granada (una por vida)'],
   [['1', '2', '3', 'Q'], 'Cambiar de arma (3: cuchillo)'],
   [['Tab'], 'Marcador'],
+  [['V'], 'Chat rápido'],
   [['Esc'], 'Pausa'],
 ];
 
@@ -26,11 +29,22 @@ interface Props {
   onLeave: () => void;
   /** server PC only: practice bot tools */
   admin: boolean;
+  onStats: () => void;
 }
 
-export default function PauseMenu({ mode, onResume, onSettings, onManual, onSwitchTeam, onLeave, admin }: Props) {
+export default function PauseMenu({
+  mode,
+  onResume,
+  onSettings,
+  onManual,
+  onSwitchTeam,
+  onLeave,
+  admin,
+  onStats,
+}: Props) {
   const myTeam = useHud((s) => s.myTeam) ?? 0;
   const other: SideTeam = myTeam === 1 ? 2 : 1;
+  const [level, setLevel] = useState<BotLevel>('normal');
   return (
     <div className="pause-bg" onClick={onResume}>
       <div className="stage">
@@ -68,15 +82,32 @@ export default function PauseMenu({ mode, onResume, onSettings, onManual, onSwit
             <div className="admin-row" onClick={(e) => e.stopPropagation()}>
               <span className="kicker">
                 <Icon name="lock" />
-                Solo en el PC del servidor
+                Solo servidor
               </span>
-              <button className="btn sm" onClick={() => socket.emit('bot:add')}>
-                <Icon name="plus" />
-                Añadir bot que dispara
+              <div className="seg sm" role="radiogroup" aria-label="Nivel del bot">
+                {(Object.keys(BOT_LEVELS) as BotLevel[]).map((l) => (
+                  <button
+                    key={l}
+                    role="radio"
+                    aria-checked={level === l}
+                    className={level === l ? 'on' : ''}
+                    onClick={() => setLevel(l)}
+                  >
+                    {BOT_LEVELS[l].name}
+                  </button>
+                ))}
+              </div>
+              <button className="btn sm" onClick={() => socket.emit('bot:add', { level })}>
+                <Icon name="bot" />
+                Añadir bot
               </button>
               <button className="btn sm ghost" onClick={() => socket.emit('bot:clear')}>
                 <Icon name="x" />
                 Quitar bots
+              </button>
+              <button className="btn sm ghost" onClick={onStats}>
+                <Icon name="chart" />
+                Estadísticas
               </button>
             </div>
           )}

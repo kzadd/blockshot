@@ -11,10 +11,12 @@ export const CONTROLS: [string[], string][] = [
   [['Clic izq.'], 'Disparar'],
   [['Clic der.'], 'Apuntar (mira telescópica con el francotirador)'],
   [['R'], 'Recargar'],
+  [['G'], 'Lanzar la granada (una por vida; rebota y explota a los 2 s)'],
   [['1', '2', '3', 'Q', 'Rueda'], 'Cambiar de arma (3: cuchillo, por la espalda mata de un golpe)'],
   [['Tab'], 'Ver el marcador (mantener)'],
   [['B'], 'Cambiar de personaje (solo estando muerto)'],
   [['T'], 'Cambiar de equipo (por equipos; no en pleno combate)'],
+  [['V', '1–8'], 'Chat rápido: abre las frases y elige una con su número'],
   [['O'], 'Ajustes: mira, sensibilidad, campo de visión, volumen'],
   [['H', 'F1'], 'Abrir este manual'],
   [['Esc'], 'Soltar el ratón / pausa'],
@@ -48,7 +50,18 @@ const STEPS: [string, string][] = [
     'Infectados',
     'Uno empieza infectado: solo lleva cuchillo, pero corre más y aguanta más. Cada superviviente que cae se infecta. Los supervivientes ganan si aguantan hasta el final.',
   ],
-  ['Si te eliminan', `Reapareces a los ${PLAYER.respawnDelay / 1000} s. Pulsa B para cambiar de personaje antes.`],
+  [
+    'Dominio',
+    'Quédate en una zona (A, B o C) sin rivales dentro para capturarla. Cada 2 s tu equipo suma un punto por zona.',
+  ],
+  [
+    'Rondas',
+    'No se reaparece durante la ronda: gana el equipo que deje al otro sin nadie en pie. Vale para 1 contra 1.',
+  ],
+  [
+    'Si te eliminan',
+    `Ves la repetición desde los ojos de quien te eliminó y reapareces a los ${PLAYER.respawnDelay / 1000} s. B cambia de personaje.`,
+  ],
 ];
 
 const TRICKS: [string, string][] = [
@@ -78,6 +91,11 @@ const TRICKS: [string, string][] = [
     'Con 5 bajas seguidas ganas Radar (ves a todos los enemigos en el minimapa un rato); con 7, Blindaje (+50 que se gasta antes que la vida).',
   ],
   ['Disparos justos', 'El servidor compensa el retraso de la red: si en tu pantalla le diste, cuenta.'],
+  ['Granadas', 'Sácalos de una esquina: la explosión no atraviesa paredes y no daña a tu equipo ni a ti.'],
+  [
+    'Medallas',
+    'Primera sangre, doble baja, venganza, desde el aire, por la espalda o tiro lejano: suman en el marcador.',
+  ],
 ];
 
 const TABS = ['Controles', 'Cómo jugar', 'Personajes', 'Armas', 'Trucos'];

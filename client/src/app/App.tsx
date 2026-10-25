@@ -23,7 +23,7 @@ export default function App() {
       {session ? (
         <GameErrorBoundary key={session.room.id} onLeave={leave}>
           <Suspense fallback={null}>
-            <Game session={session} onLeave={leave} />
+            <Game session={session} onLeave={leave} onRoom={(room) => setSession((s) => (s ? { ...s, room } : s))} />
           </Suspense>
         </GameErrorBoundary>
       ) : (

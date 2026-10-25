@@ -70,7 +70,16 @@ pasan por Husky: lint-staged (ESLint + Prettier) y commitlint (conventional comm
    - **Infectados:** con 2 jugadores empieza una cuenta atrás de 10 s y uno se convierte en infectado (solo cuchillo,
      +30 % de vida y +15 % de velocidad). Cada superviviente que cae se infecta. Ganan los infectados si no queda nadie;
      los supervivientes, si aguantan los minutos elegidos (2, 3 o 5).
-     La partida se reinicia sola a los 8 s. Todos los personajes llevan cuchillo (tecla **3**); por la espalda mata de un golpe.
+   - **Dominio** (Rojo contra Azul): tres zonas, A, B y C. Quédate en una sin rivales dentro para capturarla; cada 2 s
+     tu equipo suma un punto por zona. Gana el primero en llegar a los puntos elegidos (100, 150 o 250).
+   - **Rondas** (Rojo contra Azul, vale para 1 contra 1): no se reaparece durante la ronda; gana la ronda el equipo que
+     deje al otro sin nadie en pie (si se acaban los 2 min, el que tenga más gente viva). Gana quien gane 3, 5 o 7 rondas.
+
+   Al terminar, durante 12 s se ve el resultado y se **vota** la siguiente partida entre tres mapas y modos (si nadie
+   vota, se repite la misma). En los modos por equipos, los equipos se **equilibran** solos según la partida anterior.
+   Todos los personajes llevan cuchillo (tecla **3**); por la espalda mata de un golpe, y una **granada** por vida.
+   Al morir ves una **repetición** de tus últimos segundos desde los ojos de quien te eliminó. Las bajas especiales dan
+   **medallas** (primera sangre, doble y triple baja, venganza, desde el aire, por la espalda y tiro lejano).
 
 | Tecla             | Acción                                                                                             |
 | ----------------- | -------------------------------------------------------------------------------------------------- |
@@ -81,10 +90,12 @@ pasan por Husky: lint-staged (ESLint + Prettier) y commitlint (conventional comm
 | Clic izquierdo    | Disparar                                                                                           |
 | Clic derecho      | Apuntar: más zoom y precisión, pero te mueves más despacio (mira telescópica con el francotirador) |
 | R                 | Recargar                                                                                           |
+| G                 | Lanzar la granada (una por vida; rebota, explota a los 2 s y las paredes cubren)                   |
 | 1 / 2 / Q / rueda | Cambiar de arma                                                                                    |
 | Tab               | Marcador                                                                                           |
 | B                 | Cambiar de personaje (solo estando muerto)                                                         |
 | T                 | Cambiar de equipo (por equipos; espera 5 s entre cambios y no vale en pleno combate)               |
+| V y 1–8           | Chat rápido: frases fijas (las tácticas solo las ve tu equipo)                                     |
 | O                 | Ajustes: mira (6 estilos, color, tamaño…), sensibilidad, campo de visión y volumen                 |
 | H / F1            | Manual del juego (controles, personajes, armas y trucos)                                           |
 | Esc               | Pausa (soltar el ratón); otro Esc vuelve al juego                                                  |
@@ -190,7 +201,7 @@ client/src/
   baja, `tick`…), una línea en `server/src/modes/index.ts`, su entrada en `MODES` (`shared/src/modes`) y su
   presentación en `client/src/game/modeUi.ts`.
 - **Ajustes y mira:** valores por defecto en `client/src/settings/settingsStore.ts`; se guardan en el navegador.
-- **Mapas:** hay cinco (Patio, Almacén, Desfiladero, Polvo y Ciudad) en tres tamaños (pequeño 52 m, mediano 80 m,
+- **Mapas:** hay seis (Patio, Almacén, Desfiladero, Polvo, Ciudad y Obra) en tres tamaños (pequeño 52 m, mediano 80 m,
   grande 112 m). Cada mapa es una función en `shared/src/maps/builders/` que recibe `H` (mitad del lado) y coloca cajas
   con `B(x, y, z, ancho, alto, fondo, tipo)` (x/z = centro, y = base) y spawns con `S(x, z)`. Para añadir uno, escribe
   su función y regístrala en `MAP_DEFS` (`shared/src/maps/maps.ts`). Todo lo que sea caja tiene colisión y bloquea

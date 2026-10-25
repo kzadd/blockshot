@@ -39,6 +39,10 @@ const SPARK_SPEED = 3.2;
 const SPARK_SPREAD = 0.8;
 const SPARK_GRAVITY = 9;
 const SPARK_COLOR = 0xffc266;
+const BLAST_FIRE = 0xffa53a;
+const BLAST_SMOKE_COLOR = 0x5d5a55;
+const BLAST_SPARKS = 18;
+const BLAST_SMOKE = 8;
 const SPARKS_PER_HIT = 4;
 const SPARKS_PER_PELLET = 1;
 const DROPS_PER_HIT = 4;
@@ -389,6 +393,14 @@ export class Effects {
     p.life = p.max = life;
     this.scene.add(p.sprite);
     this.liveParticles.push(p);
+  }
+
+  /** Grenade blast: a fire ball, sparks and a cloud of smoke rising. */
+  explosion(at: THREE.Vector3): void {
+    this.particle(at, BLAST_FIRE, 1.2, 3.2, 0.35, 0, 0, 1, UP, 0, true);
+    for (let i = 0; i < BLAST_SPARKS; i++)
+      this.particle(at, SPARK_COLOR, 0.08, 0, 0.6, 11, SPARK_GRAVITY, 1, UP, 1, true);
+    for (let i = 0; i < BLAST_SMOKE; i++) this.particle(at, BLAST_SMOKE_COLOR, 0.9, 2.4, 1.6, 1.6, -0.6, 0.55, UP, 1);
   }
 
   damageNumber(at: readonly [number, number, number], dmg: number, head: boolean, kill: boolean): void {

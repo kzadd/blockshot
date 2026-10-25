@@ -1,14 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  MEDALS,
+  MODE_BY_ID,
+  QUICK_CHAT,
   STREAKS,
   canSwitchTeam,
   getMap,
   isCharacterId,
+  isSkinId,
   type CharacterId,
   type KillEvent,
   type MatchEnd,
   type SideTeam,
+  type RoomInfo,
   type SkinId,
+  type Team,
 } from '@blockshot/shared';
 import type { Session } from '../app/App';
 import type { ColorChoice, SkinChoice } from '../characters/CharacterSelect';
@@ -17,6 +23,7 @@ import { markGameLost } from '../network/connection';
 import { socket } from '../network/socket';
 import Settings from '../settings/SettingsDialog';
 import { useSettings } from '../settings/settingsStore';
+import { Icon } from '../ui/icons';
 import { playCurtain } from '../ui/ui';
 import { sfx } from './audio/sound';
 import { Engine } from './engine/Engine';
@@ -26,6 +33,7 @@ import type { RoomView } from './roomView';
 import CharacterScreen from './screens/CharacterScreen';
 import DeathScreen, { type LastDeath } from './screens/DeathScreen';
 import PauseMenu from './screens/PauseMenu';
+import StatsDialog from './screens/StatsDialog';
 import ScoresLayer, { type MatchState } from './screens/ScoresLayer';
 
 let feedId = 0;
@@ -56,13 +64,22 @@ const loadChoice = <T,>(key: string): T => {
     return {} as T;
   }
 };
-const loadSkins = () => loadChoice<SkinChoice>(SKINS_KEY);
+// Picks saved before the creature skins (camo, noche…) are dropped: they fall back to Humano
+const loadSkins = (): SkinChoice =>
+  Object.fromEntries(Object.entries(loadChoice<SkinChoice>(SKINS_KEY)).filter(([, s]) => isSkinId(s)));
 const loadColors = () => loadChoice<ColorChoice>(COLORS_KEY);
 
-type Menu = 'settings' | 'manual' | null;
+type Menu = 'settings' | 'manual' | 'stats' | null;
 type NewFeedItem = FeedItem extends infer F ? (F extends FeedItem ? Omit<F, 'key' | 't'> : never) : never;
 
-export default function Game({ session, onLeave }: { session: Session; onLeave: () => void }) {
+interface GameProps {
+  session: Session;
+  onLeave: () => void;
+  /** the room moved to another map / mode (end of match vote) */
+  onRoom: (room: RoomInfo) => void;
+}
+
+export default function Game({ session, onLeave, onRoom }: GameProps) {
   const mount = useRef<HTMLDivElement>(null);
   const engine = useRef<Engine | null>(null);
   const settings = useSettings();
@@ -89,6 +106,10 @@ export default function Game({ session, onLeave }: { session: Session; onLeave: 
   }));
   const live = useRef({ match, menu });
   live.current = { match, menu };
+  const resume = useRef({ selecting, charId, skins, colors });
+  // New map or mode after a vote: a light "click to start" instead of the pause menu (the browser needs a click)
+  const [fresh, setFresh] = useState(false);
+  resume.current = { selecting, charId, skins, colors };
 
   const info: RoomView = {
     name: room.name,
@@ -110,6 +131,12 @@ export default function Game({ session, onLeave }: { session: Session; onLeave: 
       room.scoreLimit,
     );
     engine.current = e;
+    const keep = resume.current;
+    if (!keep.selecting && keep.charId) {
+      e.autoChar = { id: keep.charId, skin: keep.skins[keep.charId] ?? 'base', color: keep.colors[keep.charId] };
+      e.respawnSoon();
+      setFresh(true);
+    }
     return () => {
       e.destroy();
       resetHud();
@@ -165,12 +192,23 @@ export default function Game({ session, onLeave }: { session: Session; onLeave: 
       if (d.killer === you) {
         if (label || d.reward) sfx.streak();
         clearTimeout(bannerTimer);
-        setBanner({ key: Date.now(), name: d.victimName, head: d.head, label, n: d.streak, reward: d.reward });
+        setBanner({
+          key: Date.now(),
+          name: d.victimName,
+          head: d.head,
+          label,
+          n: d.streak,
+          reward: d.reward,
+          medals: d.medals.map((m) => MEDALS[m]),
+        });
         bannerTimer = setTimeout(() => setBanner(null), BANNER_MS);
       }
     };
     const onNotice = (text: string) => push({ type: 'notice', text });
-    const onEnd = (d: MatchEnd) => setMatch({ ...d, at: Date.now() });
+    const onChat = (d: { name: string; team: Team; i: number }) =>
+      push({ type: 'chat', name: d.name, team: d.team, text: QUICK_CHAT[d.i]?.text ?? '' });
+    const onEnd = (d: MatchEnd) => setMatch({ ...d, at: Date.now(), votes: d.vote.map(() => 0), myVote: null });
+    const onVotes = (votes: number[]) => setMatch((m) => (m ? { ...m, votes } : m));
     const onStart = () => {
       setMatch(null);
       setLastDeath(null);
@@ -182,6 +220,9 @@ export default function Game({ session, onLeave }: { session: Session; onLeave: 
     };
     socket.on('kill', onKill);
     socket.on('notice', onNotice);
+    socket.on('chat', onChat);
+    socket.on('vote', onVotes);
+    socket.on('room:changed', onRoom);
     socket.on('match:end', onEnd);
     socket.on('match:start', onStart);
     socket.on('disconnect', onDisc);
@@ -243,6 +284,9 @@ export default function Game({ session, onLeave }: { session: Session; onLeave: 
     return () => {
       socket.off('kill', onKill);
       socket.off('notice', onNotice);
+      socket.off('chat', onChat);
+      socket.off('vote', onVotes);
+      socket.off('room:changed', onRoom);
       socket.off('match:end', onEnd);
       socket.off('match:start', onStart);
       socket.off('disconnect', onDisc);
@@ -251,7 +295,7 @@ export default function Game({ session, onLeave }: { session: Session; onLeave: 
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
     };
-  }, [onLeave, you, room.mode]);
+  }, [onLeave, onRoom, you, room.mode]);
 
   const pick = (characterId: CharacterId, skin: SkinId, color: string) => {
     const next = { ...skins, [characterId]: skin };
@@ -277,11 +321,18 @@ export default function Game({ session, onLeave }: { session: Session; onLeave: 
     onLeave();
   };
   const switchTeam = (team: SideTeam) => socket.emit('team:set', { team });
+  const vote = (i: number) => {
+    socket.emit('vote', { i });
+    setMatch((m) => (m ? { ...m, myVote: i } : m));
+  };
 
   const ready = !!g;
   const dead = ready && !g.alive && g.everSpawned && !selecting && !match;
   const choosing = ready && !g.alive && selecting && !match;
   const paused = ready && g.alive && !g.locked && !match && !menu;
+  useEffect(() => {
+    if (g?.locked) setFresh(false);
+  }, [g?.locked]);
 
   return (
     <div className={`game ${shake}`}>
@@ -325,7 +376,22 @@ export default function Game({ session, onLeave }: { session: Session; onLeave: 
         />
       )}
 
-      {paused && (
+      {paused && fresh && (
+        <div className="click-start" onClick={() => engine.current?.requestLock()}>
+          <div className="cs-card">
+            <span className="kicker">Siguiente partida</span>
+            <b>
+              {map.name} · {MODE_BY_ID[room.mode].name}
+            </b>
+            <span className="cs-hint">
+              <Icon name="crosshair" size={16} />
+              Haz clic para empezar
+            </span>
+          </div>
+        </div>
+      )}
+
+      {paused && !fresh && (
         <PauseMenu
           mode={room.mode}
           onResume={() => engine.current?.requestLock()}
@@ -333,6 +399,8 @@ export default function Game({ session, onLeave }: { session: Session; onLeave: 
           onManual={() => setMenu('manual')}
           onSwitchTeam={switchTeam}
           onLeave={leave}
+          admin={!!session.admin}
+          onStats={() => setMenu('stats')}
         />
       )}
 
@@ -344,10 +412,12 @@ export default function Game({ session, onLeave }: { session: Session; onLeave: 
           scoreLimit={room.scoreLimit}
           mode={room.mode}
           onLeave={leave}
+          onVote={vote}
         />
       )}
 
       {menu === 'settings' && <Settings onClose={() => setMenu(null)} />}
+      {menu === 'stats' && <StatsDialog onClose={() => setMenu(null)} />}
       {menu === 'manual' && <Manual onClose={() => setMenu(null)} />}
     </div>
   );

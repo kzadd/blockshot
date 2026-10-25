@@ -528,6 +528,16 @@ const THEMES: Record<MapId, Theme> = {
     sky: '#5d8fd0',
     scenery: city,
   },
+  obra: {
+    floor: ['gravel', 3],
+    wall: ['panels', 3],
+    platform: ['planks', 2],
+    step: ['concrete', 2],
+    ground: ['gravel', 4, '#9a8f7c'],
+    sun: 0xffe9cc,
+    sky: '#6f9ccc',
+    scenery: construction,
+  },
 };
 const CAR_COLORS = ['#c0503e', '#3d6e9e', '#e8e4dc', '#2b2f36', '#c9a13a', '#4f7a45'];
 
@@ -871,11 +881,12 @@ function addSky(scene: THREE.Scene, map: GameMap, theme: Theme): void {
 
 // ------------------------------------------------------------ Scenery outside the walls
 // Random point outside the arena, between `near` and `far` metres from the wall
-function outside(rand: Rand, H: number, near: number, far: number): [number, number] {
+/** A centre outside the arena, with the whole footprint (`radius` from the centre) at least `near` past the walls. */
+function outside(rand: Rand, H: number, near: number, far: number, radius = 0): [number, number] {
   for (;;) {
     const x = (rand() * 2 - 1) * (H + far);
     const z = (rand() * 2 - 1) * (H + far);
-    if (Math.max(Math.abs(x), Math.abs(z)) > H + near) return [x, z];
+    if (Math.max(Math.abs(x), Math.abs(z)) > H + near + radius) return [x, z];
   }
 }
 
@@ -916,10 +927,10 @@ function industrial(batch: Batch, map: GameMap, rand: Rand): void {
   // Sheds and chimneys around
   const cols = ['#8a96a3', '#a3a9b0', '#7b8794', '#b0a48e'];
   for (let i = 0; i < 16; i++) {
-    const [x, z] = outside(rand, H, 8, 60);
     const w = 14 + rand() * 18;
     const d = 12 + rand() * 14;
     const h = 9 + rand() * 9;
+    const [x, z] = outside(rand, H, 8, 60, Math.max(w, d) / 2 + 0.3);
     batch.add(tiledBoxCached(1), mat(pick(cols, i), 'corrugated'), x, h / 2, z, 0, w, h, d);
     batch.add(BOX, mat('#5d6670', 'diamond'), x, h + 0.3, z, 0, w + 0.6, 0.6, d + 0.6);
   }
@@ -935,10 +946,11 @@ function desert(batch: Batch, map: GameMap, rand: Rand): void {
   const H = map.half;
   const rockCols = ['#c98a5a', '#b0704a', '#d19a64', '#a86a48'];
   for (let i = 0; i < 22; i++) {
-    const [x, z] = outside(rand, H, 15, 110);
     const w = 18 + rand() * 30;
     const d = 18 + rand() * 30;
     const h = 12 + rand() * 30;
+    // Turned at random: the half diagonal is how far it can reach towards the arena
+    const [x, z] = outside(rand, H, 15, 110, Math.hypot(w, d) / 2);
     batch.add(tiledBoxCached(8), mat(pick(rockCols, i), 'rock'), x, h / 2, z, rand() * 3, w, h, d);
     batch.add(tiledBoxCached(8), mat(pick(rockCols, i + 1), 'rock'), x, h + 2, z, rand() * 3, w * 0.7, 4, d * 0.7);
   }
@@ -953,12 +965,49 @@ function city(batch: Batch, map: GameMap, rand: Rand): void {
   const H = map.half;
   const cols = ['#9fb0c4', '#c9b79a', '#8a96a3', '#d8c8b0', '#7b8794', '#b58c74'];
   for (let i = 0; i < 40; i++) {
-    const [x, z] = outside(rand, H, 6, 70);
     const w = 10 + rand() * 14;
     const d = 10 + rand() * 14;
     const h = 16 + rand() * 45;
+    const [x, z] = outside(rand, H, 6, 70, Math.max(w, d) / 2);
     batch.add(tiledBoxCached(Math.round(h / 6)), mat(pick(cols, i), 'windows'), x, h / 2, z, 0, w, h, d);
     batch.add(BOX, mat('#4a5562', 'concrete'), x, h + 0.4, z, 0, w * 0.5, 0.8, d * 0.5);
+  }
+}
+
+// Around the site: more concrete skeletons, tower cranes and the city behind
+function construction(batch: Batch, map: GameMap, rand: Rand): void {
+  const H = map.half;
+  city(batch, map, rand);
+  const concrete = mat('#b3afa6', 'concrete');
+  for (let i = 0; i < 5; i++) {
+    const [x, z] = outside(rand, H, 14, 40);
+    const floors = 3 + Math.floor(rand() * 4);
+    const w = 12 + rand() * 8;
+    for (let f = 1; f <= floors; f++) batch.add(BOX, concrete, x, f * 3.2, z, 0, w, 0.35, w);
+    for (const cx of [-1, 1]) {
+      for (const cz of [-1, 1]) {
+        batch.add(
+          BOX,
+          concrete,
+          x + (cx * (w - 1)) / 2,
+          (floors * 3.2) / 2,
+          z + (cz * (w - 1)) / 2,
+          0,
+          0.8,
+          floors * 3.2,
+          0.8,
+        );
+      }
+    }
+  }
+  const yellow = mat('#e9b824', 'hazard');
+  for (let i = 0; i < 3; i++) {
+    const [x, z] = outside(rand, H, 20, 55);
+    const h = 30 + rand() * 12;
+    const ry = rand() * Math.PI;
+    batch.add(BOX, yellow, x, h / 2, z, 0, 1.6, h, 1.6);
+    batch.add(BOX, yellow, x + Math.cos(ry) * 10, h + 0.6, z - Math.sin(ry) * 10, ry, 30, 1, 1);
+    batch.add(BOX, mat('#8a8f99', 'concrete'), x - Math.cos(ry) * 6, h - 0.4, z + Math.sin(ry) * 6, ry, 3, 2, 2);
   }
 }
 

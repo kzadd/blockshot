@@ -1,4 +1,5 @@
 import { PLAYER, SERVER_TICK_MS, round2, type PlayerSnapshot, type StateSnapshot } from '@blockshot/shared';
+import { grenadeSnapshot } from '../combat/grenades';
 import { sendAcks } from '../players/movement';
 import type { Player } from '../players/player';
 import { isTeamRoom } from '../players/teams';
@@ -40,6 +41,7 @@ const playerSnapshot = (p: Player, now: number): PlayerSnapshot => ({
   mh: p.maxHp,
   ar: Math.ceil(p.armor || 0),
   rd: now < p.radarUntil ? 1 : 0,
+  md: p.medals,
 });
 
 export function buildSnapshot(room: Room, now: number): StateSnapshot {
@@ -50,6 +52,9 @@ export function buildSnapshot(room: Room, now: number): StateSnapshot {
     fl: mode.fl ?? null,
     tg: mode.tg ?? null,
     inf: mode.inf ?? null,
+    gr: grenadeSnapshot(room),
+    dz: mode.dz ?? null,
+    rd: mode.rd ?? null,
   };
 }
 

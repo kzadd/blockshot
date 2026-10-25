@@ -86,6 +86,14 @@ export class CameraRig {
     this.apply();
   }
 
+  /** Death replay: exactly where the killer was looking. */
+  replay(x: number, y: number, z: number, yaw: number, pitch: number): void {
+    this.camera.position.set(x, y, z);
+    this.camera.rotation.set(pitch, yaw, 0);
+    this.fov = this.baseFov;
+    this.apply();
+  }
+
   /** Before spawning: a slow orbit over the map. */
   orbit(now: number, half: number): void {
     const t = now * ORBIT_SPEED;

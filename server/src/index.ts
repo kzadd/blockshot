@@ -5,12 +5,14 @@ import { Server } from 'socket.io';
 import msgpackParser from 'socket.io-msgpack-parser';
 import { FIXED_DT, SIM_STEPS_PER_TICK } from '@blockshot/shared';
 import { serverConfig } from './config';
+import { tickGrenades } from './combat/grenades';
 import { startFixedLoop } from './game/loop';
 import { snapshotRoom } from './game/tick';
 import { createApp } from './http/app';
 import { logger } from './logger';
 import { LOBBY_CHANNEL, attachGateway, type GameServer } from './network/gateway';
 import { announce, findLanAddress, printBanner } from './network/lan';
+import { tickBots } from './players/bot';
 import { simulateRoom } from './players/movement';
 import { RoomRegistry } from './rooms/registry';
 import type { RoomChannel } from './rooms/room';
@@ -51,7 +53,9 @@ startFixedLoop(FIXED_DT * MS_PER_S, (now) => {
   const snapshot = ++step % SIM_STEPS_PER_TICK === 0;
   for (const room of rooms.all()) {
     try {
+      tickBots(room, now);
       simulateRoom(room, FIXED_DT, now);
+      tickGrenades(room, FIXED_DT, now);
       if (snapshot) snapshotRoom(room, now);
     } catch (err) {
       logger.error({ err, room: room.id }, 'room tick failed');

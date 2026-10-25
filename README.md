@@ -20,14 +20,6 @@ pnpm install
 pnpm clase      # compila cliente y servidor y arranca en el puerto 3000
 ```
 
-La consola muestra algo así:
-
-```
-  Tú:         http://localhost:3000
-  La clase:   http://blockshot.local:3000
-              (si no carga: http://192.168.1.35:3000)
-```
-
 Comparte `http://blockshot.local:3000` con la clase: el servidor anuncia ese nombre en la red local (mDNS),
 así no hace falta dictar la IP. Si en algún equipo no carga (redes que bloquean multicast), usa la IP de debajo.
 Si hay dos servidores en la misma red, cambia el nombre: `NOMBRE=aula2 pnpm clase` (Windows PowerShell:
@@ -78,7 +70,16 @@ pasan por Husky: lint-staged (ESLint + Prettier) y commitlint (conventional comm
    - **Infectados:** con 2 jugadores empieza una cuenta atrás de 10 s y uno se convierte en infectado (solo cuchillo,
      +30 % de vida y +15 % de velocidad). Cada superviviente que cae se infecta. Ganan los infectados si no queda nadie;
      los supervivientes, si aguantan los minutos elegidos (2, 3 o 5).
-     La partida se reinicia sola a los 8 s. Todos los personajes llevan cuchillo (tecla **3**); por la espalda mata de un golpe.
+   - **Dominio** (Rojo contra Azul): tres zonas, A, B y C. Quédate en una sin rivales dentro para capturarla; cada 2 s
+     tu equipo suma un punto por zona. Gana el primero en llegar a los puntos elegidos (100, 150 o 250).
+   - **Rondas** (Rojo contra Azul, vale para 1 contra 1): no se reaparece durante la ronda; gana la ronda el equipo que
+     deje al otro sin nadie en pie (si se acaban los 2 min, el que tenga más gente viva). Gana quien gane 3, 5 o 7 rondas.
+
+   Al terminar, durante 12 s se ve el resultado y se **vota** la siguiente partida entre tres mapas y modos (si nadie
+   vota, se repite la misma). En los modos por equipos, los equipos se **equilibran** solos según la partida anterior.
+   Todos los personajes llevan cuchillo (tecla **3**); por la espalda mata de un golpe, y una **granada** por vida.
+   Al morir ves una **repetición** de tus últimos segundos desde los ojos de quien te eliminó. Las bajas especiales dan
+   **medallas** (primera sangre, doble y triple baja, venganza, desde el aire, por la espalda y tiro lejano).
 
 | Tecla             | Acción                                                                                             |
 | ----------------- | -------------------------------------------------------------------------------------------------- |
@@ -89,10 +90,12 @@ pasan por Husky: lint-staged (ESLint + Prettier) y commitlint (conventional comm
 | Clic izquierdo    | Disparar                                                                                           |
 | Clic derecho      | Apuntar: más zoom y precisión, pero te mueves más despacio (mira telescópica con el francotirador) |
 | R                 | Recargar                                                                                           |
+| G                 | Lanzar la granada (una por vida; rebota, explota a los 2 s y las paredes cubren)                   |
 | 1 / 2 / Q / rueda | Cambiar de arma                                                                                    |
 | Tab               | Marcador                                                                                           |
 | B                 | Cambiar de personaje (solo estando muerto)                                                         |
 | T                 | Cambiar de equipo (por equipos; espera 5 s entre cambios y no vale en pleno combate)               |
+| V y 1–8           | Chat rápido: frases fijas (las tácticas solo las ve tu equipo)                                     |
 | O                 | Ajustes: mira (6 estilos, color, tamaño…), sensibilidad, campo de visión y volumen                 |
 | H / F1            | Manual del juego (controles, personajes, armas y trucos)                                           |
 | Esc               | Pausa (soltar el ratón); otro Esc vuelve al juego                                                  |
@@ -118,7 +121,7 @@ No hay en Infectados.
 
 **Armas:** las pesadas (francotirador, ametralladora) frenan al llevarlas en la mano; saca la secundaria para correr.
 Apuntar tarda un momento (más con las pesadas) y la precisión llega al terminar de subir el arma. Casi todas pierden
-daño con la distancia. El francotirador hace 120 al cuerpo y 240 a la cabeza: de un tiro al cuerpo mata a todos menos al Tanque (150 de vida), al que hay que darle en la cabeza; tras
+daño con la distancia. El francotirador hace 120 al cuerpo y 240 a la cabeza: de un tiro al cuerpo mata a todos menos al Tanque (140 de vida), al que hay que darle en la cabeza; tras
 cada disparo hay que volver a apuntar (cerrojo), y si te mueves o saltas con la mira puesta el tiro se desvía.
 
 En pantalla: **minimapa** (aliados en verde; los enemigos solo aparecen en rojo 2 s después de disparar),
@@ -129,13 +132,13 @@ del daño y el **ping** arriba. En el marcador (Tab) se ven bajas, muertes, rach
 
 Más vida = más lento. La velocidad (m/s) es con la principal / con la secundaria en la mano.
 
-| Personaje | Vida | Velocidad   | Principal       | Secundaria |
-| --------- | ---- | ----------- | --------------- | ---------- |
-| Rayo      | 85   | 10.4 / 10.7 | Subfusil        | Pistola    |
-| Cazador   | 90   | 7.2 / 7.8   | Francotirador   | Pistola    |
-| Soldado   | 100  | 7.1 / 7.5   | Rifle de asalto | Pistola    |
-| Bastión   | 120  | 6.6 / 7.3   | Ametralladora   | Revólver   |
-| Tanque    | 150  | 6.5 / 6.8   | Escopeta        | Revólver   |
+| Personaje | Vida | Velocidad | Principal       | Secundaria |
+| --------- | ---- | --------- | --------------- | ---------- |
+| Rayo      | 90   | 8.6 / 8.9 | Subfusil        | Pistola    |
+| Cazador   | 90   | 7.2 / 7.8 | Francotirador   | Pistola    |
+| Soldado   | 100  | 7.1 / 7.5 | Rifle de asalto | Pistola    |
+| Bastión   | 120  | 6.6 / 7.3 | Ametralladora   | Revólver   |
+| Tanque    | 140  | 6.5 / 6.8 | Escopeta        | Revólver   |
 
 ## Estructura
 
@@ -198,7 +201,7 @@ client/src/
   baja, `tick`…), una línea en `server/src/modes/index.ts`, su entrada en `MODES` (`shared/src/modes`) y su
   presentación en `client/src/game/modeUi.ts`.
 - **Ajustes y mira:** valores por defecto en `client/src/settings/settingsStore.ts`; se guardan en el navegador.
-- **Mapas:** hay cinco (Patio, Almacén, Desfiladero, Polvo y Ciudad) en tres tamaños (pequeño 52 m, mediano 80 m,
+- **Mapas:** hay seis (Patio, Almacén, Desfiladero, Polvo, Ciudad y Obra) en tres tamaños (pequeño 52 m, mediano 80 m,
   grande 112 m). Cada mapa es una función en `shared/src/maps/builders/` que recibe `H` (mitad del lado) y coloca cajas
   con `B(x, y, z, ancho, alto, fondo, tipo)` (x/z = centro, y = base) y spawns con `S(x, z)`. Para añadir uno, escribe
   su función y regístrala en `MAP_DEFS` (`shared/src/maps/maps.ts`). Todo lo que sea caja tiene colisión y bloquea

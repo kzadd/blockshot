@@ -6,6 +6,7 @@ import { PLAYER } from '../player/player';
 import { buildAlmacen } from './builders/almacen';
 import { buildCiudad } from './builders/ciudad';
 import { buildDesfiladero } from './builders/desfiladero';
+import { buildObra } from './builders/obra';
 import { buildPatio } from './builders/patio';
 import { buildPolvo } from './builders/polvo';
 import { PROP_COLORS } from './props';
@@ -123,6 +124,31 @@ const MAP_DEFS: Record<MapId, MapDef> = {
       platform: '#a8a196',
       step: '#bdb6aa',
       crate: '#c99a55',
+    },
+  },
+  obra: {
+    name: 'Obra',
+    tag: 'Vertical',
+    desc: 'Edificio en obra de tres plantas, andamios y grúa. Combate en altura.',
+    build: buildObra,
+    wallH: 10,
+    sky: '#bcd4e6',
+    colors: {
+      floor: '#a39684',
+      wall: '#c9c3b6',
+      platform: '#b08a5a',
+      step: '#a9a49a',
+      concrete: '#b3afa6',
+      slab: '#9c978e',
+      stair: '#b8b2a6',
+      railing: '#e8772e',
+      metal: '#9aa6b1',
+      rail: '#e9b824',
+      brick: '#b8664a',
+      crate: '#c99a55',
+      crate2: '#8d6a3f',
+      cont1: '#d9772e',
+      cont2: '#4a7fb0',
     },
   },
 };

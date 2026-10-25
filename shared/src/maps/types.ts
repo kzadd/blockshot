@@ -70,7 +70,7 @@ export interface MapBuildContext {
 
 export type MapColors = Partial<Record<BoxKind, string>> & { floor: string; wall: string };
 
-export type MapId = 'patio' | 'almacen' | 'desfiladero' | 'polvo' | 'ciudad';
+export type MapId = 'patio' | 'almacen' | 'desfiladero' | 'polvo' | 'ciudad' | 'obra';
 export type SizeId = 's' | 'm' | 'l';
 
 export interface MapDef {

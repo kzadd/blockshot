@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { PLAYER, WEAPONS, damageAt, type Vec3 } from '@blockshot/shared';
+import { CHAR_BY_ID, PLAYER, WEAPONS, damageAt, type Vec3 } from '@blockshot/shared';
 import { recordPosition } from '../players/history';
 import type { Player } from '../players/player';
 import { makeRoom } from '../testing/fakeRoom';
@@ -10,6 +10,7 @@ const A: [number, number] = [8, -2.5];
 const B: [number, number] = [13, -2.5];
 const CHEST = 1.3;
 const HEAD = 1.64;
+const TANK_HP = CHAR_BY_ID.tanque.hp;
 
 const eye = (p: Player): Vec3 => [p.x, p.y + PLAYER.eye, p.z];
 function aim(from: Player, x: number, y: number, z: number): Vec3 {
@@ -69,8 +70,8 @@ describe('handleShoot', () => {
     const dir = aim(a, b.x, b.y + CHEST, b.z);
     handleShoot(r.room, a, { o: eye(a), d: Array.from({ length: w.pellets }, () => dir), lag: 0 });
     const dist = Math.hypot(b.x - a.x, b.y + CHEST - (a.y + PLAYER.eye), b.z - a.z);
-    const expected = w.melee ? w.damage : Math.min(150, damageAt(w, dist - 0.38) * w.pellets);
-    expect(150 - b.hp).toBeCloseTo(expected, 0);
+    const expected = w.melee ? w.damage : Math.min(TANK_HP, damageAt(w, dist - 0.38) * w.pellets);
+    expect(TANK_HP - b.hp).toBeCloseTo(expected, 0);
   });
 
   it('respects the fire rate and the magazine, and reloads', () => {
@@ -170,7 +171,7 @@ describe('handleShoot', () => {
     a.slot = 2;
     b.ry = 0; // a is in front of b
     handleShoot(r.room, a, { o: eye(a), d: [aim(a, b.x, b.y + 1, b.z)], lag: 0 });
-    expect(b.hp).toBe(150 - WEAPONS.knife.damage);
+    expect(b.hp).toBe(TANK_HP - WEAPONS.knife.damage);
   });
 
   it('rejects a shot whose origin is on the other side of a wall', () => {
@@ -195,6 +196,6 @@ describe('handleShoot', () => {
     a.slot = 2;
     const o: Vec3 = [a.x, a.y + PLAYER.eye, a.z + 1.2]; // moved towards b, inside the tolerance
     handleShoot(r.room, a, { o, d: [aim(a, b.x, b.y + 1, b.z)], lag: 0 });
-    expect(b.hp).toBe(150);
+    expect(b.hp).toBe(TANK_HP);
   });
 });

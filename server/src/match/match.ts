@@ -1,6 +1,8 @@
 import { MATCH_RESTART_MS, type BestPlay, type Team } from '@blockshot/shared';
 import { resetMatchStats, type Player } from '../players/player';
 import type { Room } from '../rooms/room';
+import { foldPlayer } from '../stats/sessionStats';
+import { applyOption, balanceTeams, rating, startVote, voteWinner } from './vote';
 
 /** Accuracy only counts for players who fired at least this many shots. */
 const MIN_SHOTS_FOR_ACCURACY = 10;
@@ -31,20 +33,37 @@ export function bestPlays(room: Room): BestPlay[] {
 /** Ends the match, shows the results and starts a new one after MATCH_RESTART_MS. */
 export function endMatch(room: Room, winnerName: string, winnerTeam: Team = 0): void {
   room.matchOver = true;
+  room.grenades = [];
   for (const p of room.players.values()) p.alive = false;
   const scores = [...room.players.values()]
     .map((p) => ({ name: p.name, kills: p.kills, deaths: p.deaths, team: p.team }))
     .sort((a, b) => b.kills - a.kills);
   room.channel.broadcast('match:end', [
-    { winner: winnerName, team: winnerTeam, scores, best: bestPlays(room), restartIn: MATCH_RESTART_MS },
+    {
+      winner: winnerName,
+      team: winnerTeam,
+      scores,
+      best: bestPlays(room),
+      restartIn: MATCH_RESTART_MS,
+      vote: startVote(room),
+    },
   ]);
   room.restartTimer = setTimeout(() => restartMatch(room), MATCH_RESTART_MS);
 }
 
 export function restartMatch(room: Room): void {
+  const ratings = new Map([...room.players.values()].map((p) => [p.id, rating(p)]));
+  const next = voteWinner(room);
+  room.vote = null;
+  if (next) applyOption(room, next);
   room.teamScore = { 1: 0, 2: 0 };
   room.mode.onMatchReset?.(room);
-  for (const p of room.players.values()) resetMatchStats(p);
+  balanceTeams(room, ratings);
+  for (const p of room.players.values()) {
+    foldPlayer(p);
+    resetMatchStats(p);
+  }
   room.matchOver = false;
+  room.firstBlood = false;
   room.channel.broadcast('match:start', []);
 }

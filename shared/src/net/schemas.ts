@@ -2,6 +2,8 @@
 // Schemas check shape and types only; game rules (cooldowns, ranges, ammo…) are enforced by the server logic.
 import * as v from 'valibot';
 import { OUTFIT_COLOR_HEXES } from '../characters/characters';
+import { VOTE_OPTIONS } from '../modes/modes';
+import { QUICK_CHAT } from '../modes/quickChat';
 
 const finite = v.pipe(v.number(), v.finite());
 const vec3 = v.tuple([finite, finite, finite]);
@@ -64,6 +66,14 @@ export const ShootSchema = v.object({
   d: v.pipe(v.array(vec3), v.minLength(1), v.maxLength(MAX_PELLETS)),
   lag: v.optional(finite),
 });
+
+export const GrenadeSchema = v.object({ o: vec3, d: vec3 });
+
+export const BotAddSchema = v.optional(v.object({ level: v.optional(v.picklist(['easy', 'normal', 'hard'])) }));
+
+export const VoteSchema = v.object({ i: v.pipe(int, v.minValue(0), v.maxValue(VOTE_OPTIONS - 1)) });
+
+export const QuickChatSchema = v.object({ i: v.pipe(int, v.minValue(0), v.maxValue(QUICK_CHAT.length - 1)) });
 
 /** Messages without payload must not carry one either. */
 export const EmptySchema = v.optional(v.union([v.undefined(), v.null(), v.object({})]));

@@ -140,6 +140,12 @@ class Sfx {
     src.stop(t + dur + 0.02);
   }
 
+  /** Grenade blast: a deep rumble and a crack. */
+  boom(vol = 1): void {
+    this.thud(160, 1.1, 0.9 * vol);
+    this.thud(900, 0.25, 0.5 * vol, 'bandpass');
+  }
+
   step(vol = 1): void {
     this.thud(380 + Math.random() * 120, 0.06, 0.16 * vol);
   }

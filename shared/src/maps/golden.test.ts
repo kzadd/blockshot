@@ -22,16 +22,22 @@ const MAP_HASHES: Record<string, string> = {
   'ciudad:s': 'b105cc877be14b0a',
   'ciudad:m': 'd00601f6b555f63f',
   'ciudad:l': 'f26e27d6dc034b52',
+  // sixth map (construction site) added on purpose
+  'obra:s': '4fbae09d2b1e274d',
+  'obra:m': '45479f810f4d6784',
+  'obra:l': '8c39ea14b4f07024',
 };
 
 const TABLE_HASHES = {
-  WEAPONS: '21f5599b47a110a7',
-  CHARACTERS: '2009178fe674681e',
-  MODES: '87ca9b7c1b43670c',
+  // Balance pass (2026-10-24, checked with server/src/combat/duel.sim.test.ts): Rayo 8.6 m/s and 90 hp, Tanque 140 hp,
+  // slower sniper aim, rifle 105 ms, more falloff on rifle and LMG, longer SMG range
+  WEAPONS: 'd1ba1521e4a96c96',
+  CHARACTERS: 'ee946d556cf3f25f',
+  MODES: '7b0e3729e18e0ee7', // two new modes: Dominio and Rondas
   PLAYER: '0bf57b8a7e2429af',
-  MAPS: 'b76607c240b9cebc',
+  MAPS: '64018304e6c9b34c', // sixth map: Obra
   MAP_SIZES: '0cd287561039dcb2',
-  SKINS: '376855100cbba893', // five cosmetic skins added (urbano, desierto, bosque, carbono, neon)
+  SKINS: '9808ff7d018a973e', // creatures: Humano, Alien, Mapache, Robot, Oso, Astronauta, Zombi, Rana, Gato, Calabaza
   GUN_LADDERS: '8f9323383a0b8d4b',
   STREAKS: 'c5eac1deecda3aac',
   STREAK_REWARDS: 'a57d0b99f6cfdc4d',

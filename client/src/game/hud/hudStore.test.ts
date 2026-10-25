@@ -34,7 +34,7 @@ const base = (): HudState => ({
   damage: 0,
   respawnIn: 0,
   killerName: '',
-  players: [{ id: 'a', n: 'Ana', c: 'soldado', k: 0, d: 0, tm: 0, pg: 10, st: 0, cp: 0, lv: 0 }],
+  players: [{ id: 'a', n: 'Ana', c: 'soldado', k: 0, d: 0, tm: 0, pg: 10, st: 0, cp: 0, lv: 0, md: 0 }],
   spread: 0.01,
   aim: 0,
   dmgDirs: [],
@@ -51,6 +51,11 @@ const base = (): HudState => ({
   teamScore: null,
   flags: null,
   ping: 10,
+  chatOpen: false,
+  grenades: 1,
+  zones: null,
+  round: null,
+  replay: false,
 });
 
 describe('hud store', () => {

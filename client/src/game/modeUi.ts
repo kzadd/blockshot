@@ -62,4 +62,18 @@ export const MODE_UI: Record<ModeId, ModeUi> = {
     points: null,
     top: 'infect',
   },
+  dom: {
+    sub: 'Controla las zonas',
+    hint: (n) => `${units('dom', n)} del equipo`,
+    goal: (n) => `gana el primer equipo en llegar a ${n} puntos (1 por zona cada 2 s)`,
+    points: 'Capturas',
+    top: 'teams',
+  },
+  rounds: {
+    sub: 'El último en pie gana',
+    hint: (n) => units('rounds', n),
+    goal: (n) => `gana el primer equipo en ganar ${n} rondas`,
+    points: null,
+    top: 'teams',
+  },
 };

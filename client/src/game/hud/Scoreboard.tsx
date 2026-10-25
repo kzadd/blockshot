@@ -8,6 +8,7 @@ import {
   type SideTeam,
   type WeaponId,
 } from '@blockshot/shared';
+import { Icon } from '../../ui/icons';
 import { MODE_UI } from '../modeUi';
 import type { RoomView } from '../roomView';
 import type { HudPlayer } from './hudState';
@@ -49,6 +50,9 @@ function Table({ players, me, numbered, caps, ladder }: TableProps) {
           <th className="num" style={{ width: 64 }}>
             Racha
           </th>
+          <th className="num" style={{ width: 84 }}>
+            Medallas
+          </th>
           <th className="num" style={{ width: 56 }}>
             Ping
           </th>
@@ -80,7 +84,17 @@ function Table({ players, me, numbered, caps, ladder }: TableProps) {
             )}
             <td className="num k">{p.k}</td>
             <td className="num">{p.d}</td>
-            <td className={`num ${p.st >= HOT_STREAK ? 'fire' : ''}`}>{p.st >= HOT_STREAK ? `🔥 ${p.st}` : p.st}</td>
+            <td className={`num ${p.st >= HOT_STREAK ? 'fire' : ''}`}>
+              {p.st >= HOT_STREAK ? (
+                <>
+                  <Icon name="flame" size={14} />
+                  {p.st}
+                </>
+              ) : (
+                p.st
+              )}
+            </td>
+            <td className="num">{p.md || '—'}</td>
             <td className={`num ping ${p.pg > BAD_PING_MS ? 'bad' : ''}`}>{p.pg || '—'}</td>
           </tr>
         ))}
@@ -113,28 +127,30 @@ export default function Scoreboard({ players, me, info, scoreLimit, mode, teamSc
           {info.map} · {info.size} · {goal}
         </span>
       </div>
-      {teams ? (
-        SIDES.map((t) => (
-          <div key={t} className="sb-team" style={{ '--t': teamVar(t), '--tt': TEAM_TXT[t] }}>
-            <div className="sb-team-head">
-              <b>{infect ? teamName(mode, t) : `Equipo ${teamName(mode, t)}`}</b>
-              <span>
-                {infect
-                  ? `${sorted.filter((p) => p.tm === t).length} ${sorted.filter((p) => p.tm === t).length === 1 ? 'jugador' : 'jugadores'}`
-                  : `${teamScore?.[t] ?? 0} / ${scoreLimit}`}
-              </span>
-            </div>
-            {!infect && (
-              <div className="pbar">
-                <i style={{ width: `${((teamScore?.[t] ?? 0) / scoreLimit) * 100}%` }} />
+      <div className="sb-scroll">
+        {teams ? (
+          SIDES.map((t) => (
+            <div key={t} className="sb-team" style={{ '--t': teamVar(t), '--tt': TEAM_TXT[t] }}>
+              <div className="sb-team-head">
+                <b>{infect ? teamName(mode, t) : `Equipo ${teamName(mode, t)}`}</b>
+                <span>
+                  {infect
+                    ? `${sorted.filter((p) => p.tm === t).length} ${sorted.filter((p) => p.tm === t).length === 1 ? 'jugador' : 'jugadores'}`
+                    : `${teamScore?.[t] ?? 0} / ${scoreLimit}`}
+                </span>
               </div>
-            )}
-            <Table players={sorted.filter((p) => p.tm === t)} me={me} caps={caps} />
-          </div>
-        ))
-      ) : (
-        <Table players={sorted} me={me} numbered ladder={ladder} />
-      )}
+              {!infect && (
+                <div className="pbar">
+                  <i style={{ width: `${((teamScore?.[t] ?? 0) / scoreLimit) * 100}%` }} />
+                </div>
+              )}
+              <Table players={sorted.filter((p) => p.tm === t)} me={me} caps={caps} />
+            </div>
+          ))
+        ) : (
+          <Table players={sorted} me={me} numbered ladder={ladder} />
+        )}
+      </div>
     </div>
   );
 }

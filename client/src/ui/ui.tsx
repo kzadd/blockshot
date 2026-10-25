@@ -2,18 +2,21 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 
 // ------------------------------------------------------------ Scale (--s)
-// Every screen is drawn on a ~1280×720 design canvas scaled to the window. It is left a bit smaller than
-// "fill the screen" (UI_FIT) to breathe, and may drop below 1 on laptops with the browser bar (~650 px tall).
+// Every screen is drawn on a 1280×720 design canvas (margins included) scaled to fit the window, so a
+// 1280×720 window is pixel for pixel the design; it drops below 1 on laptops with the browser bar (~650 px tall).
 const DESIGN_W = 1280;
 const DESIGN_H = 720;
-const UI_FIT = 0.9;
-/** Below this the small labels stop being readable: the screens scroll instead of shrinking further. */
-const MIN_SCALE = 0.85;
-const MAX_SCALE = 1.25;
+/**
+ * Below this the small labels stop being readable. Low enough for a 1366×768 laptop at 125 % with the browser
+ * bar (~940×490 CSS px); the panels compress (and scroll inside as a last resort) instead of overlapping.
+ */
+const MIN_SCALE = 0.68;
+/** 1920×1080 */
+const MAX_SCALE = 1.5;
 export function useUiScale(): void {
   useEffect(() => {
     const apply = () => {
-      const fit = Math.min(window.innerWidth / DESIGN_W, window.innerHeight / DESIGN_H) * UI_FIT;
+      const fit = Math.min(window.innerWidth / DESIGN_W, window.innerHeight / DESIGN_H);
       const s = Math.min(MAX_SCALE, Math.max(MIN_SCALE, fit));
       document.documentElement.style.setProperty('--s', String(Math.round(s * 1000) / 1000));
     };
@@ -113,7 +116,7 @@ export function Check({ checked, onChange, children, help }: CheckProps) {
           <path
             d="M1.5 6.5l3.5 3.5 7.5-8"
             fill="none"
-            stroke="#1b2a4a"
+            stroke="#1d242c"
             strokeWidth="2.6"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -152,7 +155,7 @@ export function Slider({ label, value, min, max, step = 1, format = (v) => v, on
         max={max}
         step={step}
         value={value}
-        style={{ '--p': `${p}%` }}
+        style={{ '--p': `${p}%`, '--f': p / 100 }}
         onChange={(e) => onChange(Number(e.target.value))}
       />
     </label>

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { getMap, type KillEvent, type MatchEnd } from '@blockshot/shared';
+import { CHAR_BY_ID, INFECT, getMap, type KillEvent, type MatchEnd } from '@blockshot/shared';
 import { Bot, shootUntil, sleep, startServer, type TestServer } from './harness';
 
 const SPOT_A = [8, -2.5] as const;
@@ -74,7 +74,8 @@ describe('infected', () => {
     const zombie = a.me()?.tm === 2 ? a : b;
     const human = zombie === a ? b : a;
     expect(zombie.find('loadout', (d: { team?: number }) => d.team === 2)).toBeTruthy();
-    expect(zombie.me()?.mh).toBe(zombie === a ? 130 : 111);
+    const zombieChar = CHAR_BY_ID[zombie === a ? 'soldado' : 'rayo'];
+    expect(zombie.me()?.mh).toBe(Math.round(zombieChar.hp * INFECT.hp));
     await both(4100);
     await shootUntil(zombie, human, () => zombie.count('kill') > 0, { tries: 10, every: 520, dy: 1 });
     expect(zombie.find<KillEvent>('kill')?.weapon).toBe('Cuchillo');

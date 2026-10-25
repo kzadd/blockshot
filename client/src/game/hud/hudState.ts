@@ -1,9 +1,11 @@
 import type {
   CharacterId,
+  DomSnapshot,
   FlagSnapshot,
   InfectSnapshot,
   ModeId,
   PlayerSnapshot,
+  RoundSnapshot,
   SideTeam,
   Team,
 } from '@blockshot/shared';
@@ -22,16 +24,26 @@ export interface SoundMark extends ScreenMark {
 }
 
 /** A player as the HUD sees it: no positions (they change every tick and the HUD does not need them). */
-export type HudPlayer = Pick<PlayerSnapshot, 'id' | 'n' | 'c' | 'k' | 'd' | 'tm' | 'pg' | 'st' | 'cp' | 'lv'>;
+export type HudPlayer = Pick<PlayerSnapshot, 'id' | 'n' | 'c' | 'k' | 'd' | 'tm' | 'pg' | 'st' | 'cp' | 'lv' | 'md'>;
 
 /** Everything the HUD shows, published by the engine a few times per second. */
 export interface HudState {
   alive: boolean;
   everSpawned: boolean;
   locked: boolean;
+  /** quick chat menu open */
+  chatOpen: boolean;
+  /** grenades left this life */
+  grenades: number;
+  /** Domination zones */
+  zones: DomSnapshot[] | null;
+  /** Rounds: phase, round number and time left */
+  round: RoundSnapshot | null;
+  /** the death replay is playing */
+  replay: boolean;
   hp: number;
   maxHp: number;
-  // TODO(review): posible código muerto: published since the original version, no screen reads it
+  /** the health block shows the character's name and colour */
   characterId: CharacterId | undefined;
   // TODO(review): posible código muerto: the v3 HUD no longer shows the character name
   charName: string | undefined;

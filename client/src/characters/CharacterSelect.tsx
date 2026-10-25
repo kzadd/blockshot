@@ -21,30 +21,78 @@ import {
 import type { HudPlayer } from '../game/hud/hudState';
 import type { RoomView } from '../game/roomView';
 import { SIDES, teamVar } from '../game/hud/teamStyle';
+import { Icon } from '../ui/icons';
 import CharacterPreview from './CharacterPreview';
 
 /** Bar scales of the character sheet. */
-const MAX_HP_BAR = 150;
+const MAX_HP_BAR = 140;
 const SPEED_BAR_MIN = 5;
 const SPEED_BAR_RANGE = 5.5;
+/** A team picked on the character screen shows at once; if the server never confirms, it goes back after this. */
+const PENDING_TEAM_MS = 1500;
 
 export type SkinChoice = Partial<Record<CharacterId, SkinId>>;
 /** Outfit colour (hex from OUTFIT_COLORS) picked for each character. */
 export type ColorChoice = Partial<Record<CharacterId, string>>;
 
-// Swatch of each skin: 135° diagonal with two colours
-const SKIN_SWATCH: Record<SkinId, (c: string) => [string, string]> = {
-  base: (c) => [c, `color-mix(in oklch, ${c} 55%, #1b2a4a)`],
-  camo: () => ['#6b7a3a', '#3d4722'],
-  noche: (c) => ['#16181f', c],
-  artico: () => ['#eef2f6', '#9aa8b6'],
-  oro: () => ['#ffd34d', '#a8780f'],
-  urbano: () => ['#7a7e84', '#3c3f44'],
-  desierto: () => ['#d2bc94', '#8f7450'],
-  bosque: () => ['#4b5a32', '#2a2f1e'],
-  carbono: (c) => ['#26282c', c],
-  neon: (c) => ['#16131f', c],
+// Pixel face of each skin (8×8, "." = empty). Letters are colours; "a" is the outfit colour
+const SKIN_FACES: Record<SkinId, { rows: string[]; colors: Record<string, string> }> = {
+  base: {
+    rows: ['hhhhhhhh', 'hhhhhhhh', 'ssssssss', 'seessees', 'ssssssss', 'ssssssss', 'ssmmmmss', 'ssssssss'],
+    colors: { h: '#3a2a1e', s: '#e0b088', e: '#15171c', m: '#9a5a44' },
+  },
+  alien: {
+    rows: ['a......a', '.g....g.', 'gggggggg', 'geeggeeg', 'geeggeeg', 'gggggggg', '.gggggg.', '..gggg..'],
+    colors: { g: '#86d46c', e: '#15171c' },
+  },
+  mapache: {
+    rows: ['gk....kg', 'gggggggg', 'gggggggg', 'kkkkkkkk', 'kwkkkkwk', 'gwwwwwwg', 'gwwkkwwg', 'ggwwwwgg'],
+    colors: { g: '#8d9095', k: '#1d1f24', w: '#ece8df' },
+  },
+  robot: {
+    rows: ['...d....', '...a....', 'mmmmmmmm', 'maaaaaam', 'mmmmmmmm', 'mmddddmm', 'mmddddmm', 'mmmmmmmm'],
+    colors: { m: '#9aa3ad', d: '#4b5058' },
+  },
+  oso: {
+    rows: ['bb....bb', 'blbbbblb', 'bbbbbbbb', 'bkbbbbkb', 'bbbllbbb', 'bbllllbb', 'bblkklbb', '.bbbbbb.'],
+    colors: { b: '#8a5a36', l: '#d8b88a', k: '#1d1f24' },
+  },
+  astronauta: {
+    rows: ['.wwwwww.', 'wwwwwwww', 'aaaaaaaa', 'woooooow', 'woooooow', 'woooooow', 'wwwwwwww', '.gggggg.'],
+    colors: { w: '#eef1f4', o: '#d9a53a', g: '#9aa3ad' },
+  },
+  zombi: {
+    rows: ['kkkk.kk.', 'kkkkkkkk', 'gggggggk', 'geeggkgk', 'geeggggk', 'gggggggg', 'gkwkwkgg', 'gggggggg'],
+    colors: { g: '#7fa36a', k: '#1d1f24', e: '#15171c', w: '#d9d2b8' },
+  },
+  rana: {
+    rows: ['.gg..gg.', 'gwwggwwg', 'gwkggkwg', 'gggggggg', 'gggggggg', 'kkkkkkkk', 'llllllll', '.llllll.'],
+    colors: { g: '#5cb85c', w: '#f2f2ea', k: '#15171c', l: '#ece6a6' },
+  },
+  gato: {
+    rows: ['o......o', 'oo....oo', 'okokokoo', 'okooooko', 'oooooooo', 'ooowwooo', 'oowkkwoo', '.owwwwo.'],
+    colors: { o: '#e08a3c', k: '#15171c', w: '#f4e6d0' },
+  },
+  calabaza: {
+    rows: ['...s....', '.oooooo.', 'oyyooyyo', 'oooooooo', 'oooyyooo', 'oyyyyyyo', 'ooyoyooo', '.oooooo.'],
+    colors: { s: '#3f7a2a', o: '#e8781e', y: '#ffd24a' },
+  },
 };
+
+function SkinFace({ skin, color }: { skin: SkinId; color: string }) {
+  const { rows, colors } = SKIN_FACES[skin];
+  return (
+    <svg viewBox="0 0 8 8" shapeRendering="crispEdges" aria-hidden="true">
+      {rows.flatMap((row, y) =>
+        [...row].map((ch, x) =>
+          ch === '.' ? null : (
+            <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill={ch === 'a' ? color : colors[ch]} />
+          ),
+        ),
+      )}
+    </svg>
+  );
+}
 
 function WeaponCard({ id, slot }: { id: WeaponId; slot: string }) {
   const w = WEAPONS[id];
@@ -83,25 +131,45 @@ interface TeamPickerProps {
   onTeam: (t: SideTeam) => void;
 }
 function TeamPicker({ myTeam, players = [], onTeam }: TeamPickerProps) {
-  const count = (t: SideTeam) => players.filter((p) => p.tm === t).length;
+  // Shown at once on click; the server's answer (myTeam) takes over when it arrives
+  const [pending, setPending] = useState<SideTeam | null>(null);
+  useEffect(() => {
+    if (pending === myTeam) setPending(null);
+  }, [pending, myTeam]);
+  useEffect(() => {
+    if (!pending) return undefined;
+    const t = setTimeout(() => setPending(null), PENDING_TEAM_MS);
+    return () => clearTimeout(t);
+  }, [pending]);
+  const shown = pending ?? myTeam;
+  const count = (t: SideTeam) =>
+    players.filter((p) => p.tm === t).length + (pending === t ? 1 : 0) - (pending && myTeam === t ? 1 : 0);
   return (
     <div className="team-pick">
-      <span>Equipo</span>
-      {SIDES.map((t) => (
-        <button
-          key={t}
-          className={myTeam === t ? 'on' : ''}
-          style={{ '--t': teamVar(t) }}
-          onClick={() => myTeam !== t && onTeam(t)}
-        >
-          <i />
-          {TEAMS[t].name}
-          <small>
-            {count(t)} {count(t) === 1 ? 'jugador' : 'jugadores'}
-          </small>
-          {myTeam === t && <em>Tu equipo</em>}
-        </button>
-      ))}
+      <span className="kicker">Tu equipo</span>
+      <div className="seg">
+        {SIDES.map((t) => (
+          <button
+            key={t}
+            className={shown === t ? 'on' : ''}
+            aria-pressed={shown === t}
+            style={{ '--t': teamVar(t) }}
+            onClick={() => {
+              if (shown === t) return;
+              setPending(t);
+              onTeam(t);
+            }}
+          >
+            <b>
+              <i />
+              {TEAMS[t].name}
+            </b>
+            <small>
+              {count(t)} {count(t) === 1 ? 'jugador' : 'jugadores'}
+            </small>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -165,16 +233,30 @@ export default function CharacterSelect({
   return (
     <div className="select-screen">
       <div className="stage">
-        <div className="room-info">
-          <b>{info.name}</b>
-          <span>
-            {info.map} · {info.size} · {info.players} jugando
-          </span>
-        </div>
-        <h2 className="screen-title">Elige personaje</h2>
+        <header className="sel-head">
+          <div className="room-info">
+            <b>{info.name}</b>
+            <span>
+              {info.map} · {info.size} · {info.players} jugando
+            </span>
+          </div>
+          <h2 className="screen-title">Elige personaje</h2>
+          <div className="sel-actions">
+            {onKeep && current && (
+              <button className="btn md" onClick={onKeep}>
+                Seguir con {CHAR_BY_ID[current].name}
+              </button>
+            )}
+            <button className="btn ghost danger md" onClick={onLeave}>
+              <Icon name="logout" />
+              Salir de la sala
+            </button>
+          </div>
+        </header>
         {fromDeath && (
           <div className="death-chip">
-            ⏱ Se aplica al reaparecer{respawnIn > 0 ? ` · ${Math.ceil(respawnIn / 1000)} s` : ''}
+            <Icon name="info" size={14} />
+            Se aplica al reaparecer{respawnIn > 0 ? ` · ${Math.ceil(respawnIn / 1000)} s` : ''}
           </div>
         )}
 
@@ -189,16 +271,17 @@ export default function CharacterSelect({
                 onDoubleClick={() => onPick(ch.id, skinBy[ch.id] || 'base', colorOf(ch.id))}
               >
                 <span className="sq" />
-                <span>
+                <span className="char-card-text">
                   <b>{ch.name}</b>
                   <small>{WEAPONS[ch.primary].name}</small>
                 </span>
                 <span className="side">
                   {fromDeath && ch.id === current && <span className="tag-sol">Actual</span>}
-                  <span className="num">{i + 1}</span>
+                  <kbd>{i + 1}</kbd>
                 </span>
               </button>
             ))}
+            {canSwitchTeam(mode) && myTeam ? <TeamPicker myTeam={myTeam} players={players} onTeam={onTeam} /> : null}
           </div>
 
           <div className="char-stage">
@@ -208,38 +291,43 @@ export default function CharacterSelect({
                 Skin {SKINS.find((k) => k.id === skin)?.name}
                 {!isTeamMode(mode) && ` · ${OUTFIT_COLORS.find((o) => o.hex === color)?.name ?? ''}`}
               </small>
-              {/* Outfit colour: only seen in free for all (team modes wear the team colour) */}
-              {!isTeamMode(mode) && (
-                <div className="outfit-colors">
-                  {OUTFIT_COLORS.map((o) => (
-                    <button
-                      key={o.hex}
-                      className={color === o.hex ? 'on' : ''}
-                      title={o.name}
-                      aria-label={`Color ${o.name}`}
-                      onClick={() => setColorBy({ ...colorBy, [sel]: o.hex })}
-                      style={{ background: o.hex }}
-                    />
-                  ))}
-                </div>
-              )}
             </div>
-            <span className="drag">↔ Arrastra para girar</span>
+            {/* Outfit colour: only seen in free for all (team modes wear the team colour) */}
+            {!isTeamMode(mode) && (
+              <div className="outfit-colors">
+                {OUTFIT_COLORS.map((o) => (
+                  <button
+                    key={o.hex}
+                    className={color === o.hex ? 'on' : ''}
+                    title={o.name}
+                    aria-label={`Color ${o.name}`}
+                    onClick={() => setColorBy({ ...colorBy, [sel]: o.hex })}
+                    style={{ background: o.hex }}
+                  />
+                ))}
+              </div>
+            )}
+            <span className="drag">
+              <Icon name="rotate" size={15} />
+              Arrastra para girar
+            </span>
             <span className="peana" />
             <CharacterPreview charId={sel} skin={skin} color={color} />
-            {/* One row of swatches (the name of the chosen skin is shown above) */}
-            <div className="skins" style={{ gridTemplateColumns: `repeat(${SKINS.length}, minmax(0, 1fr))` }}>
+            <div className="skins">
               {SKINS.map((k) => {
-                const [a, b] = SKIN_SWATCH[k.id](color);
                 return (
                   <button
                     key={k.id}
                     className={skin === k.id ? 'on' : ''}
                     title={k.name}
                     aria-label={`Skin ${k.name}`}
+                    aria-pressed={skin === k.id}
                     onClick={() => setSkinBy({ ...skinBy, [sel]: k.id })}
                   >
-                    <i style={{ background: `linear-gradient(135deg, ${a} 50%, ${b} 50%)` }} />
+                    <i style={{ '--c': color }}>
+                      <SkinFace skin={k.id} color={color} />
+                    </i>
+                    <span>{k.name}</span>
                   </button>
                 );
               })}
@@ -249,21 +337,20 @@ export default function CharacterSelect({
           <div className="char-info">
             <div className="top">
               <h3>{c.name}</h3>
-              <span className="role">{c.role}</span>
+              <span className="chip-char" style={{ '--c': c.color }}>
+                {c.role}
+              </span>
             </div>
             <p>{c.desc}</p>
-            <div className="stat">
+            <div className="stats">
               <span>Vida</span>
               <div className="bar">
                 <i style={{ width: `${(c.hp / MAX_HP_BAR) * 100}%` }} />
               </div>
               <b>{c.hp}</b>
-            </div>
-            <div
-              className="stat"
-              title={`Con ${WEAPONS[c.secondary].name.toLowerCase()}: ${speedWith(c, c.secondary)} m/s`}
-            >
-              <span>Velocidad</span>
+              <span title={`Con ${WEAPONS[c.secondary].name.toLowerCase()}: ${speedWith(c, c.secondary)} m/s`}>
+                Velocidad
+              </span>
               <div className="bar">
                 <i style={{ width: `${((speedWith(c, c.primary) - SPEED_BAR_MIN) / SPEED_BAR_RANGE) * 100}%` }} />
               </div>
@@ -275,24 +362,6 @@ export default function CharacterSelect({
               Jugar como {c.name}
             </button>
           </div>
-        </div>
-
-        <div className="select-foot">
-          {canSwitchTeam(mode) && myTeam ? (
-            <TeamPicker myTeam={myTeam} players={players} onTeam={onTeam} />
-          ) : (
-            <span>
-              Sala: <b>{info.name}</b>
-            </span>
-          )}
-          {onKeep && current && (
-            <button className="btn" onClick={onKeep}>
-              Seguir con {CHAR_BY_ID[current].name}
-            </button>
-          )}
-          <button className="btn ghost" onClick={onLeave}>
-            Salir de la sala
-          </button>
         </div>
       </div>
     </div>

@@ -28,8 +28,8 @@ import {
 import { damp, dampAngle } from './util';
 
 const INFECTED_COLOR = '#6fcf3a';
-/** Snapshots kept per player (1 s at 20 Hz). */
-const BUFFER_SIZE = 20;
+/** Snapshots kept per player: 4.5 s at 20 Hz, enough to replay how you died. */
+const BUFFER_SIZE = 90;
 const NAME_TAG_Y = 2.3;
 const REMOTE_GUN_SCALE = 1.3;
 /** Muzzle flash of remote guns (ms) and the shot origin when the gun is not drawn yet. */
@@ -60,12 +60,15 @@ const FOOTSTEP_EVERY_M = 4.5;
 const FOOTSTEP_RANGE = 20;
 const AIRBORNE_DY = 0.3;
 
-interface Sample {
+export interface Sample {
   t: number;
   x: number;
   y: number;
   z: number;
   ry: number;
+  rx: number;
+  sl: number;
+  cr: number;
 }
 
 export interface Outfit {
@@ -103,8 +106,9 @@ export interface Remote {
 /** In team modes everybody wears its team colour; in free for all, the colour the player picked and its skin. */
 export function outfitFor(mode: ModeId, charId: CharacterId, skin: string, team: Team, color?: string): Outfit {
   const ch = CHAR_BY_ID[charId];
-  if (mode === 'infect' && team === 2) return { color: INFECTED_COLOR, skin: 'base' };
-  if (isTeamMode(mode) && team) return { color: teamColor(team, ch.color), skin: 'base' };
+  // Team modes paint the uniform in the team colour; the skin (who you are) is always yours
+  if (mode === 'infect' && team === 2) return { color: INFECTED_COLOR, skin: 'zombi' };
+  if (isTeamMode(mode) && team) return { color: teamColor(team, ch.color), skin };
   return { color: isOutfitColor(color) ? color : ch.color, skin };
 }
 
@@ -168,7 +172,7 @@ export class RemotePlayers {
       if (!r.model || !r.charId) continue;
       // A player that just (re)spawned jumps to its new place instead of sliding there
       if (r.alive && !r.wasAlive) r.buffer.length = 0;
-      r.buffer.push({ t: now, x: p.x, y: p.y, z: p.z, ry: p.ry });
+      r.buffer.push({ t: now, x: p.x, y: p.y, z: p.z, ry: p.ry, rx: p.rx, sl: p.sl, cr: p.cr });
       if (r.buffer.length > BUFFER_SIZE) r.buffer.shift();
       const ch = CHAR_BY_ID[r.charId];
       r.tag?.userData.setHp(Math.min(1, p.h / (p.mh || ch.hp)));
@@ -245,18 +249,38 @@ export class RemotePlayers {
           y: a.y + (c.y - a.y) * k,
           z: a.z + (c.z - a.z) * k,
           ry: dampAngle(a.ry, c.ry, k),
+          rx: a.rx + (c.rx - a.rx) * k,
+          sl: c.sl,
+          cr: c.cr,
         };
       }
     }
     return b[0]!;
   }
 
-  /** Moves and animates every remote; `footstep` is called for nearby running enemies. */
-  update(dt: number, now: number, me: THREE.Vector3 | null, footstep: (x: number, z: number) => void): void {
+  /** Pose of a remote at `renderTime` (death replay camera). */
+  poseAt(id: string, renderTime: number): Sample | null {
+    const r = this.all.get(id);
+    return r ? this.sample(r, renderTime) : null;
+  }
+
+  /**
+   * Moves and animates every remote; `footstep` is called for nearby running enemies. `rewind` (ms) draws
+   * everybody that much further in the past (death replay); `hidden` is not drawn (the replay camera is in it).
+   */
+  update(
+    dt: number,
+    now: number,
+    me: THREE.Vector3 | null,
+    footstep: (x: number, z: number) => void,
+    rewind = 0,
+    hidden: string | null = null,
+  ): void {
     const k = damp(AIM_FOLLOW, dt);
     bubbleMat.opacity = BUBBLE_OPACITY + BUBBLE_PULSE * Math.sin(now * BUBBLE_PULSE_SPEED);
-    const renderTime = now - VIEW_DELAY_MS;
+    const renderTime = now - VIEW_DELAY_MS - rewind;
     for (const r of this.all.values()) {
+      if (r.model) r.model.group.visible = r.alive && r.id !== hidden;
       if (!r.model || !r.alive) continue;
       if (r.bubble) r.bubble.visible = r.prot;
       const flash = r.gun?.userData.flash;
@@ -268,7 +292,7 @@ export class RemotePlayers {
       const bz = g.position.z;
       g.position.set(s.x, s.y, s.z);
       g.rotation.y = s.ry;
-      r.model.aim.rotation.x += (r.rx - r.model.aim.rotation.x) * k;
+      r.model.aim.rotation.x += (s.rx - r.model.aim.rotation.x) * k;
       const speed = Math.hypot(g.position.x - bx, g.position.z - bz) / Math.max(dt, 1e-4);
       r.walk += speed * dt * WALK_CYCLE;
       const latest = r.buffer[r.buffer.length - 1]!;
@@ -287,14 +311,15 @@ export class RemotePlayers {
         }
       }
       // Walking swings the legs; sliding stretches them; crouching puts a knee down
-      const swing = r.sl
+      const { sl, cr } = s;
+      const swing = sl
         ? 0
-        : Math.sin(r.walk) * Math.min(speed / WALK_FULL_SPEED, 1) * (r.cr ? LEG_SWING_CROUCHED : LEG_SWING);
-      const low = r.sl || r.cr;
-      r.model.legL.rotation.x = r.sl ? 1.2 : r.cr ? 1.1 + swing : swing;
-      r.model.legR.rotation.x = r.sl ? 1.2 : r.cr ? -0.35 - swing : -swing;
-      const kneeL = r.sl ? 0 : r.cr ? KNEE_CROUCH_FRONT : -Math.max(0, -swing) * KNEE_BEND;
-      const kneeR = r.sl ? 0 : r.cr ? KNEE_CROUCH_BACK : -Math.max(0, swing) * KNEE_BEND;
+        : Math.sin(r.walk) * Math.min(speed / WALK_FULL_SPEED, 1) * (cr ? LEG_SWING_CROUCHED : LEG_SWING);
+      const low = sl || cr;
+      r.model.legL.rotation.x = sl ? 1.2 : cr ? 1.1 + swing : swing;
+      r.model.legR.rotation.x = sl ? 1.2 : cr ? -0.35 - swing : -swing;
+      const kneeL = sl ? 0 : cr ? KNEE_CROUCH_FRONT : -Math.max(0, -swing) * KNEE_BEND;
+      const kneeR = sl ? 0 : cr ? KNEE_CROUCH_BACK : -Math.max(0, swing) * KNEE_BEND;
       r.model.kneeL.rotation.x += (kneeL - r.model.kneeL.rotation.x) * k;
       r.model.kneeR.rotation.x += (kneeR - r.model.kneeR.rotation.x) * k;
       r.model.legL.position.y = r.model.legR.position.y += ((low ? 0.5 : 0.8) - r.model.legR.position.y) * k;

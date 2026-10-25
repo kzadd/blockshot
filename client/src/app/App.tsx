@@ -10,6 +10,8 @@ const Game = lazy(() => import('../game/Game'));
 export interface Session {
   you: string;
   room: RoomInfo;
+  /** opened on the server's own PC: shows the practice bot tools */
+  admin?: boolean;
 }
 
 export default function App() {
@@ -21,7 +23,7 @@ export default function App() {
       {session ? (
         <GameErrorBoundary key={session.room.id} onLeave={leave}>
           <Suspense fallback={null}>
-            <Game session={session} onLeave={leave} />
+            <Game session={session} onLeave={leave} onRoom={(room) => setSession((s) => (s ? { ...s, room } : s))} />
           </Suspense>
         </GameErrorBoundary>
       ) : (

@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { mapImage } from '../lobby/mapImage';
+import { Icon } from '../ui/icons';
 import { Check, Slider } from '../ui/ui';
 import Crosshair from './Crosshair';
 import { COLORBLIND } from './palette';
@@ -35,8 +37,8 @@ export default function Settings({ onClose }: { onClose: () => void }) {
         <div className="modal-head">
           <h2>Ajustes</h2>
           <span className="esc">Esc para cerrar</span>
-          <button className="btn ghost icon" onClick={onClose} aria-label="Cerrar">
-            ✕
+          <button className="btn icon" onClick={onClose} aria-label="Cerrar">
+            <Icon name="x" size={18} />
           </button>
         </div>
         <nav className="seg tabs">
@@ -53,6 +55,7 @@ export default function Settings({ onClose }: { onClose: () => void }) {
               <div>
                 <div
                   className="xh-preview"
+                  style={{ backgroundImage: `url(${mapImage('patio')})` }}
                   onMouseDown={() => setDemo(PREVIEW_SPREAD)}
                   onMouseUp={() => setDemo(0)}
                   onMouseLeave={() => setDemo(0)}
@@ -72,7 +75,7 @@ export default function Settings({ onClose }: { onClose: () => void }) {
                           thickness: 2,
                           dynamic: false,
                           outline: false,
-                          color: ch.style === c.id ? '#ffc93c' : '#0f1923',
+                          color: ch.style === c.id ? '#1d242c' : '#ece3cf',
                         }}
                         className="crosshair mini"
                         half={10}
@@ -97,7 +100,7 @@ export default function Settings({ onClose }: { onClose: () => void }) {
                   ))}
                   <label
                     className="free"
-                    style={custom ? { boxShadow: '0 0 0 3px #1f3052, 0 0 0 6px #ffc93c' } : undefined}
+                    style={custom ? { boxShadow: '0 0 0 3px #1d242c, 0 0 0 5px #ffc531' } : undefined}
                   >
                     <input type="color" value={ch.color} onChange={(e) => setCh({ color: e.target.value })} />
                     Libre
@@ -176,6 +179,7 @@ export default function Settings({ onClose }: { onClose: () => void }) {
                 onChange={(v) => setSettings({ volume: v / 100 })}
               />
               <p className="settings-note">
+                <Icon name="info" size={18} />
                 «Sensibilidad al apuntar» a ×1 hace que la mira se sienta igual que sin apuntar; menos, más lenta.
               </p>
             </div>

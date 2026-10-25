@@ -10,19 +10,21 @@ export interface MinimapView {
   dots: { x: number; z: number; mate: boolean; alpha: number }[];
   tags: { x: number; z: number; team: SideTeam }[];
   flags: { x: number; z: number; team: SideTeam }[];
+  /** Domination zones: letter in the owner's colour */
+  zones: { x: number; z: number; owner: number; letter: string }[];
 }
 export interface MinimapSource {
   minimap(now: number): MinimapView;
 }
 
-const SIZE = 164; // inside of the 170 box with a 3 px border
+const SIZE = 168; // inside of the 180 frame with 6 px padding
 const PAD = 6;
 const REDRAW_MS = 50;
 const BACKGROUND_ALPHA = 0.5;
 /** Roofs are see-through so the rooms under them can be read. */
 const ROOF_ALPHA = 0.35;
 const DOT_R = 5.5;
-const INK = '#0b1426';
+const INK = '#12171c';
 
 // North-up minimap: you (yellow arrow), allies always in green, enemies in red only after shooting
 // (or always, with the streak radar)
@@ -116,6 +118,24 @@ export default function Minimap({
         g.stroke();
       }
 
+      // Domination: zone letters in their owner's colour
+      for (const zn of view.zones) {
+        const x = toPx(zn.x);
+        const y = toPx(zn.z);
+        g.beginPath();
+        g.arc(x, y, 8, 0, Math.PI * 2);
+        g.fillStyle = zn.owner ? teamColor(zn.owner, INK) : '#ece3cf';
+        g.fill();
+        g.lineWidth = 2;
+        g.strokeStyle = INK;
+        g.stroke();
+        g.fillStyle = INK;
+        g.font = '700 10px Bungee, sans-serif';
+        g.textAlign = 'center';
+        g.textBaseline = 'middle';
+        g.fillText(zn.letter, x, y + 1);
+      }
+
       // Capture the flag: flags always visible (they follow their carrier)
       for (const f of view.flags) {
         const x = toPx(f.x);
@@ -131,8 +151,8 @@ export default function Minimap({
         g.save();
         g.translate(toPx(view.me.x), toPx(view.me.z));
         g.rotate(-view.me.yaw);
-        arrow(22, 24, '#1b2a4a');
-        arrow(14, 16, '#ffc93c');
+        arrow(22, 24, INK);
+        arrow(14, 16, '#ffc531');
         g.restore();
       }
     };

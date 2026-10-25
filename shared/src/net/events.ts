@@ -2,6 +2,8 @@
 import type { Vec3 } from '../core/math';
 import type { CharacterId, SkinId } from '../characters/characters';
 import type { MapId, SizeId } from '../maps/types';
+import type { BotLevel } from '../modes/bots';
+import type { MedalId } from '../modes/medals';
 import type { ModeId, SideTeam, Team } from '../modes/modes';
 import type { MoveInput, MoveState } from '../movement/movement';
 import type { WeaponId } from '../weapons/weapons';
@@ -32,7 +34,8 @@ export interface RoomInfo {
   max: number;
 }
 
-export type JoinResult = { ok: true; you: string; room: RoomInfo } | { ok: false; error: string };
+/** `admin`: the player opened the game on the server's own PC (practice bots and other test tools). */
+export type JoinResult = { ok: true; you: string; room: RoomInfo; admin?: boolean } | { ok: false; error: string };
 
 export interface CreateRoomRequest {
   nickname: string;
@@ -101,6 +104,8 @@ export interface PlayerSnapshot {
   ar: number;
   /** radar active */
   rd: number;
+  /** medals this match */
+  md: number;
 }
 
 export interface FlagSnapshot {
@@ -123,12 +128,28 @@ export interface InfectSnapshot {
   t: number;
 }
 
+/** Domination zone: [owner, capture -100 (Blue) … 100 (Red), contested] */
+export type DomSnapshot = [Team, number, number];
+
+/** Rounds: phase (0 waiting for players, 1 playing, 2 break), round number, ms left in the phase. */
+export interface RoundSnapshot {
+  p: 0 | 1 | 2;
+  n: number;
+  t: number;
+}
+
+/** Grenade in flight: [id, x, y, z] */
+export type GrenadeSnapshot = [number, number, number, number];
+
 export interface StateSnapshot {
   players: PlayerSnapshot[];
   ts: Record<SideTeam, number> | null;
   fl: Record<SideTeam, FlagSnapshot> | null;
   tg: TagSnapshot[] | null;
   inf: InfectSnapshot | null;
+  gr: GrenadeSnapshot[];
+  dz: DomSnapshot[] | null;
+  rd: RoundSnapshot | null;
 }
 
 /** A batch of input commands (sent every CLIENT_SEND_MS, one command per FIXED_DT step). */
@@ -180,6 +201,7 @@ export interface KillEvent {
   streak: number;
   ended: number;
   reward: string | undefined;
+  medals: MedalId[];
 }
 
 export interface BestPlay {
@@ -188,15 +210,36 @@ export interface BestPlay {
   n: string;
 }
 
+/** A map + mode offered for the next match. */
+export interface VoteOption {
+  mapId: MapId;
+  mode: ModeId;
+}
+
 export interface MatchEnd {
   winner: string;
   team: Team;
   scores: { name: string; kills: number; deaths: number; team: Team }[];
   best: BestPlay[];
   restartIn: number;
+  /** options for the next match (empty: the same one again) */
+  vote: VoteOption[];
 }
 
 export type FlagEventType = 'take' | 'drop' | 'return' | 'capture';
+
+/** Session statistics of one player (server PC only). */
+export interface SessionStatsRow {
+  name: string;
+  kills: number;
+  deaths: number;
+  shots: number;
+  hits: number;
+  heads: number;
+  medals: number;
+  /** spawns per character */
+  picks: Partial<Record<CharacterId, number>>;
+}
 
 export interface ServerToClientEvents {
   rooms: (rooms: RoomSummary[]) => void;
@@ -213,6 +256,14 @@ export interface ServerToClientEvents {
   tag: (d: { type: 'confirm' | 'deny' }) => void;
   'match:end': (d: MatchEnd) => void;
   'match:start': () => void;
+  /** a quick chat phrase (QUICK_CHAT index) */
+  chat: (d: { name: string; team: Team; i: number }) => void;
+  /** votes per option of the current vote */
+  vote: (counts: number[]) => void;
+  /** the room moved to another map / mode (end of match vote) */
+  'room:changed': (room: RoomInfo) => void;
+  /** a grenade exploded */
+  boom: (d: { x: number; y: number; z: number }) => void;
 }
 
 export interface ClientToServerEvents {
@@ -227,4 +278,11 @@ export interface ClientToServerEvents {
   'player:switch': (d: { slot: number }) => void;
   'player:reload': () => void;
   'player:shoot': (d: ShootMessage) => void;
+  /** server PC only: practice bots */
+  'bot:add': (d?: { level?: BotLevel }) => void;
+  'bot:clear': () => void;
+  'chat:quick': (d: { i: number }) => void;
+  'player:grenade': (d: { o: Vec3; d: Vec3 }) => void;
+  vote: (d: { i: number }) => void;
+  'admin:stats': (cb: (rows: SessionStatsRow[]) => void) => void;
 }

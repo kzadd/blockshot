@@ -29,7 +29,7 @@ describe('message schemas', () => {
   });
 
   it('accepts a spawn with any palette outfit colour, or none, and nothing else', () => {
-    expect(ok(SpawnSchema, { characterId: 'soldado', skin: 'neon' })).toBe(true);
+    expect(ok(SpawnSchema, { characterId: 'soldado', skin: 'robot' })).toBe(true);
     for (const c of OUTFIT_COLORS)
       expect(ok(SpawnSchema, { characterId: 'rayo', skin: 'base', color: c.hex })).toBe(true);
     expect(ok(SpawnSchema, { characterId: 'rayo', color: '#123456' })).toBe(false);
@@ -39,8 +39,9 @@ describe('message schemas', () => {
 });
 
 describe('cosmetics', () => {
-  it('has ten skins with unique ids that the server accepts', () => {
+  it('has six skins with unique ids that the server accepts', () => {
     expect(SKINS).toHaveLength(10);
+    expect(isSkinId('camo')).toBe(false); // the old pattern skins are gone (stored picks fall back to Humano)
     expect(new Set(SKINS.map((k) => k.id)).size).toBe(SKINS.length);
     for (const k of SKINS) expect(isSkinId(k.id)).toBe(true);
     expect(isSkinId('rgb')).toBe(false);

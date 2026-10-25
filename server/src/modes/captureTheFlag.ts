@@ -16,7 +16,7 @@ import type { Player } from '../players/player';
 import { smallerTeam } from '../players/teams';
 import { notice, type Room } from '../rooms/room';
 import type { GameMode } from './gameMode';
-import { scoreTeam } from './scoring';
+import { scoreTeam, teamSideSpawns } from './scoring';
 
 interface Flag {
   home: Vec3;
@@ -74,12 +74,7 @@ export function createCaptureTheFlag(room: Room): GameMode {
     streakRewards: true,
     initialTeam: smallerTeam,
     onKill: () => {}, // kills do not score: only captures do
-    // Each team spawns in its own half (Red west, Blue east)
-    filterSpawns(_room, p, spawns) {
-      if (!p.team) return spawns;
-      const mine = spawns.filter((s) => (p.team === 1 ? s[0] < -1 : s[0] > 1));
-      return mine.length ? mine : spawns;
-    },
+    filterSpawns: teamSideSpawns,
     tick(_room, now) {
       updateCarriedFlags(now);
       for (const p of room.players.values()) {

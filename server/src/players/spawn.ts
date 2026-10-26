@@ -64,6 +64,7 @@ export function spawnPlayer(room: Room, p: Player, ch: Character, skin: string |
     hist: [],
     move: createMoveState(x, y, z),
     inputs: [],
+    lastSeq: -1, // a new client engine (new map after a vote) numbers its commands from 0 again
     simBudget: 0,
     life: p.life + 1,
   });

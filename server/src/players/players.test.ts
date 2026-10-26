@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { FIXED_DT, MAX_QUEUED_INPUTS, MAX_SIM_BUDGET_S, type MoveInput } from '@blockshot/shared';
+import { CHAR_BY_ID, FIXED_DT, MAX_QUEUED_INPUTS, MAX_SIM_BUDGET_S, type MoveInput } from '@blockshot/shared';
 import { bestPlays } from '../match/match';
 import { makeRoom } from '../testing/fakeRoom';
 import { queueInputs, simulateRoom } from './movement';
-import { pickSpawn } from './spawn';
+import { pickSpawn, spawnPlayer } from './spawn';
 
 const cmd = (seq: number, f = 1): MoveInput => ({ seq, f, s: 0, yaw: 0, pitch: 0, b: 0, slot: 0 });
 
@@ -18,6 +18,15 @@ describe('input queue', () => {
       Array.from({ length: MAX_QUEUED_INPUTS * 2 }, (_, i) => cmd(10 + i)),
     );
     expect(p.inputs).toHaveLength(MAX_QUEUED_INPUTS);
+  });
+
+  it('a respawn accepts a client that numbers its commands from 0 again (new map after a vote)', () => {
+    const { room, join } = makeRoom('ffa');
+    const p = join('A', 0, 20);
+    p.lastSeq = 20000; // last command of the previous match
+    spawnPlayer(room, p, CHAR_BY_ID.soldado, 'base');
+    queueInputs(p, [cmd(0), cmd(1)]);
+    expect(p.inputs.map((c) => c.seq)).toEqual([0, 1]);
   });
 
   it('only simulates the time that passed (plus the jitter bank)', () => {

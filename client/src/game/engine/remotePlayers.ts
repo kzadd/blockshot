@@ -40,6 +40,40 @@ const BUBBLE_Y = 0.95;
 // Spawn protection bubble
 const bubbleGeo = new THREE.SphereGeometry(1, 18, 12);
 const bubbleMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.18, depthWrite: false });
+/** Scope glint: a bright star at the lens, the same size on screen at any distance. */
+const GLINT_X = 0.14;
+const GLINT_Y = 1.58;
+const GLINT_Z = -0.7;
+const GLINT_SIZE = 0.07;
+let glintMaterial: THREE.SpriteMaterial | null = null;
+function glintMat(): THREE.SpriteMaterial {
+  if (glintMaterial) return glintMaterial;
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d')!;
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.25, 'rgba(255,240,190,0.9)');
+  grad.addColorStop(1, 'rgba(255,220,120,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  g.fillStyle = 'rgba(255,255,255,0.8)'; // star rays
+  g.fillRect(0, 31, 64, 2);
+  g.fillRect(31, 0, 2, 64);
+  glintMaterial = new THREE.SpriteMaterial({
+    map: new THREE.CanvasTexture(c),
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    sizeAttenuation: false,
+  });
+  return glintMaterial;
+}
+
+/** Tanque's shield: a glassy blue panel in front of the chest (the model faces -z). */
+const SHIELD_Y = 1.05;
+const SHIELD_Z = -0.62;
+const shieldGeo = new THREE.BoxGeometry(1.25, 1.7, 0.06);
+const shieldMat = new THREE.MeshBasicMaterial({ color: 0x5aaaff, transparent: true, opacity: 0.38, depthWrite: false });
 const BUBBLE_OPACITY = 0.14;
 const BUBBLE_PULSE = 0.08;
 const BUBBLE_PULSE_SPEED = 0.008;
@@ -82,6 +116,10 @@ export interface Remote {
   model: CharacterModel | null;
   tag: NameTag | null;
   bubble: THREE.Mesh | null;
+  /** Tanque's shield in front of the body */
+  shield: THREE.Mesh | null;
+  /** lens glint of a sniper who is scoped in */
+  glint: THREE.Sprite | null;
   charId: CharacterId | null;
   skin: SkinId | null;
   /** outfit colour picked by the player */
@@ -142,6 +180,8 @@ export class RemotePlayers {
           model: null,
           tag: null,
           bubble: null,
+          shield: null,
+          glint: null,
           charId: null,
           skin: null,
           co: '',
@@ -169,6 +209,8 @@ export class RemotePlayers {
       r.cr = p.cr;
       r.alive = !!p.a;
       r.prot = !!p.pr;
+      if (r.shield) r.shield.visible = !!p.sh;
+      if (r.glint) r.glint.visible = !!p.gl;
       if (!r.model || !r.charId) continue;
       // A player that just (re)spawned jumps to its new place instead of sliding there
       if (r.alive && !r.wasAlive) r.buffer.length = 0;
@@ -206,6 +248,15 @@ export class RemotePlayers {
     r.bubble.position.y = BUBBLE_Y;
     r.bubble.visible = false;
     r.model.group.add(r.bubble);
+    r.shield = new THREE.Mesh(shieldGeo, shieldMat);
+    r.shield.position.set(0, SHIELD_Y, SHIELD_Z);
+    r.shield.visible = false;
+    r.model.group.add(r.shield);
+    r.glint = new THREE.Sprite(glintMat());
+    r.glint.position.set(GLINT_X, GLINT_Y, GLINT_Z);
+    r.glint.scale.setScalar(GLINT_SIZE);
+    r.glint.visible = false;
+    r.model.group.add(r.glint);
     r.model.group.position.set(p.x, p.y, p.z);
     this.scene.add(r.model.group);
     r.charId = p.c;
@@ -337,6 +388,11 @@ export class RemotePlayers {
       }
     }
     return out;
+  }
+
+  /** Outfit colour a remote is drawn in (for the blocks it breaks into). */
+  colorOf(id: string): string {
+    return this.all.get(id)?.color || '#888888';
   }
 
   /** World position of a remote's model, if it is drawn. */

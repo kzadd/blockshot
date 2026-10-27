@@ -90,6 +90,12 @@ export interface Player {
   lastKillerId: string | null;
   /** grenades left this life */
   grenades: number;
+  /** when the ability (key E) can be used again (ms; the dash keeps its own timer in `move`) */
+  abilityAt: number;
+  /** Tanque's shield is up until then (ms) */
+  shieldUntil: number;
+  /** aiming (right button) on the last command */
+  aiming: boolean;
   /** last quick chat phrase (ms) */
   chatAt: number;
   /** spawns per character this match (session stats) */
@@ -150,6 +156,9 @@ export function createPlayer(id: string, name: string, team: Team): Player {
     picks: {},
     chatAt: 0,
     grenades: 0,
+    abilityAt: 0,
+    shieldUntil: 0,
+    aiming: false,
   };
 }
 

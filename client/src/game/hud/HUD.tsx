@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import {
+  ABILITIES,
   CHAR_BY_ID,
+  SHIELD,
   MEDALS,
   QUICK_CHAT,
   ZONE_NAMES,
@@ -14,10 +16,11 @@ import {
   type KillEvent,
   type ModeId,
   type Team,
+  type WeaponId,
 } from '@blockshot/shared';
 import Crosshair from '../../settings/Crosshair';
 import { useSettings } from '../../settings/settingsStore';
-import { Icon } from '../../ui/icons';
+import { ABILITY_ICON, Icon } from '../../ui/icons';
 import { MODE_UI } from '../modeUi';
 import type { RoomView } from '../roomView';
 import type { HudPlayer } from './hudState';
@@ -193,6 +196,8 @@ function Health() {
     stamina: s.stamina,
     staminaLow: s.staminaLow,
     sprinting: s.sprinting,
+    mode: s.mode,
+    myTeam: s.myTeam,
   }));
   const chunks = useChunks(h?.hp ?? 0, h?.maxHp ?? 1);
   if (!h) return null;
@@ -202,6 +207,12 @@ function Health() {
   const char = h.characterId ? CHAR_BY_ID[h.characterId] : undefined;
   return (
     <div className={`hud-block hp ${tone}`}>
+      {/* Which side you are on, always in sight in team modes */}
+      {isTeamMode(h.mode) && h.myTeam !== 0 && (
+        <span className="team-badge" style={{ '--t': teamVar(h.myTeam), '--tt': TEAM_TXT[h.myTeam] }}>
+          Equipo {teamName(h.mode, h.myTeam)}
+        </span>
+      )}
       <b className="hp-num">{h.hp}</b>
       <div className="hp-side">
         <div className="hp-labels">
@@ -257,6 +268,22 @@ function Health() {
   );
 }
 
+/** Key E: the character's ability, lit when ready, counting down otherwise. */
+function AbilityChip() {
+  const a = useHud((s) => s.ability);
+  if (!a) return null;
+  const { name, cooldownMs } = ABILITIES[a.id];
+  const ready = a.left <= 0;
+  return (
+    <span className={`abil ${ready ? 'ready' : ''}`} title={`${name} (E)`}>
+      <em>E</em>
+      <Icon name={ABILITY_ICON[a.id]} size={14} />
+      {ready ? name : <small>{Math.ceil(a.left / 1000)} s</small>}
+      {!ready && <i style={{ width: `${(1 - a.left / cooldownMs) * 100}%` }} />}
+    </span>
+  );
+}
+
 function Ammo() {
   const h = useHud((s) => ({
     weaponName: s.weaponName,
@@ -308,6 +335,7 @@ function Ammo() {
             <em>G</em>
             <Icon name="bomb" size={14} />
           </span>
+          <AbilityChip />
         </div>
       )}
     </div>
@@ -461,15 +489,88 @@ function roundStatus(r: { p: number; n: number; t: number }): string {
   return `Ronda ${r.n} · ${clock(r.t)}`;
 }
 
+/** How strongly the screen blood shows right after a hit (× the damage flash). */
+const BLOOD_SCREEN = 0.9;
+
 function Vignette() {
   const h = useHud((s) => ({ low: s.hp / s.maxHp <= LOW_HP, damage: s.damage }));
   if (!h) return null;
   return (
-    <div
-      className={`vignette ${h.low ? 'low' : ''}`}
-      style={h.low ? undefined : { opacity: Math.min(1, h.damage * VIGNETTE_DAMAGE) }}
-    />
+    <>
+      <div
+        className={`vignette ${h.low ? 'low' : ''}`}
+        style={h.low ? undefined : { opacity: Math.min(1, h.damage * VIGNETTE_DAMAGE) }}
+      />
+      {/* Blood on the screen edges right after a hit */}
+      {h.damage > 0 && <div className="blood-screen" style={{ opacity: Math.min(1, h.damage * BLOOD_SCREEN) }} />}
+    </>
   );
+}
+
+function GrenadeHint() {
+  return useHud((s) => s.grenadeAim) ? (
+    <div className="grenade-hint">
+      Suelta <kbd>G</kbd> para lanzar
+    </div>
+  ) : null;
+}
+
+function ShieldRim() {
+  const h = useHud((s) => ({ left: s.shield, hit: s.shieldHit }));
+  if (!h?.left) return null;
+  return (
+    <>
+      <div className={`shield-rim ${h.hit ? 'hit' : ''}`} />
+      <div className="shield-hud">
+        <span>
+          <Icon name="shield" size={14} />
+          Escudo · para las balas de delante
+          <b>{(h.left / 1000).toFixed(1)} s</b>
+        </span>
+        <i style={{ width: `${(h.left / SHIELD.durationMs) * 100}%` }} />
+      </div>
+    </>
+  );
+}
+
+/** Inside a smoke cloud: the screen goes grey (the cloud is opaque from inside too). */
+function SmokeFog() {
+  const k = useHud((s) => s.smoke);
+  return k ? <div className="smoke-fog" style={{ opacity: k }} /> : null;
+}
+
+/** The sight each gun shows while fully aimed (the 3D gun steps aside so the target stays in view). */
+const SIGHT: Partial<Record<WeaponId, 'dot' | 'post' | 'ring' | 'scope'>> = {
+  rifle: 'dot',
+  smg: 'dot',
+  lmg: 'dot',
+  mpistol: 'dot',
+  pistol: 'post',
+  revolver: 'post',
+  shotgun: 'ring',
+  sawedoff: 'ring',
+  launcher: 'ring',
+  dmr: 'scope',
+};
+
+function AdsSight({ id }: { id: WeaponId }) {
+  const shotKey = useHud((s) => s.shotKey);
+  const kind = SIGHT[id] ?? 'dot';
+  return (
+    <div className={`ads-sight ${kind}`}>
+      <div key={shotKey} className="ads-reticle">
+        <i className="dot" />
+        {kind !== 'dot' && <i className="frame" />}
+      </div>
+    </div>
+  );
+}
+
+/** Radial streaks at the screen edges: their strength follows the speed above sprinting (slides, hops). */
+function SpeedLines() {
+  const fx = useHud((s) => s.speedFx);
+  if (!fx) return null;
+  return <div className="speed-lines" style={{ opacity: fx }} />;
 }
 
 function Scope() {
@@ -650,11 +751,13 @@ interface HudProps {
 }
 
 export default function HUD({ engine, map, mode, scoreLimit, you, feed, banner }: HudProps) {
-  const h = useHud((s) => ({ alive: s.alive, scoped: s.alive && s.scoped, radar: s.radar }));
+  const h = useHud((s) => ({ alive: s.alive, scoped: s.alive && s.scoped, radar: s.radar, sight: s.adsSight }));
   if (!h) return null;
   const { alive, scoped } = h;
   return (
     <div className="hud stage">
+      {/* First, so the rest of the HUD stays readable inside the smoke */}
+      {alive && <SmokeFog />}
       {alive && !scoped && <Minimap engine={engine} map={map} radar={h.radar} />}
       {alive && !scoped && <NetWarning />}
       {alive && !scoped && <TopCenter mode={mode} scoreLimit={scoreLimit} you={you} />}
@@ -663,11 +766,14 @@ export default function HUD({ engine, map, mode, scoreLimit, you, feed, banner }
       {alive && (
         <>
           <Vignette />
+          <ShieldRim />
+          {!scoped && <GrenadeHint />}
+          {!scoped && <SpeedLines />}
           {scoped ? (
             <Scope />
           ) : (
             <>
-              <AimCrosshair />
+              {h.sight ? <AdsSight id={h.sight} /> : <AimCrosshair />}
               <CenterMarks />
               <Banner banner={banner} />
             </>

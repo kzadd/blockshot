@@ -22,6 +22,7 @@ import { queueInputs } from './movement';
 import { findPath, navGrid } from './nav';
 import type { Player } from './player';
 import { spawnPlayer } from './spawn';
+import { smokeBlocks } from '../combat/abilities';
 import { sameTeam } from './teams';
 import { asSide } from '../modes/scoring';
 
@@ -134,7 +135,9 @@ function findTargets(room: Room, bot: Player, eye: Vec3) {
     if (!near || dist < near.dist) near = aim;
     if (dist > SIGHT_RANGE || (seen && dist >= seen.dist)) continue;
     const dir: Vec3 = [dx / dist, dy / dist, dz / dist];
-    if (!castShot(eye, dir, room.colliders, [], bot.id, dist).hit) seen = aim; // no wall in between
+    // No wall and no smoke in between
+    if (!castShot(eye, dir, room.colliders, [], bot.id, dist).hit && !smokeBlocks(room, eye, [t.x, t.y + CHEST, t.z]))
+      seen = aim;
   }
   return { seen, near };
 }

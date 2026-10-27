@@ -1,6 +1,9 @@
 import { MATCH_RESTART_MS, type BestPlay, type Team } from '@blockshot/shared';
 import { resetMatchStats, type Player } from '../players/player';
 import type { Room } from '../rooms/room';
+import { clearAbilities } from '../combat/abilities';
+import { recordMatch } from '../stats/ranking';
+import { scoreRound } from './tournament';
 import { foldPlayer } from '../stats/sessionStats';
 import { applyOption, balanceTeams, rating, startVote, voteWinner } from './vote';
 
@@ -34,6 +37,7 @@ export function bestPlays(room: Room): BestPlay[] {
 export function endMatch(room: Room, winnerName: string, winnerTeam: Team = 0): void {
   room.matchOver = true;
   room.grenades = [];
+  recordMatch(room, winnerName, winnerTeam);
   for (const p of room.players.values()) p.alive = false;
   const scores = [...room.players.values()]
     .map((p) => ({ name: p.name, kills: p.kills, deaths: p.deaths, team: p.team }))
@@ -45,6 +49,8 @@ export function endMatch(room: Room, winnerName: string, winnerTeam: Team = 0): 
       scores,
       best: bestPlays(room),
       restartIn: MATCH_RESTART_MS,
+      // The round's points first: after the last round the vote goes back to any mode
+      tour: scoreRound(room),
       vote: startVote(room),
     },
   ]);
@@ -57,6 +63,7 @@ export function restartMatch(room: Room): void {
   room.vote = null;
   if (next) applyOption(room, next);
   room.teamScore = { 1: 0, 2: 0 };
+  clearAbilities(room);
   room.mode.onMatchReset?.(room);
   balanceTeams(room, ratings);
   for (const p of room.players.values()) {

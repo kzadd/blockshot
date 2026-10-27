@@ -1,4 +1,16 @@
-export type WeaponId = 'rifle' | 'sniper' | 'shotgun' | 'smg' | 'lmg' | 'pistol' | 'revolver' | 'knife';
+export type WeaponId =
+  | 'rifle'
+  | 'sniper'
+  | 'shotgun'
+  | 'smg'
+  | 'lmg'
+  | 'pistol'
+  | 'revolver'
+  | 'knife'
+  | 'dmr'
+  | 'launcher'
+  | 'mpistol'
+  | 'sawedoff';
 
 /**
  * fireRate = ms between shots · spread = radians (adsSpread while aiming) · zoom while aiming
@@ -37,6 +49,8 @@ export interface Weapon {
   bloomMax?: number;
   melee?: boolean;
   backstab?: number;
+  /** fires a grenade that flies and blows up on contact (LAUNCHER) instead of a bullet */
+  projectile?: boolean;
 }
 
 export const WEAPONS: Record<WeaponId, Weapon> = {
@@ -59,8 +73,9 @@ export const WEAPONS: Record<WeaponId, Weapon> = {
     adsSpeed: 12,
     adsMove: 0.6,
     falloff: [30, 80, 0.65],
-    bloom: 0.0022,
-    bloomMax: 0.018,
+    // Long bursts open up: deadly up close, it has to tap at range
+    bloom: 0.003,
+    bloomMax: 0.026,
   },
   sniper: {
     name: 'Francotirador',
@@ -80,11 +95,55 @@ export const WEAPONS: Record<WeaponId, Weapon> = {
     scope: true,
     sound: 'sniper',
     weight: 0.95,
-    adsSpeed: 12,
+    // Slow to scope in: quick scopes are a gamble (it ruled every match)
+    adsSpeed: 7,
     adsMove: 0.55,
     moveSpread: 3,
     airSpread: 4,
     bolt: true,
+  },
+  // Semi-auto marksman rifle: two headshots or three body shots; wins the middle distance
+  dmr: {
+    name: 'Fusil de tirador',
+    damage: 45,
+    headMult: 2,
+    fireRate: 290,
+    mag: 12,
+    reload: 2300,
+    auto: false,
+    spread: 0.035,
+    adsSpread: 0.0012,
+    pellets: 1,
+    range: 300,
+    recoil: 0.032,
+    zoom: 2.6,
+    sound: 'dmr',
+    weight: 0.98,
+    adsSpeed: 10,
+    adsMove: 0.6,
+    moveSpread: 1.6,
+    airSpread: 2.5,
+  },
+  // Grenade launcher: slow rounds that blow up on contact (area damage), no headshots
+  launcher: {
+    name: 'Lanzagranadas',
+    damage: 95,
+    headMult: 1,
+    fireRate: 950,
+    mag: 4,
+    reload: 2900,
+    auto: false,
+    spread: 0.012,
+    adsSpread: 0.004,
+    pellets: 1,
+    range: 80,
+    recoil: 0.07,
+    zoom: 1.4,
+    sound: 'launcher',
+    weight: 0.92,
+    adsSpeed: 9,
+    adsMove: 0.6,
+    projectile: true,
   },
   shotgun: {
     name: 'Escopeta',
@@ -193,6 +252,50 @@ export const WEAPONS: Record<WeaponId, Weapon> = {
     falloff: [25, 70, 0.7],
     bloom: 0.005,
     bloomMax: 0.014,
+  },
+  // Machine pistol: a tiny automatic sidearm, deadly up close, useless far away
+  mpistol: {
+    name: 'Pistola automática',
+    damage: 13,
+    headMult: 1.4,
+    fireRate: 72,
+    mag: 20,
+    reload: 1500,
+    auto: true,
+    spread: 0.022,
+    adsSpread: 0.014,
+    pellets: 1,
+    range: 60,
+    recoil: 0.012,
+    zoom: 1.3,
+    sound: 'smg',
+    weight: 1.03,
+    adsSpeed: 20,
+    adsMove: 0.85,
+    falloff: [10, 35, 0.5],
+    bloom: 0.002,
+    bloomMax: 0.018,
+  },
+  // Sawed-off: two barrels, two shots, a wide cone that only works at arm's length
+  sawedoff: {
+    name: 'Recortada',
+    damage: 12,
+    headMult: 1.2,
+    fireRate: 260,
+    mag: 2,
+    reload: 1700,
+    auto: false,
+    spread: 0.1,
+    adsSpread: 0.085,
+    pellets: 9,
+    range: 20,
+    recoil: 0.06,
+    zoom: 1.15,
+    sound: 'shotgun',
+    weight: 1.02,
+    adsSpeed: 18,
+    adsMove: 0.8,
+    falloff: [5, 16, 0.3],
   },
   // Melee: everybody carries it (key 3). From behind it kills in one hit
   knife: {

@@ -7,7 +7,9 @@ import type {
   SideTeam,
   VoteOption,
 } from '@blockshot/shared';
+import type { Deployable } from '../combat/abilities';
 import type { Grenade } from '../combat/grenades';
+import type { Tournament } from '../match/tournament';
 import type { GameMode } from '../modes/gameMode';
 import type { Player } from '../players/player';
 
@@ -49,6 +51,14 @@ export interface Room {
   /** tells the lobby the room list changed (map / mode after a vote) */
   lobbyChanged: () => void;
   grenades: Grenade[];
+  /** smoke clouds, mines and cover walls (abilities) */
+  deployables: Deployable[];
+  /** the admin closed the room: nobody new can join */
+  closed: boolean;
+  /** names the admin kicked: they cannot come back to this room */
+  banned: Set<string>;
+  /** league tournament in progress (null: normal matches) */
+  tournament: Tournament | null;
 }
 
 export const roomInfo = (room: Room): RoomInfo => ({
@@ -59,6 +69,10 @@ export const roomInfo = (room: Room): RoomInfo => ({
   size: room.map.size,
   mode: room.modeId,
   max: room.max,
+  closed: room.closed,
+  tour: room.tournament
+    ? { round: room.tournament.round, rounds: room.tournament.rounds, by: room.tournament.by }
+    : null,
 });
 
 export const notice = (room: Room, text: string): void => room.channel.broadcast('notice', [text]);

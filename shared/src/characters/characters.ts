@@ -1,6 +1,7 @@
+import type { AbilityId } from '../abilities/abilities';
 import { WEAPONS, type WeaponId } from '../weapons/weapons';
 
-export type CharacterId = 'soldado' | 'cazador' | 'tanque' | 'rayo' | 'bastion';
+export type CharacterId = 'soldado' | 'cazador' | 'tanque' | 'rayo' | 'bastion' | 'explorador' | 'artillero';
 
 export interface Character {
   id: CharacterId;
@@ -10,6 +11,8 @@ export interface Character {
   speed: number;
   primary: WeaponId;
   secondary: WeaponId;
+  /** key E */
+  ability: AbilityId;
   role: string;
   desc: string;
 }
@@ -23,6 +26,7 @@ export const CHARACTERS: Character[] = [
     speed: 7.3,
     primary: 'rifle',
     secondary: 'pistol',
+    ability: 'smoke',
     role: 'Equilibrado',
     desc: 'Equilibrado. Rinde a cualquier distancia y perdona los fallos.',
   },
@@ -33,7 +37,8 @@ export const CHARACTERS: Character[] = [
     hp: 90,
     speed: 7.6,
     primary: 'sniper',
-    secondary: 'pistol',
+    secondary: 'mpistol',
+    ability: 'mine',
     role: 'Larga distancia',
     desc: 'Un tiro al cuerpo tumba a todos menos al Tanque (a él, a la cabeza). Busca altura.',
   },
@@ -45,6 +50,7 @@ export const CHARACTERS: Character[] = [
     speed: 6.8,
     primary: 'shotgun',
     secondary: 'revolver',
+    ability: 'shield',
     role: 'Cuerpo a cuerpo',
     desc: 'Mucha vida y escopeta. Letal de cerca, lento de lejos.',
   },
@@ -56,6 +62,7 @@ export const CHARACTERS: Character[] = [
     speed: 8.6,
     primary: 'smg',
     secondary: 'pistol',
+    ability: 'dash',
     role: 'Velocidad',
     desc: 'El más rápido. Entra, dispara y sal antes de que te vean.',
   },
@@ -67,8 +74,33 @@ export const CHARACTERS: Character[] = [
     speed: 7.3,
     primary: 'lmg',
     secondary: 'revolver',
+    ability: 'wall',
     role: 'Supresión',
     desc: 'Cargador de 80 balas. Aguanta una esquina él solo.',
+  },
+  {
+    id: 'explorador',
+    name: 'Explorador',
+    color: '#26b0a6',
+    hp: 90,
+    speed: 8.0,
+    primary: 'dmr',
+    secondary: 'pistol',
+    ability: 'radar',
+    role: 'Media distancia',
+    desc: 'Fusil de tirador semiautomático: dos tiros a la cabeza. Rápido y con radar para cazar francotiradores.',
+  },
+  {
+    id: 'artillero',
+    name: 'Artillero',
+    color: '#e0782e',
+    hp: 115,
+    speed: 7.4,
+    primary: 'launcher',
+    secondary: 'sawedoff',
+    ability: 'medkit',
+    role: 'Área',
+    desc: 'Lanzagranadas que estalla al tocar: saca a la gente de las esquinas. Lento y sin tiros a la cabeza.',
   },
 ];
 
@@ -105,6 +137,7 @@ export const OUTFIT_COLORS = [
   { hex: '#e8b923', name: 'Amarillo' },
   { hex: '#8a5cd6', name: 'Morado' },
   { hex: '#26b0a6', name: 'Turquesa' },
+  { hex: '#e0782e', name: 'Naranja' },
   { hex: '#e0609e', name: 'Rosa' },
   { hex: '#5f6873', name: 'Grafito' },
 ] as const;

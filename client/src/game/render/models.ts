@@ -514,6 +514,56 @@ const EXTRAS: Record<CharacterId, CharacterLook> = {
       k.box(0.17, 0.26, 0.05, 0, -0.17, -0.11, 'vest'); // shin guard
     },
   },
+  // Scout: boonie hat with a scarf, binoculars on the chest and light gear
+  explorador: {
+    build: 'light',
+    skinTone: '#c48a5e',
+    hair: '#2a1d14',
+    hat(k) {
+      k.box(0.44, 0.03, 0.46, 0, 1.79, 0.01, 'main'); // boonie brim
+      k.box(0.32, 0.1, 0.34, 0, 1.84, 0.01, 'main'); // crown
+      k.box(0.33, 0.025, 0.35, 0, 1.815, 0.01, 'accent'); // band
+      k.box(0.3, 0.1, 0.05, 0, 1.53, -0.15, 'gear'); // scarf over the mouth
+      k.box(0.32, 0.06, 0.3, 0, 1.48, 0.0, 'gear');
+    },
+    upper(k) {
+      k.box(0.12, 0.06, 0.08, -0.07, 1.27, -0.2, 'metal'); // binoculars
+      k.box(0.12, 0.06, 0.08, 0.07, 1.27, -0.2, 'metal');
+      k.beam(v3(-0.18, 1.45, -0.14), v3(-0.05, 1.3, -0.2), 0.02, 0.02, 'gear'); // strap
+      k.box(0.3, 0.32, 0.12, 0, 1.15, 0.2, 'gear'); // small pack
+    },
+    thigh(k, s) {
+      if (s < 0) k.box(0.06, 0.14, 0.12, -0.11, -0.12, 0, 'gear'); // map pouch
+    },
+  },
+  // Grenadier: heavy padded jacket, goggles over a beanie, bandolier of fat launcher rounds
+  artillero: {
+    build: 'heavy',
+    skinTone: '#a96f48',
+    hair: '#3a2a1e',
+    hat(k) {
+      k.box(0.34, 0.12, 0.36, 0, 1.8, 0.01, 'main'); // beanie
+      k.box(0.35, 0.04, 0.37, 0, 1.75, 0.01, 'accent'); // turned-up edge
+      k.box(0.3, 0.06, 0.04, 0, 1.73, -0.17, 'visor'); // goggles
+      k.pair(0.04, 0.05, 0.05, 0.15, 1.73, -0.14, 'gear');
+    },
+    upper(k) {
+      k.box(0.46, 0.2, 0.32, 0, 1.36, 0.0, 'vest'); // padded collar
+      // Bandolier of launcher rounds across the chest
+      for (let i = 0; i < 6; i++) {
+        const t = i / 5;
+        k.box(0.05, 0.07, 0.05, 0.19 - t * 0.36, 1.4 - t * 0.36, -0.22, 'brass', 0, 0, 0.8);
+      }
+      k.beam(v3(0.22, 1.44, -0.2), v3(-0.2, 1.02, -0.2), 0.05, 0.02, 'gear');
+      k.box(0.34, 0.4, 0.2, 0, 1.12, 0.24, 'gear'); // ammo pack
+    },
+    thigh(k) {
+      k.box(0.2, 0.2, 0.04, 0, -0.16, -0.125, 'vest'); // knee pads up the thigh
+    },
+    shin(k) {
+      k.box(0.18, 0.14, 0.06, 0, -0.04, -0.11, 'vest'); // big knee guard
+    },
+  },
   // Runner: light top with bare forearms, headband, spiky hair, goggles on the forehead
   rayo: {
     build: 'light',
@@ -1067,7 +1117,7 @@ function pistolGrip(d: GunDraw, y: number, z: number, mat: GunMat, h = 0.11): vo
   d.box(0.038, h * 0.6, 0.012, 0, y - h * 0.05, z + 0.03, 'r', 0.3); // rubber back strap
 }
 
-// The eight weapons ------------------------------------------------------------------------
+// The weapons ------------------------------------------------------------------------------
 const GUNS: Record<WeaponId, (d: GunDraw) => void> = {
   // M4-style carbine: black upper, tan furniture, M-LOK handguard and a holographic sight
   rifle(d) {
@@ -1200,6 +1250,55 @@ const GUNS: Record<WeaponId, (d: GunDraw) => void> = {
     d.bev(0.066, 0.1, 0.2, 0, -0.02, 0.3, 'v'); // stock
     d.box(0.07, 0.12, 0.024, 0, -0.024, 0.41, 'r');
   },
+  // Marksman rifle: tan chassis, long free-floated barrel, a low-power scope (the view zooms, no overlay)
+  dmr(d) {
+    d.bev(0.058, 0.06, 0.32, 0, 0.026, -0.02, 'p'); // upper receiver
+    d.bev(0.054, 0.05, 0.2, 0, -0.024, 0.02, 'p'); // lower receiver
+    d.box(0.004, 0.02, 0.06, 0.03, 0.028, 0.0, 'o'); // ejection port
+    rail(d, 0.056, -0.2, 0.12);
+    for (const z of [-0.09, 0.06]) d.bev(0.03, 0.03, 0.02, 0, 0.074, z, 'o'); // rings
+    d.cyl(0.02, 0.26, 0, 0.1, -0.01, 'm', 14); // scope tube
+    d.cyl(0.028, 0.06, 0, 0.1, -0.17, 'm', 14); // objective
+    d.cyl(0.025, 0.004, 0, 0.1, -0.201, 'g', 14); // lens
+    d.cyl(0.024, 0.06, 0, 0.1, 0.15, 'm', 14); // eyepiece
+    d.box(0.02, 0.02, 0.02, 0, 0.124, -0.01, 'o'); // turret
+    d.bev(0.06, 0.06, 0.36, 0, 0.018, -0.36, 'y'); // long handguard
+    for (const z of [-0.26, -0.33, -0.4, -0.47]) d.box(0.062, 0.01, 0.03, 0, 0.012, z, 'o');
+    d.box(0.062, 0.006, 0.02, 0, 0.018, -0.2, 'c'); // colour band
+    d.cyl(0.011, 0.2, 0, 0.018, -0.63, 'o'); // barrel
+    d.cyl(0.018, 0.07, 0, 0.018, -0.76, 'o', 8); // muzzle brake
+    d.box(0.04, 0.09, 0.06, 0, -0.1, -0.07, 'k'); // straight 12-round magazine
+    d.box(0.044, 0.01, 0.064, 0, -0.15, -0.07, 'p');
+    triggerGroup(d, -0.048, 0.12);
+    pistolGrip(d, -0.1, 0.12, 'k');
+    d.bev(0.05, 0.08, 0.2, 0, -0.004, 0.3, 'p'); // stock with a cheek riser
+    d.box(0.044, 0.022, 0.12, 0, 0.044, 0.28, 'k');
+    d.box(0.054, 0.1, 0.02, 0, -0.01, 0.405, 'r'); // butt pad
+    d.sight(0.1);
+  },
+  // Grenade launcher: fat olive tube on a short stock, flip-up ladder sight, revolving drum underneath
+  launcher(d) {
+    d.cyl(0.042, 0.46, 0, 0.03, -0.2, 'v', 14); // tube
+    d.cyl(0.047, 0.03, 0, 0.03, -0.43, 'm', 14); // muzzle ring
+    d.cyl(0.034, 0.004, 0, 0.03, -0.446, 'o', 14); // bore
+    d.cyl(0.05, 0.02, 0, 0.03, -0.05, 'c', 14); // colour band
+    d.cyl(0.058, 0.12, 0, -0.04, 0.02, 'm', 10); // drum
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2;
+      d.box(0.012, 0.012, 0.11, Math.sin(a) * 0.055, -0.04 + Math.cos(a) * 0.055, 0.02, 'o', 0, -a);
+    }
+    d.bev(0.05, 0.05, 0.1, 0, -0.02, -0.25, 'y'); // fore grip
+    d.bev(0.03, 0.08, 0.034, 0, -0.08, -0.25, 'y');
+    triggerGroup(d, -0.07, 0.15);
+    pistolGrip(d, -0.13, 0.15, 'v');
+    d.box(0.006, 0.05, 0.03, 0, 0.09, 0.0, 'o'); // ladder sight
+    for (const y of [0.075, 0.09, 0.105]) d.box(0.03, 0.004, 0.004, 0, y, 0.0, 'o');
+    d.box(0.006, 0.03, 0.01, 0, 0.08, -0.4, 'o'); // front post
+    d.cyl(0.015, 0.14, 0, 0.0, 0.2, 'm'); // buffer tube
+    d.bev(0.05, 0.08, 0.16, 0, -0.02, 0.32, 'v'); // stock
+    d.box(0.054, 0.1, 0.02, 0, -0.024, 0.41, 'r');
+    d.sight(0.098);
+  },
   // Striker pistol: gunmetal slide with serrations, polymer frame, three-dot tritium sights
   pistol(d) {
     d.bev(0.036, 0.04, 0.2, 0, 0.03, -0.04, 'm'); // slide
@@ -1257,6 +1356,44 @@ const GUNS: Record<WeaponId, (d: GunDraw) => void> = {
     d.box(0.0042, 0.004, 0.006, 0, 0.06, -0.232, 'd');
     for (const s of [-1, 1]) d.box(0.007, 0.01, 0.01, s * 0.0085, 0.057, 0.065, 'o'); // rear notch
     d.sight(0.06);
+  },
+  // Machine pistol: blocky polymer frame, long stick magazine, a compensator and a folding front grip
+  mpistol(d) {
+    d.bev(0.04, 0.044, 0.22, 0, 0.03, -0.05, 'm'); // slide
+    for (const z of [0.03, 0.042, 0.054]) d.box(0.0415, 0.03, 0.005, 0, 0.032, z, 'o'); // serrations
+    d.box(0.0415, 0.012, 0.04, 0, 0.044, -0.06, 'o'); // ejection port
+    d.bev(0.03, 0.03, 0.05, 0, 0.03, -0.185, 'o'); // compensator
+    for (const z of [-0.175, -0.195]) d.box(0.012, 0.006, 0.01, 0, 0.047, z, 'l'); // ports
+    d.bev(0.038, 0.028, 0.19, 0, -0.004, -0.055, 'p'); // frame
+    d.box(0.034, 0.012, 0.06, 0, -0.022, -0.11, 'p'); // rail
+    d.box(0.022, 0.07, 0.024, 0, -0.06, -0.12, 'p', 0.15); // folding front grip
+    d.box(0.0385, 0.006, 0.04, 0, -0.012, -0.11, 'c');
+    triggerGroup(d, -0.012, 0.07, 'p');
+    d.bev(0.036, 0.12, 0.052, 0, -0.074, 0.06, 'p', 0.22); // grip
+    d.box(0.03, 0.12, 0.04, 0, -0.17, 0.085, 'k', 0.22); // long magazine out of the grip
+    d.box(0.034, 0.012, 0.046, 0, -0.232, 0.1, 'p', 0.22);
+    d.box(0.004, 0.009, 0.006, 0, 0.0585, -0.14, 'o'); // front sight
+    d.box(0.003, 0.003, 0.002, 0, 0.06, -0.1365, 'n');
+    for (const s of [-1, 1]) d.box(0.008, 0.008, 0.008, s * 0.0085, 0.06, 0.05, 'o'); // rear notch
+    d.sight(0.06);
+  },
+  // Sawed-off: two short side by side barrels, a wooden fore-end and a cut-down pistol stock
+  sawedoff(d) {
+    for (const s of [-1, 1]) {
+      d.cyl(0.017, 0.3, s * 0.018, 0.022, -0.21, 's', 12); // barrels
+      d.cyl(0.012, 0.004, s * 0.018, 0.022, -0.362, 'o', 10); // bores
+    }
+    d.box(0.006, 0.006, 0.3, 0, 0.042, -0.21, 'o'); // rib between the barrels
+    d.box(0.005, 0.005, 0.005, 0, 0.047, -0.35, 'l'); // brass bead
+    d.bev(0.07, 0.04, 0.16, 0, -0.008, -0.17, 'w'); // fore-end
+    d.box(0.072, 0.006, 0.02, 0, -0.008, -0.1, 'c');
+    d.bev(0.066, 0.07, 0.11, 0, 0.012, -0.0, 'm'); // action
+    d.box(0.012, 0.016, 0.03, 0, 0.052, 0.03, 'o', 0.4); // top lever
+    for (const s of [-1, 1]) d.box(0.008, 0.02, 0.016, s * 0.012, 0.05, 0.055, 'o', 0.6); // hammers
+    triggerGroup(d, -0.03, 0.08, 'm');
+    d.bev(0.044, 0.12, 0.06, 0, -0.06, 0.11, 'w', 0.5); // pistol stock
+    d.box(0.046, 0.016, 0.064, 0, -0.118, 0.14, 'k', 0.5);
+    d.sight(0.047);
   },
 };
 

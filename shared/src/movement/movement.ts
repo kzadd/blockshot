@@ -1,6 +1,7 @@
 // Player movement as a pure, deterministic simulation. The server runs it as the authority and the client
 // runs the very same code to predict its own player, so both agree step by step.
 import type { Vec3 } from '../core/math';
+import { DASH } from '../abilities/abilities';
 import { PAD, PLAYER } from '../player/player';
 import type { Collider } from '../physics/raycast';
 
@@ -17,6 +18,8 @@ export const BTN_AIM = 16;
 export const BTN_FIRE = 32;
 /** a shot was fired: blocks sprinting for SPRINT_BLOCK_S */
 export const BTN_SHOT = 64;
+/** the ability key went down (Rayo's dash is part of the movement) */
+export const BTN_DASH = 128;
 
 /** One simulation step of player input (Command pattern): what the player wanted to do. */
 export interface MoveInput {
@@ -65,6 +68,12 @@ export interface MoveState {
   staminaIdle: number;
   /** m walked since the last footstep sound */
   stepDist: number;
+  /** s until the dash can be used again */
+  dashCd: number;
+  /** s left of the dash in progress and its direction */
+  dashT: number;
+  dashX: number;
+  dashZ: number;
 }
 
 /** What the environment and the player's loadout impose on a step. */
@@ -76,6 +85,8 @@ export interface MoveContext {
   adsMove: number;
   /** where to put the player back if it falls out of the map */
   fallback: Vec3;
+  /** the character's ability is the dash */
+  dash?: boolean;
 }
 
 /** Things that happened during a step (sounds and camera effects for the client). */
@@ -87,6 +98,7 @@ export interface MoveEvents {
   step: number;
   /** landing fall speed (m/s, negative) when it was hard enough to be felt; 0 otherwise */
   land: number;
+  dash: boolean;
 }
 
 /** Ground acceleration (exponential approach to the wanted speed). */
@@ -137,6 +149,10 @@ export function createMoveState(x: number, y: number, z: number): MoveState {
     stamina: PLAYER.stamina,
     staminaIdle: LONG_AGO_S,
     stepDist: 0,
+    dashCd: 0,
+    dashT: 0,
+    dashX: 0,
+    dashZ: 0,
   };
 }
 
@@ -216,7 +232,7 @@ function updateStamina(st: MoveState, dt: number, speed: number): void {
 
 /** Advances the player by one step of `dt` seconds. Mutates `st` and returns what happened. */
 export function stepMovement(st: MoveState, input: MoveInput, dt: number, ctx: MoveContext): MoveEvents {
-  const ev: MoveEvents = { jump: false, slide: false, pad: false, step: 0, land: 0 };
+  const ev: MoveEvents = { jump: false, slide: false, pad: false, step: 0, land: 0, dash: false };
   const cols = ctx.colliders;
   const held = (bit: number) => (input.b & bit) !== 0;
   const f = Math.sign(input.f);
@@ -323,6 +339,23 @@ export function stepMovement(st: MoveState, input: MoveInput, dt: number, ctx: M
     st.vz *= max / nh;
   }
 
+  // Dash (Rayo): a short flight along the move direction (forward when standing still), above the speed cap
+  if (ctx.dash && held(BTN_DASH) && st.dashCd <= 0) {
+    st.dashX = wl > 0 ? wx : -sin;
+    st.dashZ = wl > 0 ? wz : -cos;
+    st.dashT = DASH.timeS;
+    st.sliding = false;
+    st.dashCd = DASH.cooldownS;
+    ev.dash = true;
+  }
+  if (st.dashT > 0) {
+    st.dashT -= dt;
+    const v = st.dashT > 0 ? DASH.speed : DASH.exit;
+    st.vx = st.dashX * v;
+    st.vz = st.dashZ * v;
+    st.vy = Math.max(st.vy, PLAYER.gravity * dt); // gravity below cancels it: no fall while dashing
+  }
+
   // Jump (with coyote time after a ledge and a remembered key press)
   if (wantJump && st.coyote > 0 && st.vy <= JUMP_MAX_VY) {
     st.vy = PLAYER.jump; // keeps the momentum: slide + jump = very fast
@@ -361,6 +394,7 @@ export function stepMovement(st: MoveState, input: MoveInput, dt: number, ctx: M
 
   // Timers
   st.jumpBuffer = Math.max(0, st.jumpBuffer - dt);
+  st.dashCd = Math.max(0, st.dashCd - dt);
   st.sprintBlock = Math.max(0, st.sprintBlock - dt);
   st.slideSince = Math.min(LONG_AGO_S, st.slideSince + dt);
   st.staminaIdle = Math.min(LONG_AGO_S, st.staminaIdle + dt);

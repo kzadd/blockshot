@@ -1,6 +1,7 @@
 // Typed Socket.IO protocol. Short keys in high-frequency payloads keep snapshots small.
 import type { Vec3 } from '../core/math';
 import type { CharacterId, SkinId } from '../characters/characters';
+import type { TournamentResult } from '../modes/tournament';
 import type { MapId, SizeId } from '../maps/types';
 import type { BotLevel } from '../modes/bots';
 import type { MedalId } from '../modes/medals';
@@ -32,6 +33,10 @@ export interface RoomInfo {
   size: SizeId;
   mode: ModeId;
   max: number;
+  /** the admin closed the room: nobody new can join */
+  closed: boolean;
+  /** a league tournament is on: round being played and how many */
+  tour: { round: number; rounds: number; by: string } | null;
 }
 
 /** `admin`: the player opened the game on the server's own PC (practice bots and other test tools). */
@@ -106,6 +111,12 @@ export interface PlayerSnapshot {
   rd: number;
   /** medals this match */
   md: number;
+  /** shield up (Tanque's ability) */
+  sh: number;
+  /** scoped in with a sniper: others see the lens glint */
+  gl: number;
+  /** ms until the ability is ready again (0 = ready) */
+  ac: number;
 }
 
 export interface FlagSnapshot {
@@ -140,6 +151,9 @@ export interface RoundSnapshot {
 
 /** Grenade in flight: [id, x, y, z] */
 export type GrenadeSnapshot = [number, number, number, number];
+/** Ability objects in the world: [id, kind, x, y, z, along (wall: 0 = runs along x, 1 = along z), team, owner]. */
+export type DeployableKind = 'smoke' | 'mine' | 'wall';
+export type DeployableSnapshot = [number, DeployableKind, number, number, number, number, Team, string];
 
 export interface StateSnapshot {
   players: PlayerSnapshot[];
@@ -148,6 +162,8 @@ export interface StateSnapshot {
   tg: TagSnapshot[] | null;
   inf: InfectSnapshot | null;
   gr: GrenadeSnapshot[];
+  /** smoke clouds, mines and cover walls */
+  dp: DeployableSnapshot[];
   dz: DomSnapshot[] | null;
   rd: RoundSnapshot | null;
 }
@@ -224,9 +240,26 @@ export interface MatchEnd {
   restartIn: number;
   /** options for the next match (empty: the same one again) */
   vote: VoteOption[];
+  /** league tournament standings after this round */
+  tour?: TournamentResult;
 }
 
 export type FlagEventType = 'take' | 'drop' | 'return' | 'capture';
+
+/** All-time results of one player name, kept in the server's ranking file. */
+export interface RankingRow {
+  name: string;
+  matches: number;
+  wins: number;
+  kills: number;
+  deaths: number;
+  shots: number;
+  hits: number;
+  heads: number;
+  medals: number;
+  /** flag captures or confirmed tags */
+  caps: number;
+}
 
 /** Session statistics of one player (server PC only). */
 export interface SessionStatsRow {
@@ -251,6 +284,8 @@ export interface ServerToClientEvents {
   hitmarker: (d: { head: boolean; kill: boolean; dmg: number; at: Vec3 }) => void;
   kill: (d: KillEvent) => void;
   shot: (d: { id: string; w: WeaponId | null; e: Vec3[] }) => void;
+  /** a shot stopped by Tanque's shield (id = the shield's owner) */
+  'shield:hit': (d: { id: string; at: Vec3 }) => void;
   loadout: (d: { level: number; team?: Team }) => void;
   flag: (d: { type: FlagEventType; team?: SideTeam; name?: string }) => void;
   tag: (d: { type: 'confirm' | 'deny' }) => void;
@@ -264,6 +299,8 @@ export interface ServerToClientEvents {
   'room:changed': (room: RoomInfo) => void;
   /** a grenade exploded */
   boom: (d: { x: number; y: number; z: number }) => void;
+  /** the admin removed you from the room (you are back in the lobby) */
+  kicked: (reason: string) => void;
 }
 
 export interface ClientToServerEvents {
@@ -283,6 +320,21 @@ export interface ClientToServerEvents {
   'bot:clear': () => void;
   'chat:quick': (d: { i: number }) => void;
   'player:grenade': (d: { o: Vec3; d: Vec3 }) => void;
+  /** key E (the dash goes with the movement commands instead) */
+  'player:ability': (d: { o: Vec3; d: Vec3 }) => void;
   vote: (d: { i: number }) => void;
   'admin:stats': (cb: (rows: SessionStatsRow[]) => void) => void;
+  /** everybody: the ranking (best first) */
+  'ranking:get': (cb: (rows: RankingRow[]) => void) => void;
+  /** server PC only: room control */
+  'admin:kick': (d: { id: string }) => void;
+  'admin:kill': (d: { id: string }) => void;
+  'admin:team': (d: { id: string }) => void;
+  'admin:restart': () => void;
+  'admin:end': () => void;
+  'admin:room': (d: VoteOption) => void;
+  'admin:lock': (d: { locked: boolean }) => void;
+  'admin:ranking:reset': () => void;
+  /** start a league of that many rounds (0 = stop it) */
+  'tournament:set': (d: { rounds: number }) => void;
 }

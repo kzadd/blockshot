@@ -35,11 +35,16 @@ const AIM_Z: Partial<Record<WeaponId, number>> = {
   smg: -0.13,
   lmg: -0.18,
   rifle: -0.16,
+  dmr: -0.14,
+  launcher: -0.3,
+  mpistol: -0.55,
+  sawedoff: -0.36,
 };
 /** Hip position tweaks per gun (x, y, z, pitch): handguns a bit closer and higher, the knife blade up. */
 const HIP_OFFSET: Partial<Record<WeaponId, readonly [number, number, number, number]>> = {
   pistol: [0, 0.035, 0.08, 0],
   revolver: [0, 0.035, 0.08, 0],
+  mpistol: [0, 0.035, 0.08, 0],
   knife: [-0.03, 0.1, 0.08, 0.45],
 };
 const NO_OFFSET = [0, 0, 0, 0] as const;

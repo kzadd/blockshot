@@ -243,7 +243,12 @@ export class WeaponController {
         .add(cam.position);
     const pellet = w.pellets > 1;
     const dirs: Vec3[] = [];
-    for (let i = 0; i < w.pellets; i++) {
+    // Grenade launcher: the round is drawn from the snapshot as it flies; no tracer here
+    for (let i = 0; i < w.pellets && w.projectile; i++) {
+      const d = spreadDir(base, sp);
+      dirs.push([round(d.x), round(d.y), round(d.z)]);
+    }
+    for (let i = 0; i < w.pellets && !w.projectile; i++) {
       const d = spreadDir(base, sp);
       dirs.push([round(d.x), round(d.y), round(d.z)]);
       const { t, hit } = castShot(o, [d.x, d.y, d.z], this.shooter.colliders, targets, '', w.range);

@@ -5,13 +5,13 @@ import {
   MODE_BY_ID,
   VOTE_OPTIONS,
   canSwitchTeam,
-  getColliders,
   getMap,
   isTeamMode,
   type VoteOption,
 } from '@blockshot/shared';
 import { createMode } from '../modes';
 import type { Player } from '../players/player';
+import { clearAbilities } from '../combat/abilities';
 import { notice, roomInfo, type Room } from '../rooms/room';
 
 const pick = <T>(list: T[]): T => list[Math.floor(Math.random() * list.length)]!;
@@ -19,6 +19,12 @@ const pick = <T>(list: T[]): T => list[Math.floor(Math.random() * list.length)]!
 /** VOTE_OPTIONS map + mode pairs on different maps, none of them the one just played. */
 export function voteOptions(room: Room): VoteOption[] {
   const maps = MAPS.map((m) => m.id).sort(() => Math.random() - 0.5);
+  // A tournament is free for all: only the map is voted (a different one)
+  if (room.tournament)
+    return maps
+      .filter((m) => m !== room.map.id)
+      .slice(0, VOTE_OPTIONS)
+      .map((mapId) => ({ mapId, mode: 'ffa' }));
   return maps.slice(0, VOTE_OPTIONS).map((mapId) => ({
     mapId,
     mode: pick(MODES.map((m) => m.id).filter((mode) => mapId !== room.map.id || mode !== room.modeId)),
@@ -55,7 +61,7 @@ export function voteWinner(room: Room): VoteOption | null {
 /** Moves the room to another map and mode (everybody is dead between matches). */
 export function applyOption(room: Room, opt: VoteOption): void {
   room.map = getMap(opt.mapId, room.map.size);
-  room.colliders = getColliders(room.map);
+  clearAbilities(room); // also resets the colliders to the new map
   room.modeId = opt.mode;
   room.mode = createMode(opt.mode, room);
   room.scoreLimit = MODE_BY_ID[opt.mode].def;

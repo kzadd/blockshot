@@ -93,7 +93,8 @@ describe('combat', () => {
     const { a, b } = await duel('teams');
     await a.idle(200);
     const teamA = a.me()?.tm;
-    b.s.emit('team:set', { team: teamA ?? 0 });
+    // 2 v 0 breaks the balance rule for players: the admin (test sockets are local) moves B anyway
+    a.s.emit('admin:team', { id: b.id });
     await b.until(() => b.me()?.tm === teamA, 3000, 'team switch');
     await Promise.all([a.goTo(...SPOT_A), b.goTo(...SPOT_B)]);
     b.dropProtection();
@@ -102,12 +103,21 @@ describe('combat', () => {
   });
 
   it('enforces the team switch cooldown', async () => {
-    const { a } = await duel('teams');
-    await a.idle(200);
-    const t = a.me()?.tm === 1 ? 2 : 1;
-    a.s.emit('team:set', { team: t });
-    await a.idle(300);
-    a.s.emit('team:set', { team: t === 1 ? 2 : 1 });
-    await a.until(() => a.count('notice', (n: string) => n.startsWith('Espera unos segundos')) > 0, 2000, 'cooldown');
+    const { a, b } = await duel('teams');
+    // A third player (a bot) so one side has two and a switch keeps the teams within one
+    a.s.emit('bot:add', { level: 'easy' });
+    await a.until(() => (a.state?.players.length ?? 0) === 3, 3000, 'bot joined');
+    const red = a.state!.players.filter((p) => p.tm === 1).length;
+    const big = red === 2 ? 1 : 2;
+    const mover = a.me()?.tm === big ? a : b;
+    const t = big === 1 ? 2 : 1;
+    mover.s.emit('team:set', { team: t });
+    await mover.until(() => mover.me()?.tm === t, 3000, 'team switch');
+    mover.s.emit('team:set', { team: big });
+    await mover.until(
+      () => mover.count('notice', (n: string) => n.startsWith('Espera unos segundos')) > 0,
+      2000,
+      'cooldown',
+    );
   });
 });

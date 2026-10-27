@@ -17,6 +17,7 @@ import type { Session } from '../app/App';
 import { sfx } from '../game/audio/sound';
 import { MODE_UI } from '../game/modeUi';
 import Manual from '../manual/Manual';
+import RankingDialog from '../ranking/RankingDialog';
 import { clearGameLost, useConnection } from '../network/connection';
 import { socket } from '../network/socket';
 import Settings from '../settings/SettingsDialog';
@@ -69,6 +70,7 @@ export default function Lobby({ onJoined }: { onJoined: (s: Session) => void }) 
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
   const connected = useConnection((c) => c.status === 'connected');
   const lostGame = useConnection((c) => c.lostGame);
+  const kicked = useConnection((c) => c.kicked);
   const [offline, setOffline] = useState(false); // connection error notice
   const [form, setForm] = useState<RoomForm>({
     name: '',
@@ -84,7 +86,7 @@ export default function Lobby({ onJoined }: { onJoined: (s: Session) => void }) 
   const [pass, setPass] = useState('');
   const [passError, setPassError] = useState('');
   const [toast, setToast] = useState('');
-  const [menu, setMenu] = useState<'settings' | 'manual' | null>(null);
+  const [menu, setMenu] = useState<'settings' | 'manual' | 'ranking' | null>(null);
   const nickRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -202,6 +204,10 @@ export default function Lobby({ onJoined }: { onJoined: (s: Session) => void }) 
               </span>
             )}
           </label>
+          <button className="btn" onClick={() => setMenu('ranking')}>
+            <Icon name="award" size={18} />
+            Ranking
+          </button>
           <button className="btn" onClick={() => setMenu('manual')}>
             <Icon name="book" size={18} />
             Manual
@@ -551,7 +557,18 @@ export default function Lobby({ onJoined }: { onJoined: (s: Session) => void }) 
           </button>
         </div>
       )}
-      {lostGame && connected && !toast && (
+      {kicked && connected && !toast && (
+        <div className="toast" role="alert" onClick={clearGameLost}>
+          <span className="bang">
+            <Icon name="alert" size={18} />
+          </span>
+          <span>
+            <b>{kicked}</b>
+            <small>Toca para cerrar</small>
+          </span>
+        </div>
+      )}
+      {lostGame && connected && !toast && !kicked && (
         <div className="toast" role="alert" onClick={clearGameLost}>
           <span className="bang">
             <Icon name="alert" size={18} />
@@ -576,6 +593,7 @@ export default function Lobby({ onJoined }: { onJoined: (s: Session) => void }) 
 
       {menu === 'settings' && <Settings onClose={() => setMenu(null)} />}
       {menu === 'manual' && <Manual onClose={() => setMenu(null)} />}
+      {menu === 'ranking' && <RankingDialog admin={false} onClose={() => setMenu(null)} />}
     </div>
   );
 }

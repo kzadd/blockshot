@@ -2,6 +2,7 @@
 import {
   BTN_AIM,
   BTN_CROUCH,
+  BTN_DASH,
   BTN_FIRE,
   BTN_JUMP,
   BTN_JUMP_PRESSED,
@@ -61,6 +62,8 @@ export class InputController {
   private jumpPressed = false;
   /** a shot was fired since the last command */
   private shot = false;
+  /** the dash was asked for since the last command */
+  private dash = false;
   private readonly off: (() => void)[] = [];
 
   constructor(
@@ -167,6 +170,10 @@ export class InputController {
     this.shot = true;
   }
 
+  pressDash(): void {
+    this.dash = true;
+  }
+
   private held(...codes: string[]): boolean {
     return this.locked && codes.some((c) => this.keys.has(c));
   }
@@ -185,8 +192,10 @@ export class InputController {
     if (this.aiming) b |= BTN_AIM;
     if (this.mouseDown) b |= BTN_FIRE;
     if (this.shot) b |= BTN_SHOT;
+    if (live && this.dash) b |= BTN_DASH;
     this.jumpPressed = false;
     this.shot = false;
+    this.dash = false;
     return { seq, f, s, yaw: this.yaw, pitch: this.pitch, b, slot };
   }
 

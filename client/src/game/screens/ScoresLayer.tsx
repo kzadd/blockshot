@@ -34,6 +34,9 @@ function useSecondsLeft(match: MatchState | null): number {
   return match ? Math.max(0, Math.ceil((match.at + match.restartIn - now) / MS_PER_S)) : 0;
 }
 
+/** Tournament standings shown on the results screen. */
+const TOUR_ROWS = 8;
+
 // Scoreboard (Tab) and, when the match ends, the winner, your own result and the "best play" cards
 export default function ScoresLayer({ match, you, info, scoreLimit, mode, onLeave, onVote }: Props) {
   const h = useHud((s) => ({ players: s.players, teamScore: s.teamScore }));
@@ -87,6 +90,25 @@ export default function ScoresLayer({ match, you, info, scoreLimit, mode, onLeav
                     </button>
                   ))}
                 </div>
+              </div>
+            )}
+            {match.tour && (
+              <div className="tour">
+                <span className="kicker">
+                  {match.tour.final
+                    ? `🏆 ${match.tour.rows[0]?.name ?? '—'} gana el torneo`
+                    : `Torneo · ronda ${match.tour.round} de ${match.tour.rounds}`}
+                </span>
+                <ol className="tour-table">
+                  {match.tour.rows.slice(0, TOUR_ROWS).map((r, i) => (
+                    <li key={r.name} className={i === 0 ? 'lead' : ''}>
+                      <span className="pos">{i + 1}</span>
+                      <span className="nm">{r.name}</span>
+                      <span className="gain">+{r.gained}</span>
+                      <b className="pts">{r.pts}</b>
+                    </li>
+                  ))}
+                </ol>
               </div>
             )}
             {match.best.length > 0 && (

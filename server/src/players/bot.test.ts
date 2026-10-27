@@ -53,6 +53,8 @@ describe('practice bots', () => {
     addBot(f.registry, f.room, 'hard');
     const bot = [...f.room.players.values()].find(isBot)!;
     run(f, STEP_MS);
+    // A shotgun only fires up close, so it has to climb (a long gun may shoot from the ground)
+    spawnPlayer(f.room, bot, CHAR_BY_ID.tanque, 'base');
     f.place(bot, -(f.room.map.half - 4), 0);
     run(f, 40000);
     // It stops to shoot as soon as it sees the rival, sometimes from the last flight: past the 2nd floor is enough

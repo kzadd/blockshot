@@ -1,5 +1,5 @@
 // Line icons (Lucide paths, 1.75 stroke) used instead of emoji. Inline so no icon package is needed.
-import type { ModeId } from '@blockshot/shared';
+import type { AbilityId, ModeId } from '@blockshot/shared';
 
 const PATHS = {
   wifi: ['M12 20h.01', 'M2 8.82a15 15 0 0 1 20 0', 'M5 12.859a10 10 0 0 1 14 0', 'M8.5 16.429a5 5 0 0 1 7 0'],
@@ -57,6 +57,10 @@ const PATHS = {
     'M6 8a6 6 0 1 0 12 0a6 6 0 1 0-12 0',
   ],
   message: ['M7.9 20A9 9 0 1 0 4 16.1L2 22Z'],
+  cloud: ['M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z'],
+  zap: [
+    'M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z',
+  ],
   bomb: [
     'M2 13a9 9 0 1 0 18 0a9 9 0 1 0-18 0',
     'M14.35 4.65 16.3 2.7a2.41 2.41 0 0 1 3.4 0l1.6 1.6a2.4 2.4 0 0 1 0 3.4l-1.95 1.95',
@@ -93,6 +97,16 @@ const PATHS = {
 };
 
 export type IconName = keyof typeof PATHS;
+
+export const ABILITY_ICON: Record<AbilityId, IconName> = {
+  smoke: 'cloud',
+  mine: 'bomb',
+  shield: 'shield',
+  dash: 'zap',
+  wall: 'layers',
+  radar: 'target',
+  medkit: 'plus',
+};
 
 export const MODE_ICON: Record<ModeId, IconName> = {
   ffa: 'crosshair',

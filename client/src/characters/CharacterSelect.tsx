@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  ABILITIES,
   CHARACTERS,
   CHAR_BY_ID,
   OUTFIT_COLORS,
@@ -21,7 +22,7 @@ import {
 import type { HudPlayer } from '../game/hud/hudState';
 import type { RoomView } from '../game/roomView';
 import { SIDES, teamVar } from '../game/hud/teamStyle';
-import { Icon } from '../ui/icons';
+import { ABILITY_ICON, Icon } from '../ui/icons';
 import CharacterPreview from './CharacterPreview';
 
 /** Bar scales of the character sheet. */
@@ -358,6 +359,16 @@ export default function CharacterSelect({
             </div>
             <WeaponCard id={c.primary} slot="Principal · 1" />
             <WeaponCard id={c.secondary} slot="Secundaria · 2" />
+            <div className="weapon-card ability-card">
+              <div className="wh">
+                <b>
+                  <Icon name={ABILITY_ICON[c.ability]} size={16} />
+                  {ABILITIES[c.ability].name}
+                </b>
+                <small>Habilidad · E · {ABILITIES[c.ability].cooldownMs / 1000} s</small>
+              </div>
+              <p>{ABILITIES[c.ability].desc}</p>
+            </div>
             <button className="btn primary lg play" onClick={() => onPick(sel, skin, color)}>
               Jugar como {c.name}
             </button>

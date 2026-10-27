@@ -31,10 +31,10 @@ const MAP_HASHES: Record<string, string> = {
 const TABLE_HASHES = {
   // Balance pass (2026-10-24, checked with server/src/combat/duel.sim.test.ts): Rayo 8.6 m/s and 90 hp, Tanque 140 hp,
   // slower sniper aim, rifle 105 ms, more falloff on rifle and LMG, longer SMG range
-  WEAPONS: 'd1ba1521e4a96c96',
-  CHARACTERS: 'ee946d556cf3f25f',
+  WEAPONS: '3da8cc1d13ee65f6', // + marksman rifle and grenade launcher; sniper scopes in slower, rifle blooms more
+  CHARACTERS: 'c8d0180a23c4abaf', // abilities (key E) + Explorador and Artillero
   MODES: '7b0e3729e18e0ee7', // two new modes: Dominio and Rondas
-  PLAYER: '0bf57b8a7e2429af',
+  PLAYER: 'd72f2e246c7216f2', // stamina back on (sprint and slides spend it)
   MAPS: '64018304e6c9b34c', // sixth map: Obra
   MAP_SIZES: '0cd287561039dcb2',
   SKINS: '9808ff7d018a973e', // creatures: Humano, Alien, Mapache, Robot, Oso, Astronauta, Zombi, Rana, Gato, Calabaza

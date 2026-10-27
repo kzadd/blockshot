@@ -10,6 +10,15 @@ const LAND_DIP_MAX = 0.3;
 const LAND_DIP_PER_MS = 0.014;
 const SPRINT_FOLLOW = 10;
 const FOV_FOLLOW = 18;
+/** Scope sway (rad): moving or just after moving, and standing still; how fast it grows / settles (1/s). */
+const SWAY_MOVING = 0.014;
+const SWAY_STILL = 0.0016;
+const SWAY_MOVING_SPEED = 0.6;
+const SWAY_RISE = 6;
+const SWAY_SETTLE = 1.4;
+const SWAY_FREQ_X = 1.3;
+const SWAY_FREQ_Y = 2.1;
+const SWAY_Y_SHARE = 0.7;
 const SLIDE_FOV = 6;
 const SPRINT_FOV = 5;
 /** Sprinting only shows (FOV, lowered gun) above this speed. */
@@ -43,6 +52,9 @@ export class CameraRig {
   sprintLerp = 0;
   private eye = PLAYER.eye;
   private landDip = 0;
+  /** scope sway: current amplitude (rad) and its own clock (s) */
+  private sway = 0;
+  private swayT = 0;
   private readonly tmp = new THREE.Vector3();
 
   constructor(fov: number, aspect: number, far: number) {
@@ -67,7 +79,13 @@ export class CameraRig {
     this.eye += ((f.low ? PLAYER.slideEye : PLAYER.eye) - this.eye) * damp(EYE_FOLLOW, dt);
     this.landDip *= Math.exp(-LAND_DIP_RECOVER * dt);
     cam.position.set(f.position.x, f.position.y + this.eye - this.landDip, f.position.z);
-    cam.rotation.set(f.pitch, f.yaw, 0);
+    // Through a scope the view drifts: a lot right after moving, a breath when still. Shots follow the camera
+    const want = f.weapon.scope && f.scoped ? (f.speed > SWAY_MOVING_SPEED ? SWAY_MOVING : SWAY_STILL) : 0;
+    this.sway += (want - this.sway) * damp(want > this.sway ? SWAY_RISE : SWAY_SETTLE, dt);
+    this.swayT += dt;
+    const sy = Math.sin(this.swayT * SWAY_FREQ_X) * this.sway;
+    const sp = Math.sin(this.swayT * SWAY_FREQ_Y + 1) * this.sway * SWAY_Y_SHARE;
+    cam.rotation.set(f.pitch + sp, f.yaw + sy, 0);
     const running = f.sprinting && f.speed > SPRINT_MIN_SPEED;
     this.sprintLerp += ((running ? 1 : 0) - this.sprintLerp) * damp(SPRINT_FOLLOW, dt);
     const zoomT = f.weapon.scope ? (f.scoped ? 1 : 0) : f.aimLerp;

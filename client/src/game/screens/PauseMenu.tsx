@@ -1,7 +1,5 @@
-import { useState } from 'react';
-import { BOT_LEVELS, canSwitchTeam, teamName, type BotLevel, type ModeId, type SideTeam } from '@blockshot/shared';
+import { canSwitchTeam, teamName, type ModeId, type SideTeam } from '@blockshot/shared';
 import { Icon } from '../../ui/icons';
-import { socket } from '../../network/socket';
 import { Keys } from '../../ui/ui';
 import { useHud } from '../hud/hudStore';
 
@@ -13,7 +11,8 @@ const PAUSE_KEYS: [string[], string][] = [
   [['Clic izq.'], 'Disparar'],
   [['Clic der.'], 'Apuntar'],
   [['R'], 'Recargar'],
-  [['G'], 'Granada (una por vida)'],
+  [['G'], 'Granada: mantén para ver dónde cae, suelta para lanzar'],
+  [['E'], 'Habilidad del personaje'],
   [['1', '2', '3', 'Q'], 'Cambiar de arma (3: cuchillo)'],
   [['Tab'], 'Marcador'],
   [['V'], 'Chat rápido'],
@@ -27,9 +26,11 @@ interface Props {
   onManual: () => void;
   onSwitchTeam: (team: SideTeam) => void;
   onLeave: () => void;
-  /** server PC only: practice bot tools */
+  /** server PC only: the admin panel (bots, players, room) */
   admin: boolean;
-  onStats: () => void;
+  onAdmin: () => void;
+  onRanking: () => void;
+  onTour: () => void;
 }
 
 export default function PauseMenu({
@@ -40,11 +41,12 @@ export default function PauseMenu({
   onSwitchTeam,
   onLeave,
   admin,
-  onStats,
+  onAdmin,
+  onRanking,
+  onTour,
 }: Props) {
   const myTeam = useHud((s) => s.myTeam) ?? 0;
   const other: SideTeam = myTeam === 1 ? 2 : 1;
-  const [level, setLevel] = useState<BotLevel>('normal');
   return (
     <div className="pause-bg" onClick={onResume}>
       <div className="stage">
@@ -68,6 +70,14 @@ export default function PauseMenu({
             <button className="btn has-key" onClick={onManual}>
               <span className="key">H</span>Manual
             </button>
+            <button className="btn" onClick={onRanking}>
+              <Icon name="award" />
+              Ranking
+            </button>
+            <button className="btn" onClick={onTour}>
+              <Icon name="award" />
+              Torneo
+            </button>
             {canSwitchTeam(mode) && myTeam !== 0 && (
               <button className="btn has-key" onClick={() => onSwitchTeam(other)}>
                 <span className="key">T</span>Pasar a {teamName(mode, other)}
@@ -84,30 +94,9 @@ export default function PauseMenu({
                 <Icon name="lock" />
                 Solo servidor
               </span>
-              <div className="seg sm" role="radiogroup" aria-label="Nivel del bot">
-                {(Object.keys(BOT_LEVELS) as BotLevel[]).map((l) => (
-                  <button
-                    key={l}
-                    role="radio"
-                    aria-checked={level === l}
-                    className={level === l ? 'on' : ''}
-                    onClick={() => setLevel(l)}
-                  >
-                    {BOT_LEVELS[l].name}
-                  </button>
-                ))}
-              </div>
-              <button className="btn sm" onClick={() => socket.emit('bot:add', { level })}>
-                <Icon name="bot" />
-                Añadir bot
-              </button>
-              <button className="btn sm ghost" onClick={() => socket.emit('bot:clear')}>
-                <Icon name="x" />
-                Quitar bots
-              </button>
-              <button className="btn sm ghost" onClick={onStats}>
-                <Icon name="chart" />
-                Estadísticas
+              <button className="btn sm" onClick={onAdmin}>
+                <Icon name="shield" />
+                Panel de admin <span className="key">P</span>
               </button>
             </div>
           )}

@@ -67,6 +67,8 @@ export function spawnPlayer(room: Room, p: Player, ch: Character, skin: string |
     lastSeq: -1, // a new client engine (new map after a vote) numbers its commands from 0 again
     simBudget: 0,
     life: p.life + 1,
+    abilityAt: 0, // every life starts with the ability ready
+    shieldUntil: 0,
   });
   p.picks[ch.id] = (p.picks[ch.id] ?? 0) + 1;
   p.grenades = grenadesFor(room.modeId, p.team);

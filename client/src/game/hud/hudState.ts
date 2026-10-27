@@ -1,4 +1,5 @@
 import type {
+  AbilityId,
   CharacterId,
   DomSnapshot,
   FlagSnapshot,
@@ -8,6 +9,7 @@ import type {
   RoundSnapshot,
   SideTeam,
   Team,
+  WeaponId,
 } from '@blockshot/shared';
 
 /** Screen angle (radians, 0 = ahead, positive = right) of something around the player. */
@@ -51,6 +53,20 @@ export interface HudState {
   stamina: number | null;
   staminaLow: boolean;
   sprinting: boolean;
+  /** 0..1 speed lines at the screen edges (slides and chained hops) */
+  speedFx: number;
+  /** the character's ability (key E) and ms until it is ready */
+  ability: { id: AbilityId; left: number } | null;
+  /** ms left of our shield (Tanque), 0 when down */
+  shield: number;
+  /** the shield just stopped a bullet */
+  shieldHit: boolean;
+  /** fully aimed: the weapon whose sight the HUD draws (the 3D gun steps aside) */
+  adsSight: WeaponId | null;
+  /** 0..1: we are inside a smoke cloud */
+  smoke: number;
+  /** G held: aiming the grenade */
+  grenadeAim: boolean;
   armor: number;
   radar: boolean;
   infect: InfectSnapshot | null;

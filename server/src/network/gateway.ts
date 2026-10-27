@@ -3,6 +3,11 @@
 import type { Server, Socket } from 'socket.io';
 import {
   CHAR_BY_ID,
+  AbilitySchema,
+  AdminLockSchema,
+  AdminRoomSchema,
+  AdminTargetSchema,
+  TournamentSchema,
   BotAddSchema,
   COMBAT_LOCK_MS,
   DIRECTION_LENGTH_TOLERANCE,
@@ -27,23 +32,29 @@ import {
   canSwitchTeam,
   clamp,
   isCharacterId,
+  isMapId,
+  isModeId,
   teamName,
   v,
   type ClientToServerEvents,
   type ServerToClientEvents,
 } from '@blockshot/shared';
+import { useAbility } from '../combat/abilities';
 import { throwGrenade } from '../combat/grenades';
 import { handleReload, handleShoot, handleSwitch, validOrigin } from '../combat/shooting';
 import type { Logger } from '../logger';
+import { adminChangeRoom, adminEnd, adminKill, adminRestart, adminSwitchTeam } from '../match/admin';
+import { startTournament, stopTournament } from '../match/tournament';
 import { castVote } from '../match/vote';
 import { addBot, removeBots } from '../players/bot';
 import { queueInputs } from '../players/movement';
 import type { Player } from '../players/player';
-import { isTeamRoom } from '../players/teams';
+import { canJoinTeam, isTeamRoom } from '../players/teams';
 import { spawnPlayer } from '../players/spawn';
 import { cleanNickname, type RoomRegistry } from '../rooms/registry';
+import { rankingRows, resetRanking } from '../stats/ranking';
 import { sessionStats } from '../stats/sessionStats';
-import { notice, type Room } from '../rooms/room';
+import { notice, roomInfo, type Room } from '../rooms/room';
 import { MESSAGE_LIMITS, RateLimiter, type MessageCategory } from './rateLimiter';
 
 export const LOBBY_CHANNEL = 'lobby';
@@ -155,7 +166,7 @@ export function attachGateway(io: GameServer, rooms: RoomRegistry, log: Logger):
     on('room:join', 'lobby', JoinRoomSchema, (data, cb) => {
       if (!cb) return;
       const room = rooms.get(data.roomId);
-      const error = rooms.canJoin(room, data.password);
+      const error = rooms.canJoin(room, data.password, cleanNickname(data.nickname));
       if (error || !room) return (cb as (r: unknown) => void)({ ok: false, error });
       if (room.id === socket.data.roomId)
         return (cb as (r: unknown) => void)({ ok: false, error: 'Ya estás en esta sala.' });
@@ -196,6 +207,12 @@ export function attachGateway(io: GameServer, rooms: RoomRegistry, log: Logger):
       if (p.alive && now - p.lastDamage < COMBAT_LOCK_MS) {
         return socket.emit('notice', 'No puedes cambiar de equipo en pleno combate.');
       }
+      if (!canJoinTeam(room, p, team)) {
+        return socket.emit(
+          'notice',
+          `${teamName(room.modeId, team)} ya tiene más jugadores: los equipos se mantienen equilibrados.`,
+        );
+      }
       p.team = team;
       p.teamAt = now;
       p.streak = 0;
@@ -225,6 +242,14 @@ export function attachGateway(io: GameServer, rooms: RoomRegistry, log: Logger):
       const len = Math.hypot(...d.d);
       if (Math.abs(len - 1) > DIRECTION_LENGTH_TOLERANCE) return;
       throwGrenade(c.room, c.p, d.o, [d.d[0] / len, d.d[1] / len, d.d[2] / len], Date.now());
+    });
+
+    on('player:ability', 'combat', AbilitySchema, (d) => {
+      const c = ctx();
+      if (!c?.p.alive || !validOrigin(c.room, c.p, d.o)) return;
+      const len = Math.hypot(...d.d);
+      if (Math.abs(len - 1) > DIRECTION_LENGTH_TOLERANCE) return;
+      useAbility(c.room, c.p, d.o, [d.d[0] / len, d.d[1] / len, d.d[2] / len], Date.now());
     });
 
     on('player:shoot', 'combat', ShootSchema, (d) => {
@@ -263,6 +288,79 @@ export function attachGateway(io: GameServer, rooms: RoomRegistry, log: Logger):
 
     on('admin:stats', 'lobby', EmptySchema, (_d, cb) => {
       if (admin && cb) (cb as (rows: unknown) => void)(sessionStats(rooms.all()));
+    });
+
+    on('ranking:get', 'lobby', EmptySchema, (_d, cb) => cb && (cb as (rows: unknown) => void)(rankingRows()));
+
+    // Room control (server PC only). The target must be in the admin's own room
+    const target = (id: string) => {
+      const c = ctx();
+      const p = c?.room.players.get(id);
+      return admin && c && p ? { room: c.room, p } : null;
+    };
+    on('admin:kick', 'lobby', AdminTargetSchema, (d) => {
+      const t = target(d.id);
+      if (!t || t.p.id === socket.id) return;
+      const { room, p } = t;
+      const s = io.sockets.sockets.get(p.id);
+      if (s) {
+        room.banned.add(p.name);
+        s.leave(room.id);
+        s.join(LOBBY_CHANNEL);
+        s.data.roomId = null;
+        s.emit('kicked', 'El admin te ha sacado de la sala.');
+      }
+      rooms.removePlayer(room, p.id); // a bot just goes
+      log.info({ room: room.id, name: p.name }, 'player kicked');
+    });
+    on('admin:kill', 'combat', AdminTargetSchema, (d) => {
+      const t = target(d.id);
+      if (t) adminKill(t.room, t.p);
+    });
+    on('admin:team', 'misc', AdminTargetSchema, (d) => {
+      const t = target(d.id);
+      if (t) adminSwitchTeam(t.room, t.p);
+    });
+    on('admin:restart', 'lobby', EmptySchema, () => {
+      const c = ctx();
+      if (!admin || !c) return;
+      adminRestart(c.room);
+      notice(c.room, 'El admin reinició la partida');
+    });
+    on('admin:end', 'lobby', EmptySchema, () => {
+      const c = ctx();
+      if (admin && c) adminEnd(c.room);
+    });
+    on('admin:room', 'lobby', AdminRoomSchema, (d) => {
+      const c = ctx();
+      if (!admin || !c || !isMapId(d.mapId) || !isModeId(d.mode)) return;
+      adminChangeRoom(c.room, { mapId: d.mapId, mode: d.mode });
+    });
+    on('admin:lock', 'lobby', AdminLockSchema, (d) => {
+      const c = ctx();
+      if (!admin || !c) return;
+      c.room.closed = d.locked;
+      c.room.channel.broadcast('room:changed', [roomInfo(c.room)]);
+      notice(c.room, d.locked ? 'El admin cerró la sala: no entra nadie más' : 'El admin abrió la sala');
+    });
+    // Anyone in the room can start a league; only its creator or the admin can stop it
+    on('tournament:set', 'lobby', TournamentSchema, (d) => {
+      const c = ctx();
+      if (!c) return;
+      const t = c.room.tournament;
+      if (!d.rounds) {
+        if (t && (admin || t.by === c.p.id)) stopTournament(c.room);
+        return;
+      }
+      if (t) return;
+      startTournament(c.room, d.rounds, c.p.id);
+      adminChangeRoom(c.room, { mapId: c.room.map.id, mode: 'ffa' }); // round 1 starts now, free for all
+    });
+
+    on('admin:ranking:reset', 'lobby', EmptySchema, () => {
+      if (!admin) return;
+      resetRanking();
+      socket.emit('notice', 'Ranking reiniciado: la temporada anterior quedó guardada en data/.');
     });
 
     socket.on('disconnect', (reason) => {

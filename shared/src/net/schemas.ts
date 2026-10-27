@@ -4,6 +4,7 @@ import * as v from 'valibot';
 import { OUTFIT_COLOR_HEXES } from '../characters/characters';
 import { VOTE_OPTIONS } from '../modes/modes';
 import { QUICK_CHAT } from '../modes/quickChat';
+import { TOUR_ROUNDS } from '../modes/tournament';
 
 const finite = v.pipe(v.number(), v.finite());
 const vec3 = v.tuple([finite, finite, finite]);
@@ -41,6 +42,13 @@ export const SpawnSchema = v.object({
 
 export const TeamSetSchema = v.object({ team: finite });
 
+/** Server PC only: the player an admin action is about (a socket id). */
+export const AdminTargetSchema = v.object({ id: text });
+/** Server PC only: move the room to this map and mode now (checked by the server). */
+export const AdminRoomSchema = v.object({ mapId: text, mode: text });
+export const AdminLockSchema = v.object({ locked: v.boolean() });
+export const TournamentSchema = v.object({ rounds: v.picklist([0, ...TOUR_ROUNDS]) });
+
 const int = v.pipe(v.number(), v.integer());
 /** At most this many commands per batch (0.5 s worth): more means a flooding or broken client. */
 export const MAX_INPUTS_PER_MESSAGE = 30;
@@ -68,6 +76,8 @@ export const ShootSchema = v.object({
 });
 
 export const GrenadeSchema = v.object({ o: vec3, d: vec3 });
+/** key E: eye and look direction (where the smoke is thrown / the wall goes) */
+export const AbilitySchema = GrenadeSchema;
 
 export const BotAddSchema = v.optional(v.object({ level: v.optional(v.picklist(['easy', 'normal', 'hard'])) }));
 

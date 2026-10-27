@@ -21,6 +21,8 @@ import { weaponIdOf, weaponOf } from '../players/loadout';
 import type { Player } from '../players/player';
 import { sameTeam } from '../players/teams';
 import type { Room } from '../rooms/room';
+import { shieldBlocks } from './abilities';
+import { launchRound } from './grenades';
 import { applyDamage } from './damage';
 import { behaviorOf } from './weaponBehavior';
 
@@ -87,6 +89,14 @@ export function handleShoot(room: Room, p: Player, msg: ShootInput): void {
   p.lastShot[p.slot] = now;
   p.protUntil = 0; // shooting removes spawn protection
 
+  // Grenade launcher: the round flies (grenades.ts) and does the damage when it blows up
+  if (w.projectile) {
+    p.shots++;
+    launchRound(room, p, o, dirs[0]!, now);
+    room.channel.broadcast('shot', [{ id: p.id, w: weaponIdOf(p), e: [] }], p.id);
+    return;
+  }
+
   // Lag compensation: rivals are placed where the shooter saw them when firing
   const past = now - clamp(msg.lag ?? 0, 0, LAG_COMP_MAX_MS);
   const targets: HitTarget[] = [...room.players.values()]
@@ -109,6 +119,11 @@ export function handleShoot(room: Room, p: Player, msg: ShootInput): void {
   room.channel.broadcast('shot', [{ id: p.id, w: weaponIdOf(p), e: ends }], p.id);
   for (const [id, { dmg, head, at }] of damage) {
     const victim = room.players.get(id);
+    // Tanque's shield stops what comes from the front
+    if (victim && shieldBlocks(victim, o, now)) {
+      room.channel.broadcast('shield:hit', [{ id: victim.id, at: [round2(at[0]), round2(at[1]), round2(at[2])] }]);
+      continue;
+    }
     if (victim) applyDamage(room, p, victim, behavior.damage(w, p, victim, dmg), head, w, at);
   }
 }

@@ -21,6 +21,10 @@ const PRESETS: Record<WeaponId, ShotPreset> = {
   pistol: { f: 2800, dur: 0.1, thump: 180, v: 0.8 },
   revolver: { f: 1700, dur: 0.22, thump: 90, v: 1.1 },
   knife: { f: 5200, dur: 0.12, thump: 40, v: 0.35 }, // the whoosh of the slash
+  dmr: { f: 2000, dur: 0.24, thump: 95, v: 1.05 },
+  launcher: { f: 700, dur: 0.32, thump: 55, v: 1.1 }, // the hollow "bloop" of the tube
+  mpistol: { f: 3500, dur: 0.07, thump: 190, v: 0.65 },
+  sawedoff: { f: 1100, dur: 0.34, thump: 65, v: 1.3 },
 };
 
 const MASTER_GAIN = 0.45;

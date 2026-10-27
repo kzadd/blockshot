@@ -19,7 +19,7 @@ import {
 import type { Session } from '../app/App';
 import type { ColorChoice, SkinChoice } from '../characters/CharacterSelect';
 import Manual from '../manual/Manual';
-import { markGameLost } from '../network/connection';
+import { markGameLost, markKicked } from '../network/connection';
 import { socket } from '../network/socket';
 import Settings from '../settings/SettingsDialog';
 import { useSettings } from '../settings/settingsStore';
@@ -33,7 +33,10 @@ import type { RoomView } from './roomView';
 import CharacterScreen from './screens/CharacterScreen';
 import DeathScreen, { type LastDeath } from './screens/DeathScreen';
 import PauseMenu from './screens/PauseMenu';
+import AdminDialog from './screens/AdminDialog';
 import StatsDialog from './screens/StatsDialog';
+import RankingDialog from '../ranking/RankingDialog';
+import TournamentDialog from './screens/TournamentDialog';
 import ScoresLayer, { type MatchState } from './screens/ScoresLayer';
 
 let feedId = 0;
@@ -69,7 +72,7 @@ const loadSkins = (): SkinChoice =>
   Object.fromEntries(Object.entries(loadChoice<SkinChoice>(SKINS_KEY)).filter(([, s]) => isSkinId(s)));
 const loadColors = () => loadChoice<ColorChoice>(COLORS_KEY);
 
-type Menu = 'settings' | 'manual' | 'stats' | null;
+type Menu = 'settings' | 'manual' | 'stats' | 'admin' | 'ranking' | 'tour' | null;
 type NewFeedItem = FeedItem extends infer F ? (F extends FeedItem ? Omit<F, 'key' | 't'> : never) : never;
 
 interface GameProps {
@@ -218,6 +221,10 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
       markGameLost();
       onLeave();
     };
+    const onKicked = (reason: string) => {
+      markKicked(reason);
+      onLeave();
+    };
     socket.on('kill', onKill);
     socket.on('notice', onNotice);
     socket.on('chat', onChat);
@@ -226,6 +233,7 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
     socket.on('match:end', onEnd);
     socket.on('match:start', onStart);
     socket.on('disconnect', onDisc);
+    socket.on('kicked', onKicked);
     // Each killfeed line lasts 6 s (it fades during the last 300 ms)
     // Only a new state when a line starts fading or goes away (no re-render otherwise)
     const prune = setInterval(() => {
@@ -260,8 +268,15 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
         engine.current?.requestLock();
         return;
       }
-      // O: settings · H or F1: manual
-      const want: Menu = e.code === 'KeyO' ? 'settings' : e.code === 'KeyH' || e.code === 'F1' ? 'manual' : null;
+      // O: settings · H or F1: manual · P: admin panel (server PC only)
+      const want: Menu =
+        e.code === 'KeyO'
+          ? 'settings'
+          : e.code === 'KeyH' || e.code === 'F1'
+            ? 'manual'
+            : e.code === 'KeyP' && session.admin
+              ? 'admin'
+              : null;
       if (want && !e.repeat) {
         e.preventDefault();
         setMenu((cur) => (cur === want ? null : want));
@@ -290,12 +305,13 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
       socket.off('match:end', onEnd);
       socket.off('match:start', onStart);
       socket.off('disconnect', onDisc);
+      socket.off('kicked', onKicked);
       clearInterval(prune);
       clearTimeout(bannerTimer);
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
     };
-  }, [onLeave, onRoom, you, room.mode]);
+  }, [onLeave, onRoom, you, room.mode, session.admin]);
 
   const pick = (characterId: CharacterId, skin: SkinId, color: string) => {
     const next = { ...skins, [characterId]: skin };
@@ -400,7 +416,9 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
           onSwitchTeam={switchTeam}
           onLeave={leave}
           admin={!!session.admin}
-          onStats={() => setMenu('stats')}
+          onAdmin={() => setMenu('admin')}
+          onRanking={() => setMenu('ranking')}
+          onTour={() => setMenu('tour')}
         />
       )}
 
@@ -418,7 +436,14 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
 
       {menu === 'settings' && <Settings onClose={() => setMenu(null)} />}
       {menu === 'stats' && <StatsDialog onClose={() => setMenu(null)} />}
+      {menu === 'admin' && (
+        <AdminDialog room={room} you={you} onStats={() => setMenu('stats')} onClose={() => setMenu(null)} />
+      )}
+      {menu === 'ranking' && <RankingDialog admin={!!session.admin} onClose={() => setMenu(null)} />}
       {menu === 'manual' && <Manual onClose={() => setMenu(null)} />}
+      {menu === 'tour' && (
+        <TournamentDialog room={room} you={you} admin={!!session.admin} onClose={() => setMenu(null)} />
+      )}
     </div>
   );
 }

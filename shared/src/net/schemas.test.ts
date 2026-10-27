@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { OUTFIT_COLORS, SKINS, isCharacterId, isOutfitColor, isSkinId } from '../characters/characters';
+import { CHARACTERS, OUTFIT_COLORS, SKINS, isCharacterId, isOutfitColor, isSkinId } from '../characters/characters';
 import { isMapId, isSizeId } from '../maps/maps';
 import { isModeId } from '../modes/modes';
 import { CreateRoomSchema, InputSchema, MAX_INPUTS_PER_MESSAGE, ShootSchema, SpawnSchema, v } from './schemas';
@@ -36,6 +36,10 @@ describe('message schemas', () => {
     expect(ok(SpawnSchema, { characterId: 'rayo', color: 0x3f7fe0 })).toBe(false);
     expect(ok(SpawnSchema, { characterId: 'rayo', color: 'red' })).toBe(false);
   });
+
+  it('every character can spawn in its own colour (the client sends it when nothing else was picked)', () => {
+    for (const c of CHARACTERS) expect(ok(SpawnSchema, { characterId: c.id, color: c.color }), c.name).toBe(true);
+  });
 });
 
 describe('cosmetics', () => {
@@ -47,9 +51,9 @@ describe('cosmetics', () => {
     expect(isSkinId('rgb')).toBe(false);
   });
 
-  it('offers eight distinct outfit colours as #rrggbb', () => {
-    expect(OUTFIT_COLORS).toHaveLength(8);
-    expect(new Set(OUTFIT_COLORS.map((c) => c.hex)).size).toBe(8);
+  it('offers nine distinct outfit colours as #rrggbb', () => {
+    expect(OUTFIT_COLORS).toHaveLength(9);
+    expect(new Set(OUTFIT_COLORS.map((c) => c.hex)).size).toBe(9);
     for (const c of OUTFIT_COLORS) expect(c.hex).toMatch(/^#[0-9a-f]{6}$/);
     expect(isOutfitColor('#3f7fe0')).toBe(true);
     expect(isOutfitColor('#000000')).toBe(false);

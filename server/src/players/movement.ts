@@ -1,6 +1,7 @@
 // Authoritative movement: clients send input commands, the server simulates them with the shared
 // movement code at a fixed rate and tells each client where it really is (ack).
 import {
+  BTN_AIM,
   CHAR_BY_ID,
   FIXED_DT,
   MAX_QUEUED_INPUTS,
@@ -39,6 +40,7 @@ function stepPlayer(room: Room, p: Player, input: MoveInput): void {
     walk,
     adsMove: w?.adsMove ?? 1,
     fallback: spawn ? [spawn[0], spawn[1], spawn[2]] : [0, 0, 0],
+    dash: CHAR_BY_ID[p.characterId].ability === 'dash',
   });
   const m = p.move;
   p.x = m.x;
@@ -49,6 +51,7 @@ function stepPlayer(room: Room, p: Player, input: MoveInput): void {
   p.sl = m.sliding ? 1 : 0;
   p.cr = m.crouching && !m.sliding ? 1 : 0;
   p.lastSeq = input.seq;
+  p.aiming = (input.b & BTN_AIM) !== 0;
 }
 
 /**

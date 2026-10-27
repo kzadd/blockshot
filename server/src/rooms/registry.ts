@@ -107,6 +107,10 @@ export class RoomRegistry {
       channel: this.channelFor(id),
       vote: null,
       grenades: [],
+      deployables: [],
+      closed: false,
+      banned: new Set(),
+      tournament: null,
       lobbyChanged: () => this.events.changed(),
     };
     room.mode = createMode(modeId, room);
@@ -115,8 +119,10 @@ export class RoomRegistry {
   }
 
   /** Checks the room can be joined; returns an error message for the client otherwise. */
-  canJoin(room: Room | undefined, password: string | undefined): string | null {
+  canJoin(room: Room | undefined, password: string | undefined, nickname = ''): string | null {
     if (!room) return 'La sala ya no existe.';
+    if (room.banned.has(nickname)) return 'El admin te ha expulsado de esta sala.';
+    if (room.closed) return 'El admin ha cerrado la sala: espera a que la abra.';
     if (room.players.size >= room.max) return 'La sala está llena.';
     if (room.passHash && hash(String(password ?? '')) !== room.passHash) return 'Contraseña incorrecta.';
     return null;

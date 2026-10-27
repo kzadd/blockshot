@@ -27,7 +27,7 @@ export const PLAYER = {
   /** sprint multiplier (Shift) */
   sprint: 1.3,
   /** stamina (false = like Krunker: unlimited sprint and slide) */
-  useStamina: false,
+  useStamina: true,
   stamina: 100,
   /** per second while sprinting (about 6.5 s in a row) */
   staminaDrain: 15,

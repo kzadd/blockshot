@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import type { CharacterId, SkinId, WeaponId } from '@blockshot/shared';
+import { FX, fxFrame } from './fxAtlas';
+import { handAt, type Grip } from './hands';
+import type { CamoId, CharacterId, SkinId, WeaponId } from '@blockshot/shared';
 
 /** Guns whose muzzle is further than this (m) are held with the left hand on the handguard. */
 const LONG_GUN_MUZZLE_Z = -0.4;
@@ -14,14 +16,13 @@ function boxGeo(w: number, h: number, d: number): THREE.BoxGeometry {
 }
 
 // ------------------------------------------------------------ Skins
-// Each skin dresses the character. `color` is the outfit colour (class, team or the player's pick):
-// the classic skin wears it on the whole uniform, the patterned ones keep it on the accent details
-// (arm bands, patches, stripes) so the player stays recognisable whatever the skin.
-const shade = (hex: string, k: number): string => '#' + new THREE.Color(hex).multiplyScalar(k).getHexString();
+// The skin is the face; the camouflage dresses the uniform. `color` is the outfit colour (class, team or
+// the player's pick): the plain uniform wears it all over, a camouflage keeps it on the accent details
+// (arm bands, patches, stripes) so the player stays recognisable whatever the look.
 const mix = (a: string, b: string, t: number): string =>
   '#' + new THREE.Color(a).lerp(new THREE.Color(b), t).getHexString();
 
-type Pattern = 'blotch' | 'digital' | 'weave';
+export type Pattern = 'blotch' | 'digital' | 'weave' | 'stripe';
 const TEX_SIZE = 32;
 
 function patternTexture(colors: string[], pattern: Pattern): THREE.CanvasTexture {
@@ -45,6 +46,13 @@ function patternTexture(colors: string[], pattern: Pattern): THREE.CanvasTexture
       g.fillStyle = pick(i);
       const s = 2 + 2 * Math.floor(rnd() * 2);
       g.fillRect(Math.floor(rnd() * 16) * 2, Math.floor(rnd() * 16) * 2, s, s);
+    }
+  } else if (pattern === 'stripe') {
+    // Tiger stripes: long thin diagonal-ish bars
+    for (let i = 0; i < 22; i++) {
+      g.fillStyle = pick(i);
+      const y = Math.floor(rnd() * 32);
+      g.fillRect(Math.floor(rnd() * 24), y, 6 + Math.floor(rnd() * 10), 1 + Math.floor(rnd() * 2));
     }
   } else {
     for (let i = 0; i < 46; i++) {
@@ -84,8 +92,13 @@ const GLOVE_DARK = '#2a2c30';
 const METAL = '#5d636b';
 const VISOR_DARK = '#1b2a4a';
 
-function skinPalette(color: string, skin: string): SkinColors {
+function skinPalette(color: string, skin: string, camo: CamoId = 'liso'): SkinColors {
   const common = { accent: color, boot: BOOT_DARK, glove: GLOVE_DARK, metal: METAL, visor: VISOR_DARK };
+  // A camouflage dresses the uniform whatever the face; the robot keeps its glowing visor
+  if (camo !== 'liso') {
+    const p = camoPalette(color, camo, common);
+    return skin === 'robot' ? { ...p, visor: color, glow: Math.max(p.glow ?? 0, 1.4) } : p;
+  }
   switch (skin) {
     // Creatures wear the classic uniform; the robot's visor glows in the outfit colour, the astronaut's is gold
     case 'robot':
@@ -102,18 +115,26 @@ function skinPalette(color: string, skin: string): SkinColors {
         glove: '#dfe4ea',
         visor: '#d9a53a',
       };
-    // TODO(review): posible código muerto: the pattern skins below (camo … neon) are no longer in SKINS
-
-    case 'camo':
+    default:
       return {
         ...common,
-        main: '#ffffff',
-        pants: '#4a5638',
-        camo: { colors: ['#5b6b3a', shade(color, 0.75), '#3d4a2a', '#8c8a5a'], pattern: 'blotch' },
-        vest: '#4a5236',
-        gear: '#2f3526',
-        glove: '#3b4130',
+        main: color,
+        // Coloured shirt and sleeves, neutral tinted pants and a darker vest: readable but not a onesie
+        pants: mix(color, '#3b4048', 0.62),
+        vest: mix(color, '#262a30', 0.7),
+        gear: GEAR_DARK,
+        accent: mix(color, '#ffffff', 0.25),
       };
+  }
+}
+
+/** Uniform printed with a camouflage; the outfit colour stays on the accents (bands, patches, stripes). */
+function camoPalette(
+  color: string,
+  camo: Exclude<CamoId, 'liso'>,
+  common: Pick<SkinColors, 'accent' | 'boot' | 'glove' | 'metal' | 'visor'>,
+): SkinColors {
+  switch (camo) {
     case 'noche':
       return {
         ...common,
@@ -141,18 +162,6 @@ function skinPalette(color: string, skin: string): SkinColors {
         boot: '#e3e8ee',
         glove: '#9aa7b5',
         visor: '#2d4a70',
-      };
-    case 'oro':
-      return {
-        ...common,
-        main: '#e8b923',
-        pants: '#9c6f12',
-        vest: '#f0c440',
-        gear: '#5a3f0a',
-        boot: '#3a2a08',
-        glove: '#7a5610',
-        metal: '#f5d27a',
-        shiny: true,
       };
     case 'urbano':
       return {
@@ -210,17 +219,43 @@ function skinPalette(color: string, skin: string): SkinColors {
         visor: color,
         glow: 1.6,
       };
-    default:
+    case 'digital':
       return {
         ...common,
-        main: color,
-        // Coloured shirt and sleeves, neutral tinted pants and a darker vest: readable but not a onesie
-        pants: mix(color, '#3b4048', 0.62),
-        vest: mix(color, '#262a30', 0.7),
-        gear: GEAR_DARK,
-        accent: mix(color, '#ffffff', 0.25),
+        main: '#ffffff',
+        pants: '#ffffff',
+        camo: { colors: ['#5d6b45', '#3e4a2e', '#7d8a5c', '#2b3322'], pattern: 'digital' },
+        vest: '#465236',
+        gear: '#2a3122',
+        glove: '#343b2a',
+      };
+    case 'tigre':
+      return {
+        ...common,
+        main: '#ffffff',
+        pants: '#ffffff',
+        camo: { colors: ['#6f7a4a', '#232a1a', '#4c5a32', '#8a8a5a'], pattern: 'stripe' },
+        vest: '#3e4a2c',
+        gear: '#22281a',
+        boot: '#26261e',
       };
   }
+}
+
+/** Texture of a pattern (also printed on guns with the matching finish). */
+export function patternMap(colors: string[], pattern: Pattern): THREE.CanvasTexture {
+  return patternTexture(colors, pattern);
+}
+/** The uniform's camouflage as a texture, for guns painted to match (bosque when the uniform is plain). */
+export function camoMap(color: string, camo: CamoId): THREE.CanvasTexture {
+  const p = camoPalette(color, camo === 'liso' ? 'bosque' : camo, {
+    accent: color,
+    boot: '',
+    glove: '',
+    metal: '',
+    visor: '',
+  });
+  return p.camo ? patternTexture(p.camo.colors, p.camo.pattern) : patternTexture([p.main, p.vest, p.gear], 'blotch');
 }
 
 /** Body parts are painted with one of these materials. */
@@ -247,24 +282,79 @@ const METALLIC = { roughness: 0.42, metalness: 0.6 };
 const std = (color: string, extra: THREE.MeshStandardMaterialParameters = {}) =>
   new THREE.MeshStandardMaterial({ color, ...FABRIC, ...extra });
 
+// Shared cloth textures (made once, tiled): light weave for the colour, cordura grain for the bump
+const CLOTH_BUMP = 0.3;
+const WEAVE_REPEAT = 5;
+const CORDURA_REPEAT = 4;
+let weaveTex: THREE.CanvasTexture | null = null;
+let corduraTex: THREE.CanvasTexture | null = null;
+function clothCanvas(n: number, repeat: number, draw: (g: CanvasRenderingContext2D) => void): THREE.CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = c.height = n;
+  draw(c.getContext('2d')!);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(repeat, repeat);
+  return t;
+}
+function weaveTexture(): THREE.CanvasTexture {
+  if (!weaveTex) {
+    let seed = 3;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    weaveTex = clothCanvas(64, WEAVE_REPEAT, (g) => {
+      g.fillStyle = '#e6e6e6';
+      g.fillRect(0, 0, 64, 64);
+      for (let y = 0; y < 64; y += 2)
+        for (let x = 0; x < 64; x += 2) {
+          const v = Math.round(222 + ((x * 7 + y * 13) % 5) * 5 + rnd() * 12);
+          g.fillStyle = `rgb(${v},${v},${v})`;
+          g.fillRect(x + ((y / 2) % 2), y, 1, 2);
+        }
+    });
+    weaveTex.colorSpace = THREE.SRGBColorSpace;
+  }
+  return weaveTex;
+}
+function corduraTexture(): THREE.CanvasTexture {
+  if (!corduraTex) {
+    let seed = 5;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    corduraTex = clothCanvas(32, CORDURA_REPEAT, (g) => {
+      for (let y = 0; y < 32; y++)
+        for (let x = 0; x < 32; x++) {
+          const v = Math.round(150 + ((x ^ y) & 3) * 25 + rnd() * 30);
+          g.fillStyle = `rgb(${v},${v},${v})`;
+          g.fillRect(x, y, 1, 1);
+        }
+    });
+  }
+  return corduraTex;
+}
+
 const skinMatCache = new Map<string, Omit<BodyMaterials, 'skin' | 'hair'>>();
-function skinMaterials(color: string, skin: string): Omit<BodyMaterials, 'skin' | 'hair'> {
-  const key = `${color}|${skin}`;
+function skinMaterials(color: string, skin: string, camo: CamoId = 'liso'): Omit<BodyMaterials, 'skin' | 'hair'> {
+  const key = `${color}|${skin}|${camo}`;
   const cached = skinMatCache.get(key);
   if (cached) return cached;
-  const p = skinPalette(color, skin);
+  const p = skinPalette(color, skin, camo);
   const glow = (c: string, k: number) => (p.glow ? { emissive: c, emissiveIntensity: p.glow * k } : {});
   const map = p.camo ? patternTexture(p.camo.colors, p.camo.pattern) : undefined;
   const pantsMap = p.camo?.pants ? patternTexture(p.camo.pants, p.camo.pattern) : map;
+  // Fabric: a fine weave (when no camouflage is printed) and a cordura grain in the bump, so cloth reads as cloth
+  const cloth = (printed?: THREE.Texture): THREE.MeshStandardMaterialParameters => ({
+    map: printed ?? weaveTexture(),
+    bumpMap: corduraTexture(),
+    bumpScale: CLOTH_BUMP,
+  });
   const m = {
-    main: std(p.main, map ? { map } : p.shiny ? { ...METALLIC, emissive: '#3a2a00' } : {}),
-    pants: std(p.pants, pantsMap && p.pants === '#ffffff' ? { map: pantsMap } : {}),
-    vest: std(p.vest, p.shiny ? { ...METALLIC, emissive: '#3a2a00' } : POLYMER),
-    gear: std(p.gear, { roughness: 0.85 }),
+    main: std(p.main, p.shiny ? { ...METALLIC, emissive: '#3a2a00' } : cloth(map)),
+    pants: std(p.pants, cloth(pantsMap && p.pants === '#ffffff' ? pantsMap : undefined)),
+    vest: std(p.vest, p.shiny ? { ...METALLIC, emissive: '#3a2a00' } : { ...POLYMER, ...cloth() }),
+    gear: std(p.gear, { roughness: 0.85, ...cloth() }),
     accent: std(p.accent, { ...POLYMER, ...glow(p.accent, 1) }),
     visor: std(p.visor, { roughness: 0.2, metalness: 0.3, ...glow(p.visor, 1.2) }),
     boot: std(p.boot, POLYMER),
-    glove: std(p.glove, { roughness: 0.8 }),
+    glove: std(p.glove, { roughness: 0.8, bumpMap: corduraTexture(), bumpScale: CLOTH_BUMP }),
     metal: std(p.metal, METALLIC),
     eye: std('#15171c', { roughness: 0.3 }),
     brass: std('#c9a03a', { ...METALLIC, emissive: '#2a1d00' }),
@@ -287,18 +377,103 @@ const tmpEuler = new THREE.Euler();
 const tmpQuat = new THREE.Quaternion();
 
 /** Collects boxes and cylinders per material and merges them into one geometry each. */
+// Rounded bodies: every block gets its 12 edges chamfered, which takes away the "made of cubes" look.
+// Off draws the classic hard blocks (the proposal's "Actual" view compares both).
+let roundBodies = true;
+export function setRoundBodies(on: boolean): void {
+  roundBodies = on;
+}
+/** Chamfer as a fraction of a block's smallest side, and its cap (m); tiny parts stay sharp. */
+const CHAMFER = 0.2;
+const CHAMFER_MAX = 0.03;
+const CHAMFER_MIN_SIDE = 0.035;
+const HEAD_CHAMFER = 0.38;
+const HAT_CHAMFER = 0.3;
+const HEAD_SCALE = 0.91;
+const NECK_Y = 1.42;
+const HEAD_SHRINK = new THREE.Matrix4()
+  .makeTranslation(0, NECK_Y, 0)
+  .multiply(new THREE.Matrix4().makeScale(HEAD_SCALE, HEAD_SCALE, HEAD_SCALE))
+  .multiply(new THREE.Matrix4().makeTranslation(0, -NECK_Y, 0));
+/** Camouflage prints are sized per block on hard blocks; rounded blocks map metres, so scale them back. */
+const ROUND_UV = 3;
+const chamferCache = new Map<string, THREE.BufferGeometry>();
+function chamferBox(w: number, h: number, d: number, k: number): THREE.BufferGeometry {
+  const key = `${w}|${h}|${d}|${k}`;
+  let g = chamferCache.get(key);
+  if (!g) {
+    const c = Math.min(Math.min(w, h, d) * k, CHAMFER_MAX);
+    // Octagon (the side edges) extruded with a one-step bevel (the front and back edges)
+    const x = w / 2 - c;
+    const y = h / 2 - c;
+    const e = c * 0.6;
+    const s = new THREE.Shape();
+    s.moveTo(-x + e, -y);
+    s.lineTo(x - e, -y);
+    s.lineTo(x, -y + e);
+    s.lineTo(x, y - e);
+    s.lineTo(x - e, y);
+    s.lineTo(-x + e, y);
+    s.lineTo(-x, y - e);
+    s.lineTo(-x, -y + e);
+    s.closePath();
+    g = new THREE.ExtrudeGeometry(s, {
+      depth: Math.max(d - 2 * c, 1e-3),
+      bevelEnabled: true,
+      bevelThickness: c,
+      bevelSize: c,
+      bevelSegments: 1,
+    });
+    g.translate(0, 0, -(d - 2 * c) / 2);
+    const uv = g.attributes.uv!;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * ROUND_UV, uv.getY(i) * ROUND_UV);
+    chamferCache.set(key, g);
+  }
+  return g.clone();
+}
+
 class Kit {
   private readonly parts = new Map<BodyMat, THREE.BufferGeometry[]>();
+  /** chamfer of the next blocks (bigger on the head so it reads round) */
+  chamfer = CHAMFER;
+
+  /** A block: chamfered when bodies are round and it is big enough, a plain box otherwise. */
+  private block(w: number, h: number, d: number): THREE.BufferGeometry {
+    return roundBodies && Math.min(w, h, d) >= CHAMFER_MIN_SIDE
+      ? chamferBox(w, h, d, this.chamfer)
+      : new THREE.BoxGeometry(w, h, d);
+  }
+
+  /** applied to every part drawn while set (the smaller head) */
+  transform: THREE.Matrix4 | null = null;
 
   private push(mat: BodyMat, g: THREE.BufferGeometry): void {
+    if (roundBodies && g.index) g = g.toNonIndexed(); // chamfered blocks are not indexed: all must match to merge
+    if (this.transform) g.applyMatrix4(this.transform);
     const list = this.parts.get(mat);
     if (list) list.push(g);
     else this.parts.set(mat, [g]);
   }
 
   box(w: number, h: number, d: number, x: number, y: number, z: number, mat: BodyMat, rx = 0, ry = 0, rz = 0): void {
-    const g = new THREE.BoxGeometry(w, h, d);
+    const g = this.block(w, h, d);
     if (rx || ry || rz) g.applyMatrix4(tmpM4.makeRotationFromEuler(tmpEuler.set(rx, ry, rz)));
+    g.translate(x, y, z);
+    this.push(mat, g);
+  }
+
+  /**
+   * Block narrowing from bottom to top (or the other way): `top` scales the width and depth at the top
+   * face, `bottom` at the bottom one. Limbs and torsos read as one shaped piece instead of stacked boxes.
+   */
+  taper(w: number, h: number, d: number, x: number, y: number, z: number, mat: BodyMat, top: number, bottom = 1): void {
+    const g = this.block(w, h, d);
+    const pos = g.attributes.position!;
+    for (let i = 0; i < pos.count; i++) {
+      const f = bottom + (top - bottom) * (pos.getY(i) / h + 0.5);
+      pos.setXYZ(i, pos.getX(i) * f, pos.getY(i), pos.getZ(i) * f);
+    }
+    g.computeVertexNormals();
     g.translate(x, y, z);
     this.push(mat, g);
   }
@@ -321,7 +496,7 @@ class Kit {
   beam(a: V3, b: V3, w: number, h: number, mat: BodyMat, overhang = 0): void {
     const dir = b.clone().sub(a);
     const len = dir.length() + overhang * 2;
-    const g = new THREE.BoxGeometry(w, h, len);
+    const g = this.block(w, h, len);
     g.translate(0, 0, len / 2 - overhang);
     g.applyQuaternion(tmpQuat.setFromUnitVectors(Z_AXIS, dir.normalize()));
     g.translate(a.x, a.y, a.z);
@@ -341,6 +516,7 @@ class Kit {
 
 const kitCache = new Map<string, [BodyMat, THREE.BufferGeometry][]>();
 function addKit(parent: THREE.Object3D, key: string, mats: BodyMaterials, draw: (k: Kit) => void, shadow = true): void {
+  key = `${roundBodies ? 'r' : 'b'}:${key}`;
   let geos = kitCache.get(key);
   if (!geos) {
     const k = new Kit();
@@ -383,8 +559,14 @@ interface CharacterLook {
 
 /** Face looking at -Z: jaw, nose, ears, eyes and brows. Head centre at y=1.64. */
 function drawHead(k: Kit): void {
+  k.chamfer = HEAD_CHAMFER; // a rounder skull and jaw
   k.box(0.28, 0.27, 0.3, 0, 1.665, 0.005, 'skin'); // cranium
   k.box(0.24, 0.11, 0.25, 0, 1.53, -0.015, 'skin'); // jaw
+  k.chamfer = CHAMFER;
+  if (roundBodies) {
+    k.pair(0.05, 0.05, 0.08, 0.1, 1.575, -0.1, 'skin'); // cheekbones
+    k.box(0.2, 0.03, 0.04, 0, 1.715, -0.14, 'skin'); // brow ridge
+  }
   k.box(0.12, 0.05, 0.05, 0, 1.495, -0.11, 'skin'); // chin
   k.box(0.045, 0.07, 0.05, 0, 1.615, -0.16, 'skin'); // nose
   k.pair(0.035, 0.075, 0.07, 0.152, 1.625, 0.01, 'skin'); // ears
@@ -399,11 +581,22 @@ function drawTorso(k: Kit, build: Build): void {
   const heavy = build === 'heavy';
   const light = build === 'light';
   const w = heavy ? 0.5 : light ? 0.42 : 0.46;
-  k.box(0.46, 0.2, 0.26, 0, 0.83, 0, 'pants'); // hips
-  k.box(w - 0.04, 0.42, 0.24, 0, 1.13, 0, 'main'); // belly
-  k.box(w + 0.04, 0.2, 0.27, 0, 1.33, 0, 'main'); // chest
-  k.pair(0.16, 0.15, 0.2, w / 2 + 0.06, 1.37, 0, 'main'); // shoulders
-  k.box(0.2, 0.05, 0.18, 0, 1.445, 0.01, 'main'); // collar
+  if (roundBodies) {
+    // V-shaped: narrow waist, broad chest, rounded deltoids and a jacket collar
+    k.box(0.42, 0.2, 0.25, 0, 0.83, 0, 'pants'); // hips
+    k.taper(w + 0.06, 0.52, 0.27, 0, 1.17, 0, 'main', 1, 0.78); // waist widening to the chest
+    k.chamfer = HEAD_CHAMFER;
+    k.pair(0.17, 0.16, 0.21, w / 2 + 0.07, 1.36, 0, 'main'); // deltoids
+    k.chamfer = CHAMFER;
+    k.box(0.22, 0.06, 0.2, 0, 1.45, 0.01, 'main'); // collar
+    k.pair(0.07, 0.07, 0.03, 0.07, 1.44, -0.105, 'main', 0.3, 0, 0.35); // collar points
+  } else {
+    k.box(0.46, 0.2, 0.26, 0, 0.83, 0, 'pants'); // hips
+    k.box(w - 0.04, 0.42, 0.24, 0, 1.13, 0, 'main'); // belly
+    k.box(w + 0.04, 0.2, 0.27, 0, 1.33, 0, 'main'); // chest
+    k.pair(0.16, 0.15, 0.2, w / 2 + 0.06, 1.37, 0, 'main'); // shoulders
+    k.box(0.2, 0.05, 0.18, 0, 1.445, 0.01, 'main'); // collar
+  }
   k.box(0.45, 0.06, 0.27, 0, 0.93, 0, 'gear'); // belt
   k.box(0.07, 0.045, 0.012, 0, 0.93, -0.138, 'metal'); // buckle
   k.pair(0.08, 0.09, 0.07, 0.17, 0.92, -0.08, 'gear'); // belt pouches
@@ -414,6 +607,7 @@ function drawTorso(k: Kit, build: Build): void {
     for (const x of [-0.12, 0, 0.12]) k.box(0.085, 0.09, 0.05, x, 1.08, -0.145, 'gear');
     k.pair(0.06, 0.4, 0.012, 0.12, 1.2, 0.128, 'accent'); // back stripes
     k.box(0.1, 0.04, 0.008, 0.11, 1.33, -0.14, 'accent'); // patch
+    if (roundBodies) k.box(0.08, 0.11, 0.13, -0.26, 0.86, 0.03, 'gear'); // dump pouch
     return;
   }
   const d = heavy ? 0.08 : 0.055;
@@ -428,6 +622,11 @@ function drawTorso(k: Kit, build: Build): void {
     k.box(0.092, 0.03, 0.054, x, 1.16, -0.145 - d, 'vest'); // flaps
   }
   k.box(0.11, 0.05, 0.008, 0.1, 1.28, -0.122 - d, 'accent'); // name patch
+  if (roundBodies) {
+    for (const y of [1.22, 1.27, 1.32]) k.box(vw - 0.03, 0.014, 0.008, 0, y, -0.12 - d - 0.004, 'gear'); // MOLLE rows
+    k.box(0.08, 0.11, 0.13, -0.26, 0.86, 0.03, 'gear'); // dump pouch
+    k.box(0.26, 0.3, 0.07, 0, 1.17, 0.12 + d + 0.035, 'gear'); // hydration pack on the back plate
+  }
   k.box(0.05, 0.11, 0.04, -0.15, 1.3, -0.12 - d - 0.02, 'gear'); // radio
   k.box(0.012, 0.08, 0.012, -0.16, 1.4, -0.12 - d - 0.02, 'metal'); // antenna
 }
@@ -776,6 +975,178 @@ const CREATURES: Record<Exclude<SkinId, 'base'>, Creature> = {
       k.box(0.11, 0.1, 0.11, 0, 1.43, 0, 'skin'); // neck
     },
   },
+  ninja: {
+    skin: '#2b2e38',
+    fur: '#e0b088',
+    head(k) {
+      k.box(0.3, 0.3, 0.3, 0, 1.66, 0.01, 'skin'); // hood
+      k.box(0.24, 0.07, 0.02, 0, 1.68, -0.145, 'hair'); // eye slit (bare face)
+      k.pair(0.045, 0.03, 0.012, 0.06, 1.68, -0.157, 'eye'); // eyes
+      k.pair(0.06, 0.015, 0.012, 0.06, 1.71, -0.157, 'skin', 0, 0, 0.25); // frowning brows
+      k.box(0.31, 0.045, 0.31, 0, 1.765, 0.01, 'accent'); // headband in the outfit colour
+      k.box(0.06, 0.06, 0.03, 0, 1.765, 0.17, 'accent'); // knot
+      k.pair(0.04, 0.16, 0.02, 0.035, 1.69, 0.21, 'accent', -0.5, 0, 0.25); // tails
+      k.box(0.11, 0.1, 0.11, 0, 1.43, 0, 'skin'); // neck
+    },
+  },
+  pirata: {
+    skin: '#e0b088',
+    fur: '#3a2a1e',
+    head(k) {
+      k.box(0.29, 0.28, 0.29, 0, 1.65, 0, 'skin'); // head
+      k.box(0.04, 0.04, 0.012, 0.07, 1.68, -0.15, 'eye'); // eye
+      k.box(0.075, 0.07, 0.015, -0.07, 1.68, -0.152, 'eye'); // eye patch
+      k.box(0.3, 0.015, 0.3, 0, 1.72, 0, 'eye', 0, 0, -0.3); // patch strap
+      k.box(0.27, 0.1, 0.04, 0, 1.55, -0.14, 'hair'); // beard
+      k.pair(0.03, 0.12, 0.22, 0.145, 1.6, -0.03, 'hair'); // sideburns
+      k.box(0.15, 0.03, 0.02, 0, 1.605, -0.16, 'hair'); // moustache
+      k.box(0.24, 0.12, 0.24, 0, 1.84, 0.01, 'eye'); // pirate hat: crown
+      k.box(0.34, 0.025, 0.32, 0, 1.79, 0.01, 'eye'); // brim
+      k.box(0.38, 0.15, 0.03, 0, 1.86, -0.15, 'eye', 0.2); // tall turned-up front
+      k.box(0.39, 0.02, 0.035, 0, 1.935, -0.135, 'brass', 0.2); // gold trim
+      k.box(0.04, 0.04, 0.012, 0, 1.87, -0.17, 'brass', 0.2, 0, 0.785); // badge
+      k.pair(0.03, 0.1, 0.3, 0.17, 1.83, 0.02, 'eye', 0, 0, -0.3); // turned-up sides
+      k.box(0.11, 0.1, 0.11, 0, 1.43, 0, 'skin'); // neck
+    },
+  },
+  caballero: {
+    skin: '#b9c0c8',
+    fur: '#757d87',
+    head(k) {
+      k.box(0.32, 0.34, 0.32, 0, 1.66, 0.01, 'skin'); // closed helm
+      k.box(0.33, 0.03, 0.33, 0, 1.79, 0.01, 'hair'); // brow band
+      k.box(0.03, 0.3, 0.02, 0, 1.66, -0.155, 'hair'); // ridge
+      k.pair(0.1, 0.022, 0.015, 0.075, 1.69, -0.158, 'eye'); // visor slits
+      for (const y of [1.57, 1.6]) k.pair(0.015, 0.015, 0.012, 0.06, y, -0.158, 'eye'); // breathing holes
+      k.box(0.05, 0.1, 0.1, 0, 1.87, -0.04, 'accent'); // plume in the outfit colour, arching back
+      k.box(0.05, 0.1, 0.1, 0, 1.9, 0.05, 'accent');
+      k.box(0.05, 0.1, 0.1, 0, 1.85, 0.14, 'accent', 0.5);
+      k.box(0.3, 0.06, 0.3, 0, 1.49, 0.01, 'hair'); // gorget
+    },
+  },
+  vikingo: {
+    skin: '#e8b894',
+    fur: '#c4652b',
+    head(k) {
+      k.box(0.29, 0.27, 0.29, 0, 1.64, 0, 'skin'); // head
+      k.box(0.31, 0.12, 0.31, 0, 1.775, 0.005, 'metal'); // helmet
+      k.box(0.2, 0.05, 0.2, 0, 1.855, 0.005, 'metal'); // dome
+      k.box(0.32, 0.025, 0.32, 0, 1.725, 0.005, 'brass'); // rim
+      k.box(0.03, 0.1, 0.02, 0, 1.68, -0.155, 'metal'); // nose guard
+      k.pair(0.035, 0.035, 0.012, 0.07, 1.68, -0.152, 'eye'); // eyes
+      k.box(0.3, 0.16, 0.08, 0, 1.53, -0.12, 'hair'); // big beard
+      k.box(0.18, 0.08, 0.06, 0, 1.43, -0.14, 'hair'); // beard tip
+      k.box(0.17, 0.035, 0.02, 0, 1.605, -0.165, 'hair'); // moustache
+      for (const s of [-1, 1]) {
+        k.beam(v3(s * 0.14, 1.78, 0), v3(s * 0.22, 1.83, -0.01), 0.06, 0.06, 'brass'); // horns
+        k.beam(v3(s * 0.22, 1.83, -0.01), v3(s * 0.25, 1.92, -0.03), 0.04, 0.04, 'brass', 0.01);
+      }
+      k.box(0.12, 0.1, 0.12, 0, 1.43, 0.02, 'skin'); // neck
+    },
+  },
+  esqueleto: {
+    skin: '#ece6d4',
+    fur: '#c9c0a4',
+    head(k) {
+      k.box(0.3, 0.26, 0.29, 0, 1.68, 0, 'skin'); // skull
+      k.box(0.22, 0.09, 0.22, 0, 1.52, -0.02, 'skin'); // jaw
+      k.pair(0.075, 0.075, 0.012, 0.07, 1.69, -0.146, 'eye'); // eye sockets
+      k.pair(0.025, 0.025, 0.01, 0.07, 1.69, -0.154, 'accent'); // glowing pupils
+      k.box(0.035, 0.035, 0.012, 0, 1.615, -0.146, 'eye', 0, 0, 0.785); // nose hole
+      k.box(0.16, 0.04, 0.012, 0, 1.545, -0.131, 'eye'); // mouth
+      for (const x of [-0.06, -0.02, 0.02, 0.06]) k.box(0.03, 0.032, 0.014, x, 1.545, -0.134, 'skin'); // teeth
+      k.box(0.06, 0.1, 0.06, 0, 1.43, 0, 'hair'); // spine
+      k.box(0.12, 0.025, 0.08, 0, 1.44, 0, 'hair');
+    },
+  },
+  panda: {
+    skin: '#f2f0ea',
+    fur: '#24262b',
+    head(k) {
+      k.box(0.32, 0.28, 0.3, 0, 1.66, 0.01, 'skin'); // head
+      k.pair(0.09, 0.09, 0.05, 0.13, 1.82, 0.02, 'hair'); // round ears
+      k.pair(0.08, 0.1, 0.012, 0.075, 1.68, -0.146, 'hair', 0, 0, -0.4); // eye patches
+      k.pair(0.03, 0.03, 0.01, 0.075, 1.69, -0.154, 'skin'); // eyes
+      k.pair(0.016, 0.016, 0.01, 0.075, 1.69, -0.158, 'eye');
+      k.box(0.15, 0.09, 0.08, 0, 1.575, -0.17, 'skin'); // muzzle
+      k.box(0.06, 0.04, 0.03, 0, 1.605, -0.215, 'hair'); // nose
+      k.box(0.13, 0.1, 0.12, 0, 1.43, 0, 'hair'); // neck
+    },
+  },
+  pinguino: {
+    skin: '#22262e',
+    fur: '#f4f4ee',
+    head(k) {
+      k.box(0.3, 0.3, 0.3, 0, 1.66, 0.01, 'skin'); // head
+      k.box(0.24, 0.14, 0.02, 0, 1.6, -0.145, 'hair'); // white face, heart-shaped
+      k.pair(0.1, 0.08, 0.02, 0.065, 1.7, -0.145, 'hair');
+      k.pair(0.035, 0.04, 0.012, 0.065, 1.69, -0.157, 'eye'); // eyes
+      k.pair(0.014, 0.014, 0.01, 0.058, 1.7, -0.163, 'hair'); // eye shine
+      k.box(0.09, 0.04, 0.08, 0, 1.625, -0.19, 'brass'); // beak
+      k.box(0.05, 0.025, 0.05, 0, 1.6, -0.2, 'brass');
+      k.box(0.12, 0.1, 0.12, 0, 1.43, 0, 'skin'); // neck
+    },
+  },
+  perro: {
+    skin: '#d9a066',
+    fur: '#7a4a26',
+    head(k) {
+      k.box(0.3, 0.27, 0.29, 0, 1.66, 0.01, 'skin'); // head
+      k.box(0.09, 0.09, 0.012, -0.07, 1.705, -0.14, 'hair'); // patch over one eye
+      k.pair(0.035, 0.04, 0.012, 0.07, 1.7, -0.152, 'eye'); // eyes
+      k.box(0.16, 0.1, 0.12, 0, 1.58, -0.18, 'hair'); // dark snout
+      k.box(0.07, 0.045, 0.04, 0, 1.62, -0.24, 'eye'); // nose
+      k.box(0.08, 0.012, 0.01, 0, 1.55, -0.241, 'eye'); // mouth
+      k.pair(0.06, 0.2, 0.1, 0.17, 1.66, 0.01, 'hair', 0, 0, 0.15); // floppy ears
+      k.box(0.12, 0.1, 0.12, 0, 1.43, 0, 'skin'); // neck
+    },
+  },
+  dino: {
+    skin: '#6cbf4a',
+    fur: '#eee8c8',
+    head(k) {
+      k.box(0.28, 0.26, 0.3, 0, 1.67, 0.02, 'skin'); // head
+      k.box(0.22, 0.12, 0.16, 0, 1.6, -0.19, 'skin'); // long snout
+      k.box(0.2, 0.05, 0.14, 0, 1.505, -0.16, 'skin'); // lower jaw
+      for (const x of [-0.08, -0.03, 0.03, 0.08]) k.box(0.025, 0.03, 0.025, x, 1.53, -0.255, 'hair'); // teeth
+      k.pair(0.025, 0.03, 0.025, 0.1, 1.53, -0.2, 'hair');
+      k.pair(0.02, 0.015, 0.01, 0.045, 1.64, -0.272, 'eye'); // nostrils
+      k.pair(0.045, 0.05, 0.012, 0.09, 1.73, -0.132, 'hair'); // eyes
+      k.pair(0.022, 0.035, 0.01, 0.09, 1.73, -0.14, 'eye');
+      k.pair(0.07, 0.025, 0.03, 0.09, 1.77, -0.13, 'skin', 0, 0, 0.2); // brows
+      for (const [y, z] of [
+        [1.81, -0.07],
+        [1.81, 0.03],
+        [1.79, 0.13],
+        [1.71, 0.18],
+        [1.61, 0.18],
+      ] as const)
+        k.box(0.03, 0.07, 0.07, 0, y, z, 'accent', 0.785); // spikes along the top and back
+      k.box(0.12, 0.1, 0.12, 0, 1.43, 0, 'skin'); // neck
+    },
+    tail(k) {
+      // Thick tail tapering back and down, spikes in the outfit colour
+      for (let i = 0; i < 4; i++) {
+        const s = 0.15 - i * 0.03;
+        k.box(s, s, 0.1, 0, 0.85 - i * 0.06, 0.2 + i * 0.08, 'skin');
+        k.box(0.025, 0.05, 0.05, 0, 0.85 - i * 0.06 + s / 2, 0.2 + i * 0.08, 'accent', 0.785);
+      }
+    },
+  },
+  buho: {
+    skin: '#8a6440',
+    fur: '#efe0bd',
+    head(k) {
+      k.box(0.32, 0.3, 0.3, 0, 1.66, 0.01, 'skin'); // round head
+      k.pair(0.12, 0.12, 0.02, 0.07, 1.68, -0.145, 'hair'); // facial discs
+      k.pair(0.075, 0.075, 0.012, 0.07, 1.68, -0.158, 'brass'); // big yellow eyes
+      k.pair(0.035, 0.035, 0.01, 0.07, 1.68, -0.166, 'eye');
+      k.pair(0.11, 0.025, 0.02, 0.07, 1.75, -0.152, 'skin', 0, 0, 0.3); // brows
+      k.box(0.045, 0.045, 0.04, 0, 1.6, -0.16, 'eye', 0, 0, 0.785); // beak
+      k.pair(0.05, 0.1, 0.05, 0.12, 1.84, 0.01, 'skin', 0, 0, -0.3); // ear tufts
+      k.box(0.12, 0.1, 0.12, 0, 1.43, 0, 'skin'); // neck
+    },
+  },
 };
 
 /** Arm segment lengths (m). */
@@ -798,32 +1169,75 @@ function drawArm(k: Kit, look: CharacterLook, side: number, hand: V3): void {
   const wrist = hand.clone().addScaledVector(fore, -0.06);
   const heavy = look.build === 'heavy';
   const t = heavy ? 0.15 : look.build === 'light' ? 0.115 : 0.13;
-  k.beam(shoulder, elbow, t, t, 'main', 0.03); // upper sleeve
+  if (roundBodies) {
+    // Biceps thicker than the elbow, then the sleeve narrows to the cuff
+    k.beam(shoulder, shoulder.clone().lerp(elbow, 0.55), t + 0.01, t + 0.01, 'main', 0.03);
+    k.beam(shoulder.clone().lerp(elbow, 0.5), elbow, t - 0.01, t - 0.01, 'main', 0.02);
+  } else k.beam(shoulder, elbow, t, t, 'main', 0.03); // upper sleeve
   const band = shoulder.clone().lerp(elbow, 0.45);
   k.beam(band, shoulder.clone().lerp(elbow, 0.6), t + 0.01, t + 0.01, 'accent'); // arm band
   k.beam(elbow, wrist, t - 0.015, t - 0.015, look.shortSleeves ? 'skin' : 'main', 0.02); // forearm
   if (!look.shortSleeves) k.beam(wrist.clone().addScaledVector(fore, -0.07), wrist, t, t, 'main'); // cuff
   k.box(t - 0.02, t - 0.02, t - 0.02, elbow.x, elbow.y, elbow.z, heavy ? 'metal' : 'gear'); // elbow pad
-  k.beam(wrist, hand.clone().addScaledVector(fore, 0.05), 0.085, 0.1, 'glove', 0.01); // glove
+  if (roundBodies) {
+    // Back of the hand, curled fingers and a thumb instead of a mitten
+    const knuckles = hand.clone().addScaledVector(fore, 0.02);
+    k.beam(wrist, knuckles, 0.08, 0.09, 'glove', 0.01);
+    k.beam(
+      knuckles,
+      knuckles
+        .clone()
+        .addScaledVector(fore, 0.05)
+        .add(v3(0, -0.03, 0)),
+      0.075,
+      0.045,
+      'glove',
+    );
+    k.beam(
+      wrist.clone().add(v3(-side * 0.035, 0.01, 0)),
+      knuckles.clone().add(v3(-side * 0.045, 0.02, 0)),
+      0.03,
+      0.03,
+      'glove',
+    );
+    k.beam(wrist.clone().addScaledVector(fore, -0.02), wrist.clone().addScaledVector(fore, 0.02), 0.09, 0.1, 'gear'); // glove cuff
+  } else k.beam(wrist, hand.clone().addScaledVector(fore, 0.05), 0.085, 0.1, 'glove', 0.01); // glove
 }
 
 function drawLeg(k: Kit, look: CharacterLook, side: number): void {
   const w = look.build === 'heavy' ? 0.24 : look.build === 'light' ? 0.2 : 0.22;
-  k.box(w, 0.44, w + 0.02, 0, -0.2, 0, 'pants'); // thigh
-  k.box(w + 0.01, 0.06, w + 0.03, 0, -0.06, 0, 'pants'); // seam
+  if (roundBodies) {
+    k.taper(w + 0.03, 0.44, w + 0.04, 0, -0.2, 0, 'pants', 1, 0.8); // thigh narrowing to the knee
+  } else {
+    k.box(w, 0.44, w + 0.02, 0, -0.2, 0, 'pants'); // thigh
+    k.box(w + 0.01, 0.06, w + 0.03, 0, -0.06, 0, 'pants'); // seam
+  }
   k.box(0.04, 0.1, 0.1, side * (w / 2 + 0.01), -0.24, -0.01, 'pants'); // cargo pocket
+  if (roundBodies && side > 0) {
+    // Thigh holster with the pistol grip showing, and its leg strap
+    k.box(0.05, 0.17, 0.11, -(w / 2 + 0.03), -0.2, -0.01, 'gear');
+    k.box(0.035, 0.07, 0.035, -(w / 2 + 0.03), -0.08, 0, 'metal');
+    k.box(w + 0.03, 0.025, w + 0.04, 0, -0.28, 0, 'gear');
+  }
   look.thigh?.(k, side);
 }
 
 function drawShin(k: Kit, look: CharacterLook, side: number): void {
   const w = look.build === 'heavy' ? 0.21 : look.build === 'light' ? 0.17 : 0.19;
-  k.box(w, 0.3, w + 0.01, 0, -0.16, 0, 'pants'); // shin
+  if (roundBodies) {
+    k.taper(w + 0.01, 0.3, w + 0.03, 0, -0.16, 0.005, 'pants', 1, 0.78); // calf narrowing to the ankle
+  } else k.box(w, 0.3, w + 0.01, 0, -0.16, 0, 'pants'); // shin
   if (look.build !== 'light') {
     k.box(0.15, 0.12, 0.05, 0, -0.03, -0.11, 'vest'); // knee pad
     k.box(w + 0.01, 0.025, w + 0.02, 0, -0.03, 0, 'accent'); // strap
   }
   k.box(w + 0.02, 0.1, w + 0.04, 0, -0.29, 0, 'boot'); // boot shaft
-  k.box(w + 0.02, 0.1, 0.3, 0, -0.345, -0.05, 'boot'); // foot
+  k.box(w + 0.02, 0.1, roundBodies ? 0.24 : 0.3, 0, -0.345, roundBodies ? -0.02 : -0.05, 'boot'); // foot
+  if (roundBodies) {
+    k.chamfer = HEAD_CHAMFER;
+    k.box(w + 0.01, 0.085, 0.09, 0, -0.35, -0.155, 'boot'); // rounded toe cap
+    k.chamfer = CHAMFER;
+  }
   k.box(w + 0.03, 0.03, 0.31, 0, -0.385, -0.05, 'gear'); // sole
   k.box(w - 0.04, 0.012, 0.1, 0, -0.29, -0.15, 'gear'); // laces
   look.shin?.(k, side);
@@ -851,8 +1265,8 @@ const HIP_X = 0.12;
 
 const creatureOf = (skin: string): Creature | undefined => CREATURES[skin as Exclude<SkinId, 'base'>];
 
-function bodyMaterials(charId: CharacterId, color: string, skin: string): BodyMaterials {
-  return { ...skinMaterials(color, skin), ...characterMaterials(charId, skin) };
+function bodyMaterials(charId: CharacterId, color: string, skin: string, camo: CamoId): BodyMaterials {
+  return { ...skinMaterials(color, skin, camo), ...characterMaterials(charId, skin) };
 }
 const charMatCache = new Map<string, Pick<BodyMaterials, 'skin' | 'hair'>>();
 /** Bare skin and hair: the class's own for the human, the creature's fur / metal otherwise. */
@@ -871,9 +1285,14 @@ function characterMaterials(charId: CharacterId, skin: string): Pick<BodyMateria
   return m;
 }
 
-export function buildCharacter(charId: CharacterId, skin: string = 'base', color = '#3f7fe0'): CharacterModel {
+export function buildCharacter(
+  charId: CharacterId,
+  skin: string = 'base',
+  color = '#3f7fe0',
+  camo: CamoId = 'liso',
+): CharacterModel {
   const look = EXTRAS[charId];
-  const mats = bodyMaterials(charId, color, skin);
+  const mats = bodyMaterials(charId, color, skin, camo);
   const group = new THREE.Group();
 
   const legs: THREE.Group[] = [];
@@ -896,13 +1315,18 @@ export function buildCharacter(charId: CharacterId, skin: string = 'base', color
   const creature = creatureOf(skin);
   addKit(upper, `${charId}:${creature ? skin : 'base'}:upper`, mats, (k) => {
     drawTorso(k, look.build);
-    if (creature) {
-      creature.head(k);
-      creature.tail?.(k);
-    } else {
+    // Round bodies get a slightly smaller head (shrunk towards the neck): less big-headed, more lifelike.
+    // Only the drawing: the head hitbox stays the same
+    if (roundBodies) k.transform = HEAD_SHRINK;
+    if (creature) creature.head(k);
+    else {
       drawHead(k);
+      k.chamfer = HAT_CHAMFER; // helmets and caps are shells, not crates
       look.hat(k);
+      k.chamfer = CHAMFER;
     }
+    k.transform = null;
+    creature?.tail?.(k);
     look.upper?.(k);
   });
 
@@ -937,39 +1361,120 @@ export function buildCharacter(charId: CharacterId, skin: string = 'base', color
   return { group, legL: legs[0]!, legR: legs[1]!, kneeL: knees[0]!, kneeR: knees[1]!, upper, aim, hand, holdGun };
 }
 
-// First-person arms: added to the gun so it looks held. Sleeves and gloves follow the skin.
-export function buildArms(gun: GunModel, skin: string = 'base', color = '#3f7fe0'): THREE.Group {
-  const mats = { ...skinMaterials(color, skin), ...characterMaterials('soldado', skin) };
+// First-person arms: added to the gun so it looks held. The hands are the pack's glove (hands.ts), bent round the
+// grip (right) and under the handguard (left, long guns) or cupping the right hand (handguns); the knife is held
+// alone in a fist, thumb towards the blade. Sleeves follow the outfit; the gloves take the skin's glove colour.
+const GRIP = v3(0, -0.105, 0.1);
+const KNIFE_GRIP = v3(0, -0.1, 0.105);
+/**
+ * How the view model holds the knife (viewModel.ts), like a sword: the blade carries on from the forearm,
+ * pointing forward, up and in towards the middle of the screen; the fist turned so its back faces right and up.
+ */
+export const KNIFE_PITCH = 0.35;
+export const KNIFE_YAW = 0.3;
+export const KNIFE_ROLL = 0.5;
+/** The knife's forearm, in view space: back towards the camera, down and to the right. */
+const KNIFE_FOREARM = v3(0.2, -0.3, 0.5);
+/** First-person left arm closed round a grenade held at the origin, palm up, forearm down and back. */
+export function buildOffhandArm(skin: string, color: string, camo: CamoId): THREE.Group {
+  const mats = { ...skinMaterials(color, skin, camo), ...characterMaterials('soldado', skin) };
   const g = new THREE.Group();
-  const long = gun.userData.muzzleZ < LONG_GUN_MUZZLE_Z;
-  // Left hand: on the handguard of long guns, next to the right one on short guns
-  const lz = long ? Math.round(gun.userData.muzzleZ * 0.45 * 100) / 100 : 0.08;
+  const h = handAt('fist', true, v3(0, 0, 0), v3(0.3, 1, -0.2), v3(-1, 0, 0.3), mats.glove);
+  const wrist = h ? h.wrist : v3(0, -0.08, 0.04);
+  if (h) g.add(h.mesh);
+  const elbow = wrist.clone().add(v3(-0.08, -0.42, 0.22));
   addKit(
     g,
-    `fp:${lz}`,
+    `fp-off:${wrist
+      .toArray()
+      .map((n) => n.toFixed(3))
+      .join(',')}`,
     mats,
     (k) => {
-      // Right hand wrapped around the grip, forearm towards the camera
-      k.box(0.07, 0.085, 0.1, 0.006, -0.115, 0.115, 'glove'); // palm
-      k.box(0.075, 0.03, 0.06, -0.012, -0.09, 0.08, 'glove', 0.2); // fingers round the grip
-      k.box(0.025, 0.025, 0.07, -0.035, -0.07, 0.1, 'glove', 0, 0.3); // thumb
-      k.box(0.05, 0.012, 0.03, 0.04, -0.09, 0.13, 'accent'); // glove strap
-      // The forearms drop steeply out of the bottom of the screen instead of reaching back to the camera
-      const rWrist = v3(0.03, -0.16, 0.17);
-      const rElbow = v3(0.11, -0.46, 0.34);
-      k.beam(rWrist, rElbow, 0.072, 0.076, 'main', 0.02); // sleeve
-      k.beam(rWrist, rWrist.clone().lerp(rElbow, 0.14), 0.08, 0.084, 'gear'); // cuff
-      k.beam(rWrist.clone().lerp(rElbow, 0.3), rWrist.clone().lerp(rElbow, 0.36), 0.076, 0.08, 'accent'); // band
-      // Left hand
-      const ly = long ? -0.065 : -0.13;
-      const lx = long ? -0.035 : -0.05;
-      k.box(0.085, 0.07, 0.12, lx, ly, lz, 'glove'); // palm under the gun
-      k.box(0.03, 0.06, 0.1, lx + 0.045, ly + 0.035, lz - 0.01, 'glove'); // fingers over the side
-      k.box(0.05, 0.012, 0.03, lx - 0.02, ly - 0.02, lz + 0.03, 'accent');
-      const lWrist = v3(lx - 0.04, ly - 0.06, lz + 0.07);
-      const lElbow = long ? v3(lx - 0.2, ly - 0.42, lz + 0.26) : v3(lx - 0.12, ly - 0.42, lz + 0.2);
-      k.beam(lWrist, lElbow, 0.072, 0.076, 'main', 0.02);
-      k.beam(lWrist, lWrist.clone().lerp(lElbow, 0.14), 0.08, 0.084, 'gear');
+      k.beam(wrist, elbow, 0.062, 0.066, 'main', 0.02);
+      k.beam(wrist, wrist.clone().lerp(elbow, 0.12), 0.068, 0.072, 'gear');
+    },
+    false,
+  );
+  return g;
+}
+
+/** The knife hand: the forearm is set in view space and taken back through the knife's pitch, yaw and roll. */
+function knifePose(): { fingers: V3; back: V3; elbow: V3 } {
+  const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(KNIFE_PITCH, KNIFE_YAW, KNIFE_ROLL)).invert();
+  const fore = KNIFE_FOREARM.clone().applyQuaternion(q);
+  // Knuckles away from the forearm, square to the blade (gun space -Z): the wrist sits on the forearm's side
+  const fingers = v3(-fore.x, -fore.y, 0).normalize();
+  return { fingers, back: fingers.clone().cross(v3(0, 0, -1)), elbow: KNIFE_GRIP.clone().add(fore) };
+}
+export function buildArms(gun: GunModel, skin: string = 'base', color = '#3f7fe0', camo: CamoId = 'liso'): THREE.Group {
+  const mats = { ...skinMaterials(color, skin, camo), ...characterMaterials('soldado', skin) };
+  // Built again when the gloves arrive: the old arms go
+  gun.getObjectByName('fp-arms')?.removeFromParent();
+  const g = new THREE.Group();
+  g.name = 'fp-arms';
+  const id = gun.userData.id;
+  const long = gun.userData.muzzleZ < LONG_GUN_MUZZLE_Z;
+  const glove = mats.glove;
+  // Each hand: what it holds, where its fingers point (before closing) and where the back of the hand faces
+  type Pose = { grip: Grip; left: boolean; at: V3; fingers: V3; back: V3; elbow: V3 };
+  const poses: Pose[] =
+    id === 'knife'
+      ? [{ grip: 'fist', left: false, at: KNIFE_GRIP, ...knifePose() }]
+      : [
+          // Right hand round the pistol grip: thumb up, knuckles forward, back of the hand to the right
+          {
+            grip: 'fist',
+            left: false,
+            at: GRIP,
+            fingers: v3(0, -0.3, -1),
+            back: v3(1, 0, 0),
+            elbow: long ? v3(0.24, -0.4, 0.46) : v3(0.13, -0.62, 0.14),
+          },
+          long
+            ? {
+                // Left hand under the handguard, fingers wrapping up its right side, thumb along it
+                grip: 'cup',
+                left: true,
+                at: v3(0, -0.02, Math.round(gun.userData.muzzleZ * 0.42 * 100) / 100),
+                fingers: v3(1, 0.25, 0),
+                back: v3(0, -1, 0.2),
+                elbow: v3(-0.36, -0.36, Math.round(gun.userData.muzzleZ * 0.42 * 100) / 100 + 0.42),
+              }
+            : {
+                // Handguns: the left hand cups the right one from the left side
+                grip: 'cup',
+                left: true,
+                at: v3(-0.03, -0.13, 0.095),
+                fingers: v3(0.15, -0.35, -1),
+                back: v3(-1, -0.2, 0),
+                elbow: v3(-0.17, -0.62, 0.12),
+              },
+        ];
+  const wrists: [V3, V3][] = [];
+  for (const p of poses) {
+    const h = handAt(p.grip, p.left, p.at, p.fingers, p.back, glove);
+    // Without the glove (still loading) the sleeve ends at the grip
+    const wrist = h ? h.wrist : p.at.clone();
+    if (h) {
+      h.mesh.castShadow = false;
+      g.add(h.mesh);
+    }
+    wrists.push([wrist, p.elbow]);
+  }
+  const key = `fp:${wrists.map(([a, b]) => [...a.toArray(), ...b.toArray()].map((n) => n.toFixed(3)).join(',')).join('|')}`;
+  addKit(
+    g,
+    key,
+    mats,
+    (k) => {
+      for (const [wrist, elbow] of wrists) {
+        // Sleeve from the glove's cuff, with a cuff and a band
+        const cuffIn = wrist.clone().lerp(elbow, 0.02);
+        k.beam(cuffIn, elbow, 0.062, 0.066, 'main', 0.02);
+        k.beam(cuffIn, cuffIn.clone().lerp(elbow, 0.12), 0.068, 0.072, 'gear');
+        k.beam(cuffIn.clone().lerp(elbow, 0.34), cuffIn.clone().lerp(elbow, 0.4), 0.074, 0.078, 'accent');
+      }
     },
     false,
   );
@@ -993,8 +1498,8 @@ const DEFAULT_CYL_SIDES = 10;
 const FLASH_SIZE = 0.16;
 const FLASH_STREAK = 0.22;
 const FLASH_OFFSET = 0.03;
-const FLASH_CANVAS = 64;
-const FLASH_POINTS = 8;
+/** The pack's flash is white: warmed up to burning powder. */
+const FLASH_TINT = 0xffc27a;
 
 interface GunDraw {
   /** box(width, height, depth, x, y, z, material, rotX, rotZ) */
@@ -1484,33 +1989,7 @@ function gunGeometry(id: WeaponId): GunGeometry {
   return result;
 }
 
-// Muzzle flash: a star texture drawn once, on a camera-facing quad plus two crossed streak quads
-let flashTexture: THREE.CanvasTexture | null = null;
-function getFlashTexture(): THREE.CanvasTexture {
-  if (flashTexture) return flashTexture;
-  const c = document.createElement('canvas');
-  c.width = c.height = FLASH_CANVAS;
-  const g = c.getContext('2d')!;
-  const h = FLASH_CANVAS / 2;
-  const glow = g.createRadialGradient(h, h, 0, h, h, h);
-  glow.addColorStop(0, 'rgba(255,250,220,1)');
-  glow.addColorStop(0.25, 'rgba(255,200,90,0.9)');
-  glow.addColorStop(0.6, 'rgba(255,120,30,0.25)');
-  glow.addColorStop(1, 'rgba(255,90,0,0)');
-  g.fillStyle = glow;
-  g.beginPath();
-  for (let i = 0; i < FLASH_POINTS * 2; i++) {
-    const a = (i / (FLASH_POINTS * 2)) * Math.PI * 2;
-    const r = i % 2 ? h * 0.28 : h * (i % 4 ? 0.75 : 1);
-    g.lineTo(h + Math.cos(a) * r, h + Math.sin(a) * r);
-  }
-  g.closePath();
-  g.fill();
-  flashTexture = new THREE.CanvasTexture(c);
-  flashTexture.colorSpace = THREE.SRGBColorSpace;
-  return flashTexture;
-}
-
+// Muzzle flash: Kenney's star burst (fxAtlas.ts) on a camera-facing quad plus two crossed streak quads
 let flashGeo: THREE.BufferGeometry | null = null;
 function getFlashGeometry(): THREE.BufferGeometry {
   if (flashGeo) return flashGeo;
@@ -1525,8 +2004,8 @@ function getFlashGeometry(): THREE.BufferGeometry {
 
 const flashMaterial = (): THREE.MeshBasicMaterial =>
   new THREE.MeshBasicMaterial({
-    map: getFlashTexture(),
-    color: 0xffffff,
+    map: fxFrame(FX.flash),
+    color: FLASH_TINT,
     transparent: true,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
@@ -1534,7 +2013,7 @@ const flashMaterial = (): THREE.MeshBasicMaterial =>
   });
 
 export interface GunModel extends THREE.Group {
-  userData: { muzzleZ: number; muzzleY: number; sightY: number; flash?: THREE.Mesh };
+  userData: { id: WeaponId; muzzleZ: number; muzzleY: number; sightY: number; flash?: THREE.Mesh };
 }
 
 export function buildGun(id: WeaponId, withFlash = false, tint = '#ffc93c'): GunModel {
@@ -1549,6 +2028,7 @@ export function buildGun(id: WeaponId, withFlash = false, tint = '#ffc93c'): Gun
   g.userData.muzzleZ = geo.muzzleZ;
   g.userData.muzzleY = geo.muzzleY;
   g.userData.sightY = geo.sightY;
+  g.userData.id = id;
   if (withFlash) {
     const flash = new THREE.Mesh(getFlashGeometry(), flashMaterial());
     flash.position.set(0, geo.muzzleY, geo.muzzleZ - FLASH_OFFSET);

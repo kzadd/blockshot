@@ -3,6 +3,7 @@ export * from './physics/raycast';
 export * from './player/player';
 export * from './weapons/weapons';
 export * from './characters/characters';
+export * from './characters/looks';
 export * from './modes/modes';
 export * from './modes/medals';
 export * from './modes/quickChat';

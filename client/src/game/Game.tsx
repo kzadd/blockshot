@@ -2,23 +2,18 @@ import { useEffect, useRef, useState } from 'react';
 import {
   MEDALS,
   MODE_BY_ID,
-  QUICK_CHAT,
   STREAKS,
   canSwitchTeam,
   getMap,
-  isCharacterId,
-  isSkinId,
   type CharacterId,
   type KillEvent,
   type MatchEnd,
   type SideTeam,
   type RoomInfo,
-  type SkinId,
-  type Team,
 } from '@blockshot/shared';
 import type { Session } from '../app/App';
-import type { ColorChoice, SkinChoice } from '../characters/CharacterSelect';
-import Manual from '../manual/Manual';
+import { loadChar, lookOf, saveChar, saveLook, type Look } from '../characters/looks';
+import Controls from '../manual/Manual';
 import { markGameLost, markKicked } from '../network/connection';
 import { socket } from '../network/socket';
 import Settings from '../settings/SettingsDialog';
@@ -41,9 +36,6 @@ import ScoresLayer, { type MatchState } from './screens/ScoresLayer';
 
 let feedId = 0;
 
-const CHAR_KEY = 'blockshot:char';
-const SKINS_KEY = 'blockshot:skins';
-const COLORS_KEY = 'blockshot:colors';
 /** Killfeed keeps the last few lines, each for FEED_LIFE_MS (fading out from FEED_FADE_AT_MS). */
 const FEED_MAX = 5;
 const FEED_LIFE_MS = 6000;
@@ -52,27 +44,7 @@ const FEED_PRUNE_MS = 300;
 const BANNER_MS = 2300;
 const SHAKE_MS = 170;
 
-const loadChar = (): CharacterId | null => {
-  try {
-    const id = localStorage.getItem(CHAR_KEY);
-    return isCharacterId(id) ? id : null;
-  } catch {
-    return null;
-  }
-};
-const loadChoice = <T,>(key: string): T => {
-  try {
-    return (JSON.parse(localStorage.getItem(key) ?? 'null') as T | null) ?? ({} as T);
-  } catch {
-    return {} as T;
-  }
-};
-// Picks saved before the creature skins (camo, noche…) are dropped: they fall back to Humano
-const loadSkins = (): SkinChoice =>
-  Object.fromEntries(Object.entries(loadChoice<SkinChoice>(SKINS_KEY)).filter(([, s]) => isSkinId(s)));
-const loadColors = () => loadChoice<ColorChoice>(COLORS_KEY);
-
-type Menu = 'settings' | 'manual' | 'stats' | 'admin' | 'ranking' | 'tour' | null;
+type Menu = 'settings' | 'controls' | 'stats' | 'admin' | 'ranking' | 'tour' | null;
 type NewFeedItem = FeedItem extends infer F ? (F extends FeedItem ? Omit<F, 'key' | 't'> : never) : never;
 
 interface GameProps {
@@ -90,8 +62,7 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
   const [showScores, setShowScores] = useState(false);
   const [match, setMatch] = useState<MatchState | null>(null);
   const [charId, setCharId] = useState(loadChar);
-  const [skins, setSkins] = useState(loadSkins); // chosen skin for each character
-  const [colors, setColors] = useState(loadColors); // chosen outfit colour for each character
+  // The look of each character (skin, colour, camouflage, finish) lives in characters/looks (localStorage)
   const [selecting, setSelecting] = useState(true); // the character is chosen when entering
   const [menu, setMenu] = useState<Menu>(null);
   const [banner, setBanner] = useState<KillBanner | null>(null); // centre notice when you kill someone
@@ -109,10 +80,10 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
   }));
   const live = useRef({ match, menu });
   live.current = { match, menu };
-  const resume = useRef({ selecting, charId, skins, colors });
+  const resume = useRef({ selecting, charId });
   // New map or mode after a vote: a light "click to start" instead of the pause menu (the browser needs a click)
   const [fresh, setFresh] = useState(false);
-  resume.current = { selecting, charId, skins, colors };
+  resume.current = { selecting, charId };
 
   const info: RoomView = {
     name: room.name,
@@ -136,7 +107,7 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
     engine.current = e;
     const keep = resume.current;
     if (!keep.selecting && keep.charId) {
-      e.autoChar = { id: keep.charId, skin: keep.skins[keep.charId] ?? 'base', color: keep.colors[keep.charId] };
+      e.autoChar = { id: keep.charId, look: lookOf(keep.charId) };
       e.respawnSoon();
       setFresh(true);
     }
@@ -158,10 +129,8 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
 
   // While choosing a character there is no automatic respawn
   useEffect(() => {
-    if (engine.current)
-      engine.current.autoChar =
-        selecting || !charId ? null : { id: charId, skin: skins[charId] ?? 'base', color: colors[charId] };
-  }, [selecting, charId, skins, colors]);
+    if (engine.current) engine.current.autoChar = selecting || !charId ? null : { id: charId, look: lookOf(charId) };
+  }, [selecting, charId]);
 
   // Block curtain when spawning / respawning
   const wasAlive = useRef(false);
@@ -208,8 +177,6 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
       }
     };
     const onNotice = (text: string) => push({ type: 'notice', text });
-    const onChat = (d: { name: string; team: Team; i: number }) =>
-      push({ type: 'chat', name: d.name, team: d.team, text: QUICK_CHAT[d.i]?.text ?? '' });
     const onEnd = (d: MatchEnd) => setMatch({ ...d, at: Date.now(), votes: d.vote.map(() => 0), myVote: null });
     const onVotes = (votes: number[]) => setMatch((m) => (m ? { ...m, votes } : m));
     const onStart = () => {
@@ -227,7 +194,6 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
     };
     socket.on('kill', onKill);
     socket.on('notice', onNotice);
-    socket.on('chat', onChat);
     socket.on('vote', onVotes);
     socket.on('room:changed', onRoom);
     socket.on('match:end', onEnd);
@@ -268,12 +234,12 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
         engine.current?.requestLock();
         return;
       }
-      // O: settings · H or F1: manual · P: admin panel (server PC only)
+      // O: settings · H or F1: controls · P: admin panel (server PC only)
       const want: Menu =
         e.code === 'KeyO'
           ? 'settings'
           : e.code === 'KeyH' || e.code === 'F1'
-            ? 'manual'
+            ? 'controls'
             : e.code === 'KeyP' && session.admin
               ? 'admin'
               : null;
@@ -299,7 +265,6 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
     return () => {
       socket.off('kill', onKill);
       socket.off('notice', onNotice);
-      socket.off('chat', onChat);
       socket.off('vote', onVotes);
       socket.off('room:changed', onRoom);
       socket.off('match:end', onEnd);
@@ -313,20 +278,13 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
     };
   }, [onLeave, onRoom, you, room.mode, session.admin]);
 
-  const pick = (characterId: CharacterId, skin: SkinId, color: string) => {
-    const next = { ...skins, [characterId]: skin };
-    const nextColors = { ...colors, [characterId]: color };
-    try {
-      localStorage.setItem(CHAR_KEY, characterId);
-      localStorage.setItem(SKINS_KEY, JSON.stringify(next));
-      localStorage.setItem(COLORS_KEY, JSON.stringify(nextColors));
-    } catch {}
+  const pick = (characterId: CharacterId, look: Look) => {
+    saveChar(characterId);
+    saveLook(characterId, look);
     setCharId(characterId);
-    setSkins(next);
-    setColors(nextColors);
     setSelecting(false);
     engine.current?.requestLock(); // must happen inside the click
-    engine.current?.spawn(characterId, skin, color); // spawns now, or when the countdown ends
+    engine.current?.spawn(characterId, look); // spawns now, or when the countdown ends
   };
   const keep = () => {
     setSelecting(false);
@@ -382,8 +340,6 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
         <CharacterScreen
           info={info}
           current={charId}
-          skins={skins}
-          colors={colors}
           mode={room.mode}
           onPick={pick}
           onKeep={keep}
@@ -412,7 +368,7 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
           mode={room.mode}
           onResume={() => engine.current?.requestLock()}
           onSettings={() => setMenu('settings')}
-          onManual={() => setMenu('manual')}
+          onControls={() => setMenu('controls')}
           onSwitchTeam={switchTeam}
           onLeave={leave}
           admin={!!session.admin}
@@ -440,7 +396,11 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
         <AdminDialog room={room} you={you} onStats={() => setMenu('stats')} onClose={() => setMenu(null)} />
       )}
       {menu === 'ranking' && <RankingDialog admin={!!session.admin} onClose={() => setMenu(null)} />}
-      {menu === 'manual' && <Manual onClose={() => setMenu(null)} />}
+      {menu === 'controls' && (
+        <div className="pz pz-layer">
+          <Controls onClose={() => setMenu(null)} />
+        </div>
+      )}
       {menu === 'tour' && (
         <TournamentDialog room={room} you={you} admin={!!session.admin} onClose={() => setMenu(null)} />
       )}

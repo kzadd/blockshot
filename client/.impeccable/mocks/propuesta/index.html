@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BLOCKSHOT · Propuesta visual</title>
+    <link rel="icon" href="/brand/blockshot-favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Chakra+Petch:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./proto.css" />
+    <link rel="stylesheet" href="./round3.css" />
+  </head>
+  <body>
+    <div class="backdrop" id="backdrop" aria-hidden="true"></div>
+    <div class="app">
+      <header class="bar">
+        <a class="logo" href="#jugar"><img src="/brand/blockshot-logo-transparente.svg" alt="BLOCKSHOT" /></a>
+        <nav class="tabs" aria-label="Pantallas">
+          <a href="#jugar" data-tab="jugar">Jugar</a>
+          <a href="#ranking" data-tab="ranking">Ranking</a>
+          <a href="#ajustes" data-tab="ajustes">Ajustes</a>
+        </nav>
+        <nav class="tabs prop" aria-label="Propuesta">
+          <a href="#estilo" data-tab="estilo">Estilo</a>
+          <a href="#plan" data-tab="plan">Plan</a>
+        </nav>
+        <label class="nick"><span>Tu nombre</span><input value="RICARDO" maxlength="16" /></label>
+      </header>
+
+      <main id="v-jugar" class="screen jugar">
+        <section class="panel lobby">
+          <div class="ptabs" role="tablist">
+            <button role="tab" data-lt="salas" aria-selected="true">Salas abiertas <b id="roomCount"></b></button>
+            <button role="tab" data-lt="crear" aria-selected="false">Crear sala</button>
+          </div>
+          <div class="lt" id="lt-salas"></div>
+          <div class="lt create" id="lt-crear" hidden>
+            <div class="c-left">
+              <h2 class="lbl">Mapa</h2>
+              <div class="maps" id="maps"></div>
+              <h2 class="lbl">Modo de juego</h2>
+              <div class="modes" id="modes"></div>
+              <div class="rules">
+                <div>
+                  <h2 class="lbl">Para ganar</h2>
+                  <div class="seg" id="limits"></div>
+                </div>
+                <div>
+                  <h2 class="lbl">Tamaño</h2>
+                  <div class="seg" id="sizes"></div>
+                </div>
+                <div>
+                  <h2 class="lbl">Jugadores</h2>
+                  <div class="stepper" id="players">
+                    <button data-step="-1" aria-label="Menos">−</button><b></b
+                    ><button data-step="1" aria-label="Más">+</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="c-right">
+              <div class="preview" id="mapPreview"></div>
+              <div class="two">
+                <label
+                  ><span class="lbl">Nombre de la sala</span
+                  ><input class="upper" id="roomName" maxlength="24" placeholder="SALA DE RICARDO"
+                /></label>
+                <label
+                  ><span class="lbl">Contraseña · opcional</span
+                  ><input id="roomPass" placeholder="Vacía: entra cualquiera"
+                /></label>
+              </div>
+              <div>
+                <h2 class="lbl">Resumen</h2>
+                <dl class="summary" id="summary"></dl>
+              </div>
+              <button class="btn primary wide">Crear y entrar</button>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <main id="v-personaje" class="screen chars" hidden>
+        <ol class="roster" id="roster"></ol>
+        <section class="stage">
+          <div class="view">
+            <div class="stage-bg" id="stageBg"></div>
+            <canvas id="studio"></canvas>
+            <div class="stage-top">
+              <div class="seg sm" id="lookSeg">
+                <button data-look="now">Actual</button><button class="on" data-look="new">Mejorado</button>
+              </div>
+              <span class="hint">Arrastra para girar</span>
+            </div>
+            <div class="colors" id="colors" aria-label="Color del traje"></div>
+            <ul class="adds" id="adds"></ul>
+          </div>
+          <div class="skin-row" id="skins"></div>
+        </section>
+        <aside class="panel info" id="info"></aside>
+      </main>
+
+      <main id="v-ranking" class="screen ranking" hidden></main>
+      <main id="v-ajustes" class="screen ajustes" hidden></main>
+      <main id="v-estilo" class="screen estilo" hidden></main>
+      <main id="v-plan" class="screen plan" hidden></main>
+    </div>
+
+    <dialog class="modal" id="passModal" aria-labelledby="passTitle">
+      <form method="dialog">
+        <h2 id="passTitle"></h2>
+        <p class="meta" id="passSub"></p>
+        <label><span class="lbl">Contraseña</span><input type="password" id="passInput" autocomplete="off" /></label>
+        <p class="err" id="passErr" hidden>Contraseña incorrecta. Pídesela a quien creó la sala.</p>
+        <div class="modal-actions">
+          <button class="btn" value="cancel" formnovalidate>Cancelar</button>
+          <button class="btn primary" id="passOk" value="ok">Entrar</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog class="modal wide" id="keysModal" aria-labelledby="keysTitle">
+      <form method="dialog">
+        <h2 id="keysTitle">Controles</h2>
+        <div class="keys" id="keysList"></div>
+        <div class="modal-actions"><button class="btn primary" value="ok">Cerrar</button></div>
+      </form>
+    </dialog>
+    <script type="module" src="./proto.js"></script>
+  </body>
+</html>

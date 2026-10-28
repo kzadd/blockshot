@@ -3,7 +3,9 @@ import type { CrosshairConfig } from './settingsStore';
 /** Spread (radians) → extra gap in px for the dynamic crosshair, up to a maximum. */
 const SPREAD_TO_PX = 350;
 const MAX_DYNAMIC_GAP = 36;
-const OUTLINE_PX = 2;
+/** Dark outline around every piece (px each side): readable on the bright sky and sand walls. */
+const OUTLINE_PX = 1;
+const OUTLINE = 'rgba(0,0,0,0.7)';
 
 interface Props {
   cfg: CrosshairConfig;
@@ -13,48 +15,44 @@ interface Props {
   half?: number;
 }
 
-// Crosshair drawn in SVG from the settings
+type Rect = [x: number, y: number, w: number, h: number];
+
+// Crosshair drawn in SVG from the settings, like competitive shooters do: square-cut arms and dot on whole
+// pixels (crisp at any size), a 1 px dark outline, and the gap opening with the weapon's spread.
 export default function Crosshair({ cfg, spread = 0, className = 'crosshair', half = 64 }: Props) {
   const { style, color, size, thickness: t, gap, outline, dynamic } = cfg;
-  const g = gap + (dynamic ? Math.min(MAX_DYNAMIC_GAP, spread * SPREAD_TO_PX) : 0);
+  const g = Math.round(gap + (dynamic ? Math.min(MAX_DYNAMIC_GAP, spread * SPREAD_TO_PX) : 0));
+  const o = -t / 2;
 
-  const arms: [number, number][] =
-    style === 't'
-      ? [
-          [0, 1],
-          [-1, 0],
-          [1, 0],
-        ]
-      : [
-          [0, -1],
-          [0, 1],
-          [-1, 0],
-          [1, 0],
-        ];
-  const lines = ['cross', 'crossdot', 't', 'x'].includes(style)
-    ? arms.map(([dx, dy]) => [dx * g, dy * g, dx * (g + size), dy * (g + size)] as const)
-    : [];
-  const dotR =
-    style === 'dot' ? Math.max(1.5, t * 1.25) : style === 'crossdot' || style === 'circle' ? t * 0.6 + 0.6 : 0;
+  const rects: Rect[] = [];
+  if (['cross', 'crossdot', 't', 'x'].includes(style)) {
+    if (style !== 't') rects.push([o, -g - size, t, size]);
+    rects.push([o, g, t, size], [-g - size, o, size, t], [g, o, size, t]);
+  }
+  // The dot is a square too: a round one this small only blurs
+  const dot = style === 'dot' ? Math.max(2, t + 1) : style === 'crossdot' || style === 'circle' ? t : 0;
+  if (dot) rects.push([-dot / 2, -dot / 2, dot, dot]);
   const ringR = style === 'circle' ? g + size * 0.6 : 0;
 
-  const layer = (stroke: string, extra: number) => (
-    <g stroke={stroke} fill="none" strokeWidth={t + extra}>
-      {lines.map(([x1, y1, x2, y2], i) => {
-        // the outline sticks out a bit at the ends
-        const ex = Math.sign(x2 - x1) * (extra / 2);
-        const ey = Math.sign(y2 - y1) * (extra / 2);
-        return <line key={i} x1={x1 - ex} y1={y1 - ey} x2={x2 + ex} y2={y2 + ey} />;
-      })}
-      {ringR > 0 && <circle r={ringR} />}
-      {dotR > 0 && <circle r={dotR + extra / 2} fill={stroke} stroke="none" />}
+  const layer = (fill: string, e: number) => (
+    <g fill={fill}>
+      {rects.map(([x, y, w, h], i) => (
+        <rect key={i} x={x - e} y={y - e} width={w + e * 2} height={h + e * 2} />
+      ))}
+      {ringR > 0 && <circle r={ringR} fill="none" stroke={fill} strokeWidth={t + e * 2} />}
     </g>
   );
 
   return (
-    <svg className={className} width={half * 2} height={half * 2} viewBox={`${-half} ${-half} ${half * 2} ${half * 2}`}>
+    <svg
+      className={className}
+      width={half * 2}
+      height={half * 2}
+      viewBox={`${-half} ${-half} ${half * 2} ${half * 2}`}
+      shapeRendering={style === 'x' || ringR ? 'geometricPrecision' : 'crispEdges'}
+    >
       <g transform={style === 'x' ? 'rotate(45)' : undefined}>
-        {outline && layer('rgba(0,0,0,0.75)', OUTLINE_PX)}
+        {outline && layer(OUTLINE, OUTLINE_PX)}
         {layer(color, 0)}
       </g>
     </svg>

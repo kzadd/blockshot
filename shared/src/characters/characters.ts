@@ -109,7 +109,26 @@ export const isCharacterId = (v: unknown): v is CharacterId => typeof v === 'str
 
 /** Who you are (the head and bare skin); `base` is the human. The class still decides the body and stats. */
 export type SkinId =
-  'base' | 'alien' | 'mapache' | 'robot' | 'oso' | 'astronauta' | 'zombi' | 'rana' | 'gato' | 'calabaza';
+  | 'base'
+  | 'alien'
+  | 'mapache'
+  | 'robot'
+  | 'oso'
+  | 'astronauta'
+  | 'zombi'
+  | 'rana'
+  | 'gato'
+  | 'calabaza'
+  | 'ninja'
+  | 'pirata'
+  | 'caballero'
+  | 'vikingo'
+  | 'esqueleto'
+  | 'panda'
+  | 'pinguino'
+  | 'perro'
+  | 'dino'
+  | 'buho';
 
 /** Skins only change the look, never the stats (the models live in the client). */
 export const SKINS: { id: SkinId; name: string }[] = [
@@ -123,6 +142,16 @@ export const SKINS: { id: SkinId; name: string }[] = [
   { id: 'rana', name: 'Rana' },
   { id: 'gato', name: 'Gato' },
   { id: 'calabaza', name: 'Calabaza' },
+  { id: 'ninja', name: 'Ninja' },
+  { id: 'pirata', name: 'Pirata' },
+  { id: 'caballero', name: 'Caballero' },
+  { id: 'vikingo', name: 'Vikingo' },
+  { id: 'esqueleto', name: 'Esqueleto' },
+  { id: 'panda', name: 'Panda' },
+  { id: 'pinguino', name: 'Pingüino' },
+  { id: 'perro', name: 'Perro' },
+  { id: 'dino', name: 'Dinosaurio' },
+  { id: 'buho', name: 'Búho' },
 ];
 export const isSkinId = (v: unknown): v is SkinId => SKINS.some((k) => k.id === v);
 
@@ -140,6 +169,7 @@ export const OUTFIT_COLORS = [
   { hex: '#e0782e', name: 'Naranja' },
   { hex: '#e0609e', name: 'Rosa' },
   { hex: '#5f6873', name: 'Grafito' },
+  { hex: '#b8935a', name: 'Arena' },
 ] as const;
 export type OutfitColor = (typeof OUTFIT_COLORS)[number]['hex'];
 export const OUTFIT_COLOR_HEXES = OUTFIT_COLORS.map((c) => c.hex);

@@ -1,9 +1,7 @@
-import { useEffect, useState } from 'react';
-import { mapImage } from '../lobby/mapImage';
-import { Icon } from '../ui/icons';
-import { Check, Slider } from '../ui/ui';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import Controls from '../manual/Manual';
 import Crosshair from './Crosshair';
-import { COLORBLIND } from './palette';
+import { COLORBLIND, palette } from './palette';
 import {
   CROSSHAIRS,
   CROSSHAIR_COLORS,
@@ -12,234 +10,270 @@ import {
   useSettings,
   type CrosshairConfig,
 } from './settingsStore';
+import '../styles/proposal.css';
+import '../styles/pz-extra.css';
 
-const TABS = ['Mira', 'Ratón, vista y sonido', 'Accesibilidad'];
-/** Spread shown while the preview is held down. */
-const PREVIEW_SPREAD = 0.02;
+// The proposal's Ajustes screen (.impeccable/mocks/propuesta/proto.js, #v-ajustes): same markup, classes and texts.
 
-export default function Settings({ onClose }: { onClose: () => void }) {
+function Range(props: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  format: (v: number) => string;
+  onChange: (v: number) => void;
+  style?: CSSProperties;
+  children?: ReactNode;
+}) {
+  const { label, value, min, max, step = 1, format, onChange, style, children } = props;
+  return (
+    <div className="set" style={style}>
+      <span>{label}</span>
+      <b className="val">{format(value)}</b>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        aria-label={label}
+        onChange={(e) => onChange(Number(e.target.value))}
+      />
+      {children}
+    </div>
+  );
+}
+
+function Toggle({ label, on, onChange }: { label: string; on: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className="set">
+      <span>{label}</span>
+      <button
+        className={`toggle ${on ? 'on' : ''}`}
+        role="switch"
+        aria-checked={on}
+        aria-label={label}
+        onClick={() => onChange(!on)}
+      />
+    </div>
+  );
+}
+
+/** Spread shown while the preview is held down (the gun's spread when moving and shooting, radians). */
+const PREVIEW_SPREAD = 0.03;
+
+/** The crosshair preview: the game's own Crosshair (same SVG as in a match) over the Patio picture. */
+function XhPreview({ cfg }: { cfg: CrosshairConfig }) {
+  const [held, setHeld] = useState(false);
+  const release = () => setHeld(false);
+  return (
+    <div
+      className={`xh-box ${cfg.dynamic ? '' : 'static'}`}
+      onPointerDown={() => cfg.dynamic && setHeld(true)}
+      onPointerUp={release}
+      onPointerLeave={release}
+    >
+      <Crosshair cfg={cfg} spread={held ? PREVIEW_SPREAD : 0} />
+      <small className="xh-hint">Mantén pulsado para verla abrirse</small>
+    </div>
+  );
+}
+
+const fixed2 = (v: number) => v.toFixed(2);
+
+/** The three settings panels: the lobby's Ajustes page and the in-game window show the same thing. */
+export function SettingsPanels() {
   const st = useSettings();
-  const [tab, setTab] = useState(0);
   const ch = st.crosshair;
   const setCh = (patch: Partial<CrosshairConfig>) => setSettings({ crosshair: patch });
-  const [demo, setDemo] = useState(0); // holding the preview down opens the crosshair
-  const custom = !CROSSHAIR_COLORS.includes(ch.color);
-
-  useEffect(() => {
-    const esc = (e: KeyboardEvent) => e.code === 'Escape' && onClose();
-    window.addEventListener('keydown', esc);
-    return () => window.removeEventListener('keydown', esc);
-  }, [onClose]);
+  const [keys, setKeys] = useState(false);
 
   return (
-    <div className="modal-bg" onClick={onClose}>
-      <div className="modal settings" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <h2>Ajustes</h2>
-          <span className="esc">Esc para cerrar</span>
-          <button className="btn icon" onClick={onClose} aria-label="Cerrar">
-            <Icon name="x" size={18} />
+    <>
+      <section className="panel">
+        <h2 className="sec">Mira</h2>
+        <XhPreview cfg={ch} />
+        <div className="set">
+          <span>Estilo</span>
+          <div className="seg sm">
+            {CROSSHAIRS.map((c) => (
+              <button key={c.id} className={ch.style === c.id ? 'on' : ''} onClick={() => setCh({ style: c.id })}>
+                {c.name}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="set">
+          <span>Color</span>
+          <div className="swatches">
+            {CROSSHAIR_COLORS.map((c) => (
+              <button
+                key={c}
+                className={ch.color === c ? 'on' : ''}
+                style={{ background: c }}
+                aria-label={`Color ${c}`}
+                onClick={() => setCh({ color: c })}
+              />
+            ))}
+            <label
+              className={`custom ${CROSSHAIR_COLORS.includes(ch.color) ? '' : 'on'}`}
+              title="Otro color"
+              aria-label="Otro color"
+            >
+              <input type="color" value={ch.color} onChange={(e) => setCh({ color: e.target.value })} />
+            </label>
+          </div>
+        </div>
+        <Range label="Tamaño" value={ch.size} min={2} max={20} format={String} onChange={(v) => setCh({ size: v })} />
+        <Range
+          label="Grosor"
+          value={ch.thickness}
+          min={1}
+          max={5}
+          format={String}
+          onChange={(v) => setCh({ thickness: v })}
+        />
+        <Range label="Separación" value={ch.gap} min={0} max={14} format={String} onChange={(v) => setCh({ gap: v })} />
+        <Toggle label="Contorno negro" on={ch.outline} onChange={(v) => setCh({ outline: v })} />
+        <Toggle label="Se abre al moverte y disparar" on={ch.dynamic} onChange={(v) => setCh({ dynamic: v })} />
+      </section>
+
+      <section className="panel">
+        <h2 className="sec">Ratón y vista</h2>
+        <Range
+          label="Sensibilidad"
+          value={st.sens}
+          min={0.1}
+          max={3}
+          step={0.05}
+          format={fixed2}
+          onChange={(v) => setSettings({ sens: v })}
+        />
+        <Range
+          label="Sensibilidad al apuntar"
+          value={st.adsSens}
+          min={0.3}
+          max={1.5}
+          step={0.05}
+          format={fixed2}
+          onChange={(v) => setSettings({ adsSens: v })}
+          style={{ paddingBottom: '0.4rem', border: 0 }}
+        >
+          <p className="tip">
+            Se aplica solo mientras apuntas (clic derecho) y ya compensa el zoom de cada arma. 1,00 = igual que sin
+            apuntar; por debajo, más lenta y precisa (útil con francotirador); por encima, más rápida.
+          </p>
+        </Range>
+        <Range
+          label="Campo de visión"
+          value={st.fov}
+          min={60}
+          max={110}
+          format={(v) => `${v}°`}
+          onChange={(v) => setSettings({ fov: v })}
+        />
+        <Toggle label="Sacudida al recibir daño" on={st.shake} onChange={(v) => setSettings({ shake: v })} />
+        <div className="set">
+          <span>Teclas y controles</span>
+          <button className="btn" onClick={() => setKeys(true)}>
+            Ver controles
           </button>
         </div>
-        <nav className="seg tabs">
-          {TABS.map((t, i) => (
-            <button key={t} className={tab === i ? 'on' : ''} onClick={() => setTab(i)}>
-              {t}
-            </button>
-          ))}
-        </nav>
+      </section>
 
-        <div className="settings-body">
-          {tab === 0 && (
-            <div className="xh-layout">
-              <div>
-                <div
-                  className="xh-preview"
-                  style={{ backgroundImage: `url(${mapImage('patio')})` }}
-                  onMouseDown={() => setDemo(PREVIEW_SPREAD)}
-                  onMouseUp={() => setDemo(0)}
-                  onMouseLeave={() => setDemo(0)}
+      <section className="panel">
+        <h2 className="sec">Sonido, accesibilidad y gráficos</h2>
+        <Range
+          label="Volumen"
+          value={Math.round(st.volume * 100)}
+          min={0}
+          max={100}
+          format={(v) => `${v} %`}
+          onChange={(v) => setSettings({ volume: v / 100 })}
+        />
+        <div className="set">
+          <span>Daltonismo</span>
+          <div className="cb">
+            {COLORBLIND.map((m) => {
+              const p = palette({ ...st, colorblind: m.id });
+              const sw: [string, string][] = [
+                [p.ally, 'Aliado'],
+                [p.enemy, 'Enemigo'],
+                [p.team[1], 'Equipo 1'],
+                [p.team[2], 'Equipo 2'],
+              ];
+              return (
+                <button
+                  key={m.id}
+                  className={st.colorblind === m.id ? 'on' : ''}
+                  title={m.help}
+                  aria-pressed={st.colorblind === m.id}
+                  onClick={() => setSettings({ colorblind: m.id })}
                 >
-                  <Crosshair cfg={ch} spread={demo} className="crosshair static" />
-                  <small>Mantén pulsado para ver cómo se abre</small>
-                </div>
-                <div className="xh-styles">
-                  {CROSSHAIRS.map((c) => (
-                    <button key={c.id} className={ch.style === c.id ? 'on' : ''} onClick={() => setCh({ style: c.id })}>
-                      <Crosshair
-                        cfg={{
-                          ...ch,
-                          style: c.id,
-                          size: 5,
-                          gap: 2,
-                          thickness: 2,
-                          dynamic: false,
-                          outline: false,
-                          color: ch.style === c.id ? '#1d242c' : '#ece3cf',
-                        }}
-                        className="crosshair mini"
-                        half={10}
-                      />
-                      {c.name}
-                    </button>
+                  {m.name}
+                  {sw.map(([c, n]) => (
+                    <i key={n} style={{ background: c }}>
+                      {n}
+                    </i>
                   ))}
-                </div>
-              </div>
-
-              <div className="xh-controls">
-                <div className="colors">
-                  <span className="label">Color</span>
-                  {CROSSHAIR_COLORS.map((c) => (
-                    <button
-                      key={c}
-                      aria-label={c}
-                      className={ch.color === c ? 'on' : ''}
-                      style={{ background: c }}
-                      onClick={() => setCh({ color: c })}
-                    />
-                  ))}
-                  <label
-                    className="free"
-                    style={custom ? { boxShadow: '0 0 0 3px #1d242c, 0 0 0 5px #ffc531' } : undefined}
-                  >
-                    <input type="color" value={ch.color} onChange={(e) => setCh({ color: e.target.value })} />
-                    Libre
-                  </label>
-                </div>
-                <Slider
-                  label="Tamaño"
-                  value={ch.size}
-                  min={2}
-                  max={20}
-                  format={(v) => `${v} px`}
-                  onChange={(v) => setCh({ size: v })}
-                />
-                <Slider
-                  label="Grosor"
-                  value={ch.thickness}
-                  min={1}
-                  max={6}
-                  format={(v) => `${v} px`}
-                  onChange={(v) => setCh({ thickness: v })}
-                />
-                <Slider
-                  label="Separación"
-                  value={ch.gap}
-                  min={0}
-                  max={16}
-                  format={(v) => `${v} px`}
-                  onChange={(v) => setCh({ gap: v })}
-                />
-                <div className="toggles">
-                  <Check checked={ch.outline} onChange={(v) => setCh({ outline: v })}>
-                    Contorno negro
-                  </Check>
-                  <Check checked={ch.dynamic} onChange={(v) => setCh({ dynamic: v })}>
-                    Se abre al moverte y disparar
-                  </Check>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {tab === 1 && (
-            <div className="grid-2">
-              <Slider
-                label="Sensibilidad"
-                value={st.sens}
-                min={0.2}
-                max={3}
-                step={0.05}
-                format={(v) => v.toFixed(2)}
-                onChange={(v) => setSettings({ sens: v })}
-              />
-              <Slider
-                label="Sensibilidad al apuntar"
-                value={st.adsSens}
-                min={0.3}
-                max={1.5}
-                step={0.05}
-                format={(v) => `×${v.toFixed(2)}`}
-                onChange={(v) => setSettings({ adsSens: v })}
-              />
-              <Slider
-                label="Campo de visión"
-                value={st.fov}
-                min={65}
-                max={110}
-                format={(v) => `${v}°`}
-                onChange={(v) => setSettings({ fov: v })}
-              />
-              <Slider
-                label="Volumen"
-                value={Math.round(st.volume * 100)}
-                min={0}
-                max={100}
-                format={(v) => `${v} %`}
-                onChange={(v) => setSettings({ volume: v / 100 })}
-              />
-              <p className="settings-note">
-                <Icon name="info" size={18} />
-                «Sensibilidad al apuntar» a ×1 hace que la mira se sienta igual que sin apuntar; menos, más lenta.
-              </p>
-            </div>
-          )}
-
-          {tab === 2 && (
-            <div className="settings-access">
-              <div className="kicker">Modo daltónico</div>
-              <div className="seg" role="radiogroup" aria-label="Modo daltónico">
-                {COLORBLIND.map((c) => (
-                  <button
-                    key={c.id}
-                    role="radio"
-                    aria-checked={st.colorblind === c.id}
-                    className={st.colorblind === c.id ? 'on' : ''}
-                    onClick={() => setSettings({ colorblind: c.id })}
-                  >
-                    <b>{c.name}</b>
-                    {c.help && <small>{c.help}</small>}
-                  </button>
-                ))}
-              </div>
-              <div className="cb-swatches">
-                <span>
-                  <i style={{ background: 'var(--aliado)' }} />
-                  Aliado
-                </span>
-                <span>
-                  <i style={{ background: 'var(--enemigo)' }} />
-                  Enemigo
-                </span>
-                <span>
-                  <i style={{ background: 'var(--eq-rojo)' }} />
-                  Equipo Rojo
-                </span>
-                <span>
-                  <i style={{ background: 'var(--eq-azul)' }} />
-                  Equipo Azul
-                </span>
-              </div>
-              <div className="sep" />
-              <Check
-                checked={st.shake}
-                onChange={(v) => setSettings({ shake: v })}
-                help="La cámara y el HUD tiemblan un instante al recibir daño."
-              >
-                Sacudida al recibir daño
-              </Check>
-            </div>
-          )}
+                </button>
+              );
+            })}
+          </div>
         </div>
-
-        <div className="modal-foot">
-          <button className="btn ghost md" onClick={() => setSettings(DEFAULTS)}>
-            Restablecer
+        <div className="set">
+          <span>
+            Calidad gráfica<span className="new">Nuevo</span>
+          </span>
+          <div className="seg sm">
+            {(
+              [
+                ['baja', 'Baja'],
+                ['alta', 'Alta'],
+              ] as const
+            ).map(([id, name]) => (
+              <button key={id} className={st.quality === id ? 'on' : ''} onClick={() => setSettings({ quality: id })}>
+                {name}
+              </button>
+            ))}
+          </div>
+          <small>Baja: pensada para gráfica integrada. Alta: sombras suaves, antialias y oclusión ambiental.</small>
+        </div>
+        <div className="set reset">
+          <span>Valores de fábrica</span>
+          <button className="btn" onClick={() => setSettings(DEFAULTS)}>
+            Restablecer todo
           </button>
-          <button className="btn primary md" onClick={onClose}>
+        </div>
+      </section>
+      {keys && <Controls onClose={() => setKeys(false)} />}
+    </>
+  );
+}
+
+/** In game (O and the pause menu) the same screen opens over the game, in its own `.pz` root. */
+export default function Settings({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    // Esc closes it (the controls window, when open, is a native dialog that takes Esc itself)
+    const down = (e: KeyboardEvent) => e.code === 'Escape' && !document.querySelector('dialog[open]') && onClose();
+    window.addEventListener('keydown', down);
+    return () => window.removeEventListener('keydown', down);
+  }, [onClose]);
+  return (
+    <div className="pz pz-layer dim" role="dialog" aria-modal="true" aria-labelledby="st-title">
+      <div className="app">
+        <div className="headrow">
+          <h1 className="title" id="st-title">
+            Ajustes
+          </h1>
+          <button className="btn primary" onClick={onClose}>
             Listo
           </button>
         </div>
+        <main className="screen ajustes">
+          <SettingsPanels />
+        </main>
       </div>
     </div>
   );

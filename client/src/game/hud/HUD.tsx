@@ -4,7 +4,6 @@ import {
   CHAR_BY_ID,
   SHIELD,
   MEDALS,
-  QUICK_CHAT,
   ZONE_NAMES,
   STREAK_REWARDS,
   WEAPONS,
@@ -16,7 +15,6 @@ import {
   type KillEvent,
   type ModeId,
   type Team,
-  type WeaponId,
 } from '@blockshot/shared';
 import Crosshair from '../../settings/Crosshair';
 import { useSettings } from '../../settings/settingsStore';
@@ -33,7 +31,6 @@ export type FeedItem = { key: number; t: number; out?: boolean } & (
   | ({ type: 'kill' } & KillEvent)
   | { type: 'streak'; name: string; team: Team; label: string; n: number }
   | { type: 'notice'; text: string }
-  | { type: 'chat'; name: string; team: Team; text: string }
 );
 
 export interface KillBanner {
@@ -103,15 +100,6 @@ export function Feed({ feed, you, mode }: { feed: FeedItem[]; you: string; mode:
             </div>
           );
         }
-        if (f.type === 'chat') {
-          return (
-            <div key={f.key} className={`feed-item chat${out}`}>
-              <Icon name="message" size={14} />
-              <b style={{ color: color(f.team) }}>{f.name}</b>
-              <span>{f.text}</span>
-            </div>
-          );
-        }
         return (
           <div key={f.key} className={`feed-item notice${out}`}>
             {f.text}
@@ -134,6 +122,18 @@ export function RoomInfo({ info }: { info: RoomView }) {
         {info.players}/{info.max} jugando
       </span>
       {ping > 0 && <span className={ping > BAD_PING_MS ? 'bad' : ''}>{ping} ms</span>}
+    </div>
+  );
+}
+
+/** Which side you are on, under the minimap (team modes only). */
+function TeamChip() {
+  const h = useHud((s) => ({ mode: s.mode, myTeam: s.myTeam }));
+  if (!h || !isTeamMode(h.mode) || h.myTeam === 0) return null;
+  return (
+    <div className="team-chip" style={{ '--t': teamVar(h.myTeam), '--tt': TEAM_TXT[h.myTeam] }}>
+      <small>Tu equipo</small>
+      <b>{teamName(h.mode, h.myTeam)}</b>
     </div>
   );
 }
@@ -196,8 +196,6 @@ function Health() {
     stamina: s.stamina,
     staminaLow: s.staminaLow,
     sprinting: s.sprinting,
-    mode: s.mode,
-    myTeam: s.myTeam,
   }));
   const chunks = useChunks(h?.hp ?? 0, h?.maxHp ?? 1);
   if (!h) return null;
@@ -207,23 +205,13 @@ function Health() {
   const char = h.characterId ? CHAR_BY_ID[h.characterId] : undefined;
   return (
     <div className={`hud-block hp ${tone}`}>
-      {/* Which side you are on, always in sight in team modes */}
-      {isTeamMode(h.mode) && h.myTeam !== 0 && (
-        <span className="team-badge" style={{ '--t': teamVar(h.myTeam), '--tt': TEAM_TXT[h.myTeam] }}>
-          Equipo {teamName(h.mode, h.myTeam)}
-        </span>
-      )}
       <b className="hp-num">{h.hp}</b>
       <div className="hp-side">
         <div className="hp-labels">
           <span className="hp-class" style={{ '--c': char?.color }}>
             {char?.name}
           </span>
-          {h.armor > 0 ? (
-            <span className="armor-num">Blindaje {h.armor}</span>
-          ) : (
-            <span className="hp-max">/ {h.maxHp}</span>
-          )}
+          {h.armor > 0 ? <span className="armor-num">Blindaje {h.armor}</span> : <span className="hp-max">Vida</span>}
         </div>
         <div className="relative">
           {/* Four quarter blocks, like the world's pieces */}
@@ -301,12 +289,15 @@ function Ammo() {
   }));
   if (!h) return null;
   const low = h.mag > 0 && h.mag <= h.magSize * LOW_AMMO;
-  // Scoped: the rest of the HUD hides, so the block names the weapon; gun game shows the ladder step
-  const label = h.scoped ? h.weaponName : h.gunLevel ? `Arma ${h.gunLevel}/${h.gunTotal}` : '';
+  // Gun game: the ladder step next to the weapon's name
+  const step = h.gunLevel ? `${h.gunLevel}/${h.gunTotal}` : '';
   return (
     <div className="hud-block ammo">
       <div className="ammo-main">
-        {label && <span className="wname">{label}</span>}
+        <span className="wname">
+          {h.weaponName}
+          {step && <small>Arma {step}</small>}
+        </span>
         {h.reloading ? (
           <div className="reloading">
             <b>Recargando</b>
@@ -326,9 +317,8 @@ function Ammo() {
       {!h.scoped && (
         <div className="slots">
           {h.loadout.map((n, i) => (
-            <span key={n + i} className={h.slot === i ? 'on' : ''}>
+            <span key={n + i} className={h.slot === i ? 'on' : ''} title={n}>
               <em>{i + 1}</em>
-              {h.slot === i && n}
             </span>
           ))}
           <span className={`gren ${h.grenades ? '' : 'used'}`} title="Granada">
@@ -400,8 +390,8 @@ function TopCenter({ mode, scoreLimit, you }: { mode: ModeId; scoreLimit: number
               style={{ '--t': teamVar(t), '--tt': TEAM_TXT[t], order: t === 1 ? 0 : 2 }}
             >
               <small>
-                {teamName(mode, t).toUpperCase()}
-                {h.myTeam === t ? ' · TÚ' : ''}
+                {teamName(mode, t)}
+                {h.myTeam === t && <em>Tú</em>}
               </small>
               <b>{teamScore[t]}</b>
               <span className="bar">
@@ -410,7 +400,10 @@ function TopCenter({ mode, scoreLimit, you }: { mode: ModeId; scoreLimit: number
               {h.flags && <span className="flag-st">{flagStatus(h.flags[t], players, you)}</span>}
             </div>
           ))}
-          <span className="ts-limit">/ {scoreLimit}</span>
+          <span className="ts-limit">
+            <small>Meta</small>
+            {scoreLimit}
+          </span>
         </div>
         {h.zones && (
           <div className="top-sub zones">
@@ -444,7 +437,7 @@ function TopCenter({ mode, scoreLimit, you }: { mode: ModeId; scoreLimit: number
     const gun = (p: HudPlayer) =>
       `${WEAPONS[ladder[Math.min(p.lv, ladder.length - 1)]!].name} (${p.lv + 1}/${ladder.length})`;
     return (
-      <div className="hud-top leader">
+      <div className="hud-top leader ladder">
         <span className="first">1º {pos === 1 ? 'Tú' : top.n}</span>
         <span className="pill">{gun(top)}</span>
         {pos !== 1 && me && (
@@ -469,8 +462,10 @@ function TopCenter({ mode, scoreLimit, you }: { mode: ModeId; scoreLimit: number
   return (
     <div className="hud-top leader">
       <span className="first">1º {pos === 1 ? 'Tú' : first.n}</span>
-      <span className="pill">
-        {first.k} / {scoreLimit}
+      <span className="pill">{first.k}</span>
+      <span className="ts-limit">
+        <small>Meta</small>
+        {scoreLimit}
       </span>
       {right && (
         <>
@@ -539,28 +534,17 @@ function SmokeFog() {
   return k ? <div className="smoke-fog" style={{ opacity: k }} /> : null;
 }
 
-/** The sight each gun shows while fully aimed (the 3D gun steps aside so the target stays in view). */
-const SIGHT: Partial<Record<WeaponId, 'dot' | 'post' | 'ring' | 'scope'>> = {
-  rifle: 'dot',
-  smg: 'dot',
-  lmg: 'dot',
-  mpistol: 'dot',
-  pistol: 'post',
-  revolver: 'post',
-  shotgun: 'ring',
-  sawedoff: 'ring',
-  launcher: 'ring',
-  dmr: 'scope',
-};
-
-function AdsSight({ id }: { id: WeaponId }) {
+/**
+ * The marksman rifle's telescopic sight while fully aimed (its 3D scope would fill the view). Every other gun is
+ * aimed over the pack model's own iron sights, with the 3D gun in view.
+ */
+function ScopeSight() {
   const shotKey = useHud((s) => s.shotKey);
-  const kind = SIGHT[id] ?? 'dot';
   return (
-    <div className={`ads-sight ${kind}`}>
+    <div className="ads-sight scope">
       <div key={shotKey} className="ads-reticle">
         <i className="dot" />
-        {kind !== 'dot' && <i className="frame" />}
+        <i className="frame" />
       </div>
     </div>
   );
@@ -596,12 +580,12 @@ function Scope() {
 
 function AimCrosshair() {
   const settings = useSettings();
-  const h = useHud((s) => ({ aim: s.aim, spread: s.spread, shotKey: s.shotKey }));
+  const h = useHud((s) => ({ aim: s.aim, spread: s.spread }));
   if (!h) return null;
   // While aiming the gun's own sight is used (red dot or iron sight): the crosshair fades
   return (
     <div style={{ opacity: Math.max(0, 1 - h.aim * AIM_FADE), transition: 'opacity 80ms' }}>
-      <Crosshair key={h.shotKey} cfg={settings.crosshair} spread={h.spread} className="crosshair kick" />
+      <Crosshair cfg={settings.crosshair} spread={h.spread} />
     </div>
   );
 }
@@ -704,30 +688,6 @@ function CarryingFlag({ you }: { you: string }) {
   );
 }
 
-// Quick chat menu (V): numbered phrases, picked with the number keys
-function QuickChat() {
-  const open = useHud((s) => s.chatOpen);
-  if (!open) return null;
-  return (
-    <div className="quick-chat">
-      <span className="kicker">
-        <Icon name="message" size={13} />
-        Chat rápido
-      </span>
-      {QUICK_CHAT.map((c, i) => (
-        <div key={c.text} className="qc-row">
-          <kbd>{i + 1}</kbd>
-          <span>{c.text}</span>
-          {c.all && <small>todos</small>}
-        </div>
-      ))}
-      <span className="qc-hint">
-        <kbd>V</kbd> cerrar
-      </span>
-    </div>
-  );
-}
-
 function SpawnProtection() {
   const seconds = useHud((s) => Math.ceil(s.protect / MS_PER_S)) ?? 0;
   if (seconds <= 0) return null;
@@ -758,8 +718,13 @@ export default function HUD({ engine, map, mode, scoreLimit, you, feed, banner }
     <div className="hud stage">
       {/* First, so the rest of the HUD stays readable inside the smoke */}
       {alive && <SmokeFog />}
-      {alive && !scoped && <Minimap engine={engine} map={map} radar={h.radar} />}
-      {alive && !scoped && <NetWarning />}
+      {alive && !scoped && (
+        <div className="hud-left">
+          <Minimap engine={engine} map={map} radar={h.radar} />
+          <TeamChip />
+          <NetWarning />
+        </div>
+      )}
       {alive && !scoped && <TopCenter mode={mode} scoreLimit={scoreLimit} you={you} />}
       {!scoped && <Feed feed={feed} you={you} mode={mode} />}
 
@@ -773,14 +738,13 @@ export default function HUD({ engine, map, mode, scoreLimit, you, feed, banner }
             <Scope />
           ) : (
             <>
-              {h.sight ? <AdsSight id={h.sight} /> : <AimCrosshair />}
+              {h.sight ? <ScopeSight /> : <AimCrosshair />}
               <CenterMarks />
               <Banner banner={banner} />
             </>
           )}
           {!scoped && <CarryingFlag you={you} />}
           {!scoped && <SpawnProtection />}
-          {!scoped && <QuickChat />}
           <Health />
           <Ammo />
         </>

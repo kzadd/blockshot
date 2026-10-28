@@ -26,7 +26,7 @@ export function createRounds(room: Room): GameMode {
     until = now + ROUNDS.roundMs;
     // Everybody back at their side with full health, at once
     for (const p of room.players.values()) {
-      if (p.characterId) spawnPlayer(room, p, CHAR_BY_ID[p.characterId], p.skin, p.color);
+      if (p.characterId) spawnPlayer(room, p, CHAR_BY_ID[p.characterId], p.skin, p.color, p.camo, p.finish);
     }
     notice(room, `Ronda ${round}: ¡a por ellos!`);
   }

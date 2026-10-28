@@ -1,7 +1,5 @@
-import { useEffect, useState } from 'react';
-import { CHARACTERS, WEAPONS, MODE_BY_ID, PLAYER, weightName, damageAt, speedWith } from '@blockshot/shared';
-import { Icon } from '../ui/icons';
-import { Keys } from '../ui/ui';
+import { MODE_BY_ID, PLAYER, WEAPONS } from '@blockshot/shared';
+import Modal from '../ui/Modal';
 
 export const CONTROLS: [string[], string][] = [
   [['W', 'A', 'S', 'D'], 'Moverse'],
@@ -17,13 +15,12 @@ export const CONTROLS: [string[], string][] = [
   [['Tab'], 'Ver el marcador (mantener)'],
   [['B'], 'Cambiar de personaje (solo estando muerto)'],
   [['T'], 'Cambiar de equipo (por equipos; no en pleno combate)'],
-  [['V', '1–8'], 'Chat rápido: abre las frases y elige una con su número'],
   [['O'], 'Ajustes: mira, sensibilidad, campo de visión, volumen'],
-  [['H', 'F1'], 'Abrir este manual'],
+  [['H', 'F1'], 'Abrir los controles'],
   [['Esc'], 'Soltar el ratón / pausa'],
 ];
 
-const STEPS: [string, string][] = [
+export const STEPS: [string, string][] = [
   ['Escribe tu nombre', 'Así te verán los demás en el marcador y en el killfeed.'],
   ['Crea una sala o entra en una', 'Si tiene candado, pide la contraseña a quien la creó.'],
   ['Elige personaje y skin', 'Cada uno tiene vida, velocidad y armas distintas.'],
@@ -65,7 +62,7 @@ const STEPS: [string, string][] = [
   ],
 ];
 
-const TRICKS: [string, string][] = [
+export const TRICKS: [string, string][] = [
   ['Bunny hop', 'Mantén Espacio al aterrizar: cada salto encadenado conserva la velocidad.'],
   ['Deslízate', 'Corre y pulsa C para entrar en una esquina más rápido y más bajo.'],
   [
@@ -99,147 +96,30 @@ const TRICKS: [string, string][] = [
   ],
 ];
 
-const TABS = ['Controles', 'Cómo jugar', 'Personajes', 'Armas', 'Trucos'];
-const CARD_COLS = 4;
-/** Cards of an incomplete last row widen to fill it, so the grid stays symmetric (when they divide it evenly). */
-const lastRowSpan = (count: number, i: number): string | undefined => {
-  const rest = count % CARD_COLS;
-  return rest && CARD_COLS % rest === 0 && i >= count - rest ? `span ${CARD_COLS / rest}` : undefined;
-};
-
-export default function Manual({ onClose }: { onClose: () => void }) {
-  const [tab, setTab] = useState(0);
-
-  useEffect(() => {
-    const esc = (e: KeyboardEvent) => e.code === 'Escape' && onClose();
-    window.addEventListener('keydown', esc);
-    return () => window.removeEventListener('keydown', esc);
-  }, [onClose]);
-
+/** The keys window (H / F1 in game, pause menu, «Ver controles» in Settings): the proposal's #keysModal. */
+export default function Controls({ onClose }: { onClose: () => void }) {
   return (
-    <div className="modal-bg" onClick={onClose}>
-      <div className="modal manual" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <h2>Manual de BLOCKSHOT</h2>
-          <button className="btn icon" onClick={onClose} aria-label="Cerrar">
-            <Icon name="x" size={18} />
-          </button>
-        </div>
-        <nav className="seg tabs">
-          {TABS.map((t, i) => (
-            <button key={t} className={tab === i ? 'on' : ''} onClick={() => setTab(i)}>
-              {t}
-            </button>
-          ))}
-        </nav>
-
-        <div className="manual-body">
-          {tab === 0 && (
-            <div className="controls-grid">
-              {CONTROLS.map(([keys, what]) => (
-                <div className="key-row" key={what}>
-                  <Keys keys={keys} />
-                  <span>{what}</span>
-                </div>
+    <Modal className="wide" labelledBy="keysTitle" onClose={onClose}>
+      <h2 id="keysTitle">Controles</h2>
+      <div className="keys">
+        {CONTROLS.map(([keys, what]) => (
+          <div className="key" key={what}>
+            <span>
+              {keys.map((k) => (
+                <kbd className="k" key={k}>
+                  {k}
+                </kbd>
               ))}
-            </div>
-          )}
-
-          {tab === 1 && (
-            <div className="steps">
-              {STEPS.map(([t, d], i) => (
-                <div className="step" key={t} style={{ gridColumn: lastRowSpan(STEPS.length, i) }}>
-                  <span className="n">{i + 1}</span>
-                  <div>
-                    <b>{t}</b>
-                    <p>{d}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {tab === 2 && (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Personaje</th>
-                  <th>Vida</th>
-                  <th>Velocidad (1 / 2)</th>
-                  <th>Principal</th>
-                  <th>Secundaria</th>
-                  <th>Estilo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {CHARACTERS.map((c) => (
-                  <tr key={c.id}>
-                    <td>
-                      <span className="chip-char" style={{ '--c': c.color }}>
-                        {c.name}
-                      </span>
-                    </td>
-                    <td className="b">{c.hp}</td>
-                    <td className="b">
-                      {speedWith(c, c.primary)} / {speedWith(c, c.secondary)}
-                    </td>
-                    <td>{WEAPONS[c.primary].name}</td>
-                    <td>{WEAPONS[c.secondary].name}</td>
-                    <td className="desc">{c.desc}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-
-          {tab === 3 && (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Arma</th>
-                  <th>Daño (cerca → lejos)</th>
-                  <th>Cabeza</th>
-                  <th>Disparos/s</th>
-                  <th>Cargador</th>
-                  <th>Recarga</th>
-                  <th>Peso</th>
-                  <th>Modo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.values(WEAPONS).map((w) => (
-                  <tr key={w.name}>
-                    <td className="b">{w.name}</td>
-                    <td className="n">
-                      {w.pellets > 1 ? `${w.damage}×${w.pellets}` : w.damage}
-                      {w.falloff && ` → ${Math.round(damageAt(w, w.falloff[1]))}`}
-                    </td>
-                    <td className="head">×{w.headMult}</td>
-                    <td className="n">{(1000 / w.fireRate).toFixed(1)}</td>
-                    <td className="n">{w.melee ? '—' : w.mag}</td>
-                    <td className="n">{w.melee ? '—' : `${(w.reload / 1000).toFixed(1)} s`}</td>
-                    <td>{weightName(w)}</td>
-                    <td>
-                      {w.melee ? `Cuerpo a cuerpo · espalda ${w.backstab}` : w.auto ? 'Automática' : 'Semiautomática'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-
-          {tab === 4 && (
-            <div className="tricks">
-              {TRICKS.map(([t, d], i) => (
-                <div className="trick" key={t} style={{ gridColumn: lastRowSpan(TRICKS.length, i) }}>
-                  <b>{t}</b>
-                  <p>{d}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+            </span>
+            {what}
+          </div>
+        ))}
       </div>
-    </div>
+      <div className="modal-actions">
+        <button className="btn primary" value="ok">
+          Cerrar
+        </button>
+      </div>
+    </Modal>
   );
 }

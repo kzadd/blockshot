@@ -1,0 +1,367 @@
+/* ---- Ranking (src/ranking) ---- */
+/* In game the ranking screen is a window over the dimmed game, without the lobby's top bar */
+.pz.rk-window {
+  z-index: 40;
+  display: grid;
+  background: rgba(14, 16, 20, 0.9);
+}
+.pz .headrow .rk-acts {
+  display: flex;
+  gap: 0.5rem;
+}
+/* A long season scrolls inside its panel instead of spilling out of the window */
+.pz .rank-side {
+  overflow-y: auto;
+}
+
+/* ---- Character screen (src/characters) ---- */
+/* Over the game, like the old select screen */
+.pz.cs-window {
+  z-index: 10;
+}
+/* The game's global styles.css (layered) also styles kbd, button, .btn, .seg, .stage, .panel…: at zero
+   specificity everything goes back to the browser defaults, so only proposal.css draws this screen, as in the
+   proposal page. SVG keeps its presentation attributes (the faces' fills). */
+:where(.pz.cs-window) :not(svg, svg *) {
+  all: revert;
+}
+/* No Actual/Mejorado switch in the game: the hint keeps its place (right, centred on the switch's height) */
+.pz .stage-top {
+  min-height: calc(2rem + 2px);
+}
+.pz .stage-top .hint {
+  margin-left: auto;
+}
+/* The room in the top bar: name, map and mode; team, then the actions on the right */
+.pz .room-id {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.pz .room-id b {
+  font: var(--dw) 1.05rem/1 var(--display);
+  letter-spacing: var(--track);
+  text-transform: uppercase;
+}
+.pz .team-seg i {
+  display: inline-block;
+  width: 0.6rem;
+  height: 0.6rem;
+  margin-right: 0.45rem;
+  background: var(--t);
+}
+.pz .room-acts {
+  margin-left: auto;
+  display: flex;
+  gap: 0.6rem;
+}
+
+/* ---- Lobby, Ajustes and Controles (src/lobby, src/settings, src/manual, src/ui/Modal) ---- */
+/* The proposal renders on a bare page: browser defaults + its CSS. The game's styles.css (cascade layer
+   `components`) also styles .btn, .seg, .panel, .modal, .tabs, kbd, input…, adding shadows, zoom, padding and
+   alignment the proposal never had. Inside these screens every property rolls back to the browser default, so
+   only proposal.css applies, as on the proposal page. Zero specificity: any proposal.css rule wins. SVG keeps its
+   presentation attributes and the nickname error bubble keeps its styles.css look. */
+:where(.pz :is(.bar, .jugar, .ajustes, .modal, .pz-layer > .app > .headrow)),
+:where(.pz :is(.bar, .jugar, .ajustes, .modal, .pz-layer > .app > .headrow))
+  :where(:not(svg, svg *, .bubble-error, .bubble-error *)) {
+  all: revert;
+}
+/* The proposal's Estilo/Plan tabs (nav.tabs.prop, margin-left: auto) are not in the game: the name keeps its
+   place at the right end of the bar. Relative: it anchors the "write your name" bubble. */
+.pz .bar .nick {
+  margin-left: auto;
+  position: relative;
+}
+.pz .nick .bubble-error {
+  left: auto;
+  right: 0;
+}
+/* Lobby notices (outside .pz, styles.css look) sit under the top bar so they never cover the tabs */
+.toast.under-bar {
+  top: calc(4rem / var(--s) + 12px);
+}
+/* In game, Ajustes and Controles open over the game: the .pz root is a transparent layer (Controles is a
+   <dialog> with its own backdrop) or, for Ajustes, the proposal's modal backdrop (dim + blur) */
+.pz.pz-layer {
+  z-index: 50;
+  background: none;
+}
+.pz.pz-layer.dim {
+  background: rgba(8, 9, 12, 0.7);
+  backdrop-filter: blur(4px);
+}
+/* The in-game Ajustes title row (proposal .headrow + .title + .btn) lines up with the screen's padding */
+.pz.pz-layer .headrow {
+  margin: 0;
+  padding: 1.5rem 2rem 0;
+  align-items: center;
+}
+
+/* ---- In-game windows: Pausa, Panel de admin, Torneo (src/game/screens) ---- */
+/* The proposal's modal look (inset orange edge, graphite, its buttons and segments), centred over the game */
+.pz.pz-layer.wins {
+  display: grid;
+  place-items: center;
+}
+:where(.pz .win),
+:where(.pz .win) :where(:not(svg, svg *)) {
+  all: revert;
+}
+.pz .win {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 3rem);
+  padding: 1.75rem;
+  background: var(--s1);
+  border: 1px solid var(--line);
+  box-shadow:
+    inset 0 3px 0 var(--act),
+    0 1.5rem 4rem rgba(0, 0, 0, 0.6);
+  color: var(--tx);
+  font: 400 1rem/1.4 var(--body);
+  animation: pz-pop 220ms var(--ease);
+}
+.pz .win .title {
+  margin: 0;
+}
+.pz .win .meta {
+  margin: 0.35rem 0 0;
+}
+.pz .win .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.pz .win kbd.k {
+  display: inline-block;
+}
+.pz .btn.primary kbd.k {
+  background: rgba(26, 13, 2, 0.14);
+  border-color: rgba(26, 13, 2, 0.3);
+  color: var(--act-ink);
+}
+.pz .btn.danger {
+  color: var(--red);
+}
+.pz .btn.danger:hover {
+  border-color: var(--red);
+  background: rgba(255, 75, 110, 0.12);
+}
+.pz .win section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.pz .win section > .lbl {
+  margin: 0;
+}
+.pz .win small.meta {
+  font-size: 0.8rem;
+}
+
+/* Pausa: título, Continuar y un menú vertical; cada opción con su tecla a la derecha */
+.pz .pause-win {
+  width: 24rem;
+}
+.pz .pause-win .btn.wide {
+  margin: 1.4rem 0 0.9rem;
+}
+.pz .pw-menu {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+}
+.pz .pw-menu button {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  height: 2.9rem;
+  padding: 0 0.9rem;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--tx);
+  font: 600 0.95rem var(--body);
+  cursor: pointer;
+  transition:
+    background 150ms,
+    box-shadow 150ms;
+}
+.pz .pw-menu button svg {
+  color: var(--mut);
+}
+.pz .pw-menu button:hover {
+  background: var(--s2);
+  box-shadow: inset 3px 0 0 var(--act);
+}
+.pz .pw-menu button:hover svg {
+  color: var(--act);
+}
+.pz .pw-menu kbd.k {
+  margin-left: auto;
+}
+.pz .pw-menu .danger,
+.pz .pw-menu .danger svg {
+  color: var(--red);
+}
+.pz .pw-menu .danger:hover {
+  box-shadow: inset 3px 0 0 var(--red);
+}
+.pz .pw-admin {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.2rem;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--line);
+}
+.pz .pw-admin .lbl {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+}
+
+/* Panel de admin: la sala a la izquierda (partida, mapa y modo, bots, torneo), los jugadores a la derecha */
+.pz .admin-win {
+  width: min(94vw, 68rem);
+}
+.pz .aw-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.4rem;
+}
+.pz .aw-body {
+  display: grid;
+  grid-template-columns: 19rem 1fr;
+  gap: 2rem;
+  min-height: 0;
+}
+.pz .aw-side {
+  display: flex;
+  flex-direction: column;
+  gap: 1.3rem;
+}
+.pz .aw-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 0.5rem;
+}
+.pz .win .set {
+  padding: 0.3rem 0 0;
+  border-bottom: 0;
+}
+.pz .win select {
+  min-width: 0;
+  height: 2rem;
+  padding: 0 0.5rem;
+  background: var(--bg);
+  color: var(--tx);
+  border: 1px solid var(--line);
+  font: 500 0.85rem var(--body);
+}
+.pz .aw-players {
+  min-width: 0;
+  min-height: 0;
+}
+.pz .aw-ph {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.pz .aw-scroll {
+  max-height: 27rem;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  background: var(--bg);
+}
+.pz .aw-scroll .tb th {
+  position: sticky;
+  top: 0;
+  padding-top: 0.7rem;
+  background: var(--bg);
+}
+.pz .aw-scroll .tb td {
+  padding-block: 0.4rem;
+}
+.pz .aw-acts {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+.pz .aw-team {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.pz .aw-team::before {
+  content: '';
+  width: 0.6rem;
+  height: 0.6rem;
+  background: var(--t);
+}
+.pz .aw-tour {
+  margin: 0;
+}
+.pz .aw-tour b {
+  font-size: 1.1rem;
+  color: var(--act);
+}
+.pz .tour-win {
+  width: 24rem;
+}
+
+/* Estadísticas de la sesión: el reparto de personajes arriba, los jugadores debajo */
+.pz .stats-win {
+  width: min(94vw, 68rem);
+  gap: 1.3rem;
+}
+.pz .stats-win .aw-head {
+  margin-bottom: 0;
+}
+.pz .st-picks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: 0.5rem;
+}
+.pz .st-pick {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+  padding: 0.7rem 0.8rem;
+  background: var(--bg);
+  border: 1px solid var(--line);
+}
+.pz .st-pick b {
+  white-space: nowrap;
+  font: 700 1.2rem var(--body);
+  font-variant-numeric: tabular-nums;
+}
+.pz .st-pick .bar {
+  grid-column: 1 / -1;
+  height: 3px;
+  background: var(--s3);
+}
+.pz .st-pick .bar i {
+  display: block;
+  height: 100%;
+  background: var(--t);
+}
+.pz .st-pick small {
+  grid-column: 1 / -1;
+}
+.pz .st-players {
+  min-height: 0;
+}
+.pz .st-empty {
+  margin: 0;
+  padding: 2rem;
+  text-align: center;
+}

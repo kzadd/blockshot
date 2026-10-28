@@ -2,6 +2,7 @@
 // Schemas check shape and types only; game rules (cooldowns, ranges, ammo…) are enforced by the server logic.
 import * as v from 'valibot';
 import { OUTFIT_COLOR_HEXES } from '../characters/characters';
+import { CAMOS, FINISHES } from '../characters/looks';
 import { VOTE_OPTIONS } from '../modes/modes';
 import { QUICK_CHAT } from '../modes/quickChat';
 import { TOUR_ROUNDS } from '../modes/tournament';
@@ -38,6 +39,9 @@ export const SpawnSchema = v.object({
   skin: v.optional(text),
   /** outfit colour: one of OUTFIT_COLORS */
   color: v.optional(v.picklist(OUTFIT_COLOR_HEXES)),
+  /** uniform camouflage and guns' finish: cosmetic picks (shared/characters/looks) */
+  camo: v.optional(v.picklist(CAMOS.map((c) => c.id))),
+  finish: v.optional(v.picklist(FINISHES.map((f) => f.id))),
 });
 
 export const TeamSetSchema = v.object({ team: finite });

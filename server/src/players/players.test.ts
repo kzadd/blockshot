@@ -29,6 +29,16 @@ describe('input queue', () => {
     expect(p.inputs.map((c) => c.seq)).toEqual([0, 1]);
   });
 
+  it('keeps the camouflage and finish picked at spawn, and ignores unknown ones', () => {
+    const { room, join } = makeRoom('ffa');
+    const p = join('A', 0, 20);
+    spawnPlayer(room, p, CHAR_BY_ID.soldado, 'base', undefined, 'tigre', 'oro');
+    expect([p.camo, p.finish]).toEqual(['tigre', 'oro']);
+    p.alive = false;
+    spawnPlayer(room, p, CHAR_BY_ID.soldado, 'base', undefined, 'rosa', 'diamante');
+    expect([p.camo, p.finish]).toEqual(['liso', 'estandar']);
+  });
+
   it('only simulates the time that passed (plus the jitter bank)', () => {
     const { room, join } = makeRoom('ffa');
     const p = join('A', 0, 20);

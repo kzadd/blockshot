@@ -33,8 +33,6 @@ export interface HudState {
   alive: boolean;
   everSpawned: boolean;
   locked: boolean;
-  /** quick chat menu open */
-  chatOpen: boolean;
   /** grenades left this life */
   grenades: number;
   /** Domination zones */

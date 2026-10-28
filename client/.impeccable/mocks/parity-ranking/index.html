@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BLOCKSHOT · Paridad ranking</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Chakra+Petch:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <!-- The real RankingScreen with the proposal's demo rows, under the proposal's top bar, to pixel-diff against
+     ../propuesta/index.html#ranking. ?window shows the in-game RankingDialog instead. -->
+    <div class="pz" id="pz">
+      <div class="backdrop" id="backdrop" aria-hidden="true"></div>
+      <div class="app">
+        <header class="bar">
+          <a class="logo" href="#jugar"><img src="/brand/blockshot-logo-transparente.svg" alt="BLOCKSHOT" /></a>
+          <nav class="tabs" aria-label="Pantallas">
+            <a href="#jugar" data-tab="jugar">Jugar</a>
+            <a href="#ranking" data-tab="ranking" class="on">Ranking</a>
+            <a href="#ajustes" data-tab="ajustes">Ajustes</a>
+          </nav>
+          <nav class="tabs prop" aria-label="Propuesta">
+            <a href="#estilo" data-tab="estilo">Estilo</a>
+            <a href="#plan" data-tab="plan">Plan</a>
+          </nav>
+          <label class="nick"><span>Tu nombre</span><input value="RICARDO" maxlength="16" /></label>
+        </header>
+        <div id="mount" style="display: contents"></div>
+      </div>
+    </div>
+    <div id="win"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

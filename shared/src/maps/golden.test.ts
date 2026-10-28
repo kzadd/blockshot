@@ -37,7 +37,7 @@ const TABLE_HASHES = {
   PLAYER: 'd72f2e246c7216f2', // stamina back on (sprint and slides spend it)
   MAPS: '64018304e6c9b34c', // sixth map: Obra
   MAP_SIZES: '0cd287561039dcb2',
-  SKINS: '9808ff7d018a973e', // creatures: Humano, Alien, Mapache, Robot, Oso, Astronauta, Zombi, Rana, Gato, Calabaza
+  SKINS: '336d515d0bade54b', // creatures: the first ten plus Ninja, Pirata, Caballero, Vikingo, Esqueleto, Panda, Pingüino, Perro, Dinosaurio, Búho
   GUN_LADDERS: '8f9323383a0b8d4b',
   STREAKS: 'c5eac1deecda3aac',
   STREAK_REWARDS: 'a57d0b99f6cfdc4d',

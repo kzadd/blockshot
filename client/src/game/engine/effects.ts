@@ -2,6 +2,7 @@
 // numbers. Every object comes from a pool and the textures are drawn once, so shooting does not allocate
 // meshes, materials or canvases.
 import * as THREE from 'three';
+import { FX, fxFrame, pick } from '../render/fxAtlas';
 import { Pool } from './pool';
 
 // Tracers: a bright streak that travels from the muzzle to the hit point
@@ -43,6 +44,7 @@ const BLAST_FIRE = 0xffa53a;
 const BLAST_SMOKE_COLOR = 0x5d5a55;
 const BLAST_SPARKS = 18;
 const BLAST_SMOKE = 8;
+const BLAST_FIRE_BALLS = 5;
 const SPARKS_PER_HIT = 4;
 const SPARKS_PER_PELLET = 1;
 const DROPS_PER_HIT = 9;
@@ -53,18 +55,11 @@ const SPLAT_REACH = 2.6;
 const SPLAT_LIFE = 9;
 const SPLAT_FADE = 2;
 const SPLAT_CAP = 48;
-const SPLAT_SIZE = 0.55;
-const SPLAT_SIZE_JITTER = 0.35;
-/** A killed player breaks into blocks: how many (outfit colour and red), their life and bounce. */
-const GIBS = 16;
-const GIB_RED = 6;
-const GIB_LIFE = 2.6;
-const GIB_FADE = 0.8;
-const GIB_SPEED = 6.5;
-const GIB_GRAVITY = 22;
-const GIB_BOUNCE = 0.35;
-const GIB_SIZE = 0.16;
-const GIB_CAP = 96;
+const SPLAT_SIZE = 0.9;
+const SPLAT_SIZE_JITTER = 0.4;
+/** A kill: blood splats thrown round the body (how many and how far). */
+const KILL_SPLATS = 4;
+const KILL_SPLAT_REACH = 1.6;
 const POOL_LARGE = 128;
 // Damage numbers
 const NUMBER_LIFE = 0.7;
@@ -145,34 +140,6 @@ const holeTexture = (): THREE.CanvasTexture =>
     g.fill();
   });
 
-/** Blood splat: an irregular dark red blob with droplets around it. */
-const bloodTexture = (): THREE.CanvasTexture =>
-  canvasTexture(TEX_SIZE, TEX_SIZE, (g) => {
-    const h = TEX_SIZE / 2;
-    let seed = 29;
-    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-    g.fillStyle = 'rgba(120,10,12,0.92)';
-    g.beginPath();
-    for (let i = 0; i < 18; i++) {
-      const a = (i / 18) * Math.PI * 2;
-      const r = h * (0.32 + rnd() * 0.22);
-      g.lineTo(h + Math.cos(a) * r, h + Math.sin(a) * r);
-    }
-    g.closePath();
-    g.fill();
-    for (let i = 0; i < 14; i++) {
-      const a = rnd() * Math.PI * 2;
-      const r = h * (0.5 + rnd() * 0.45);
-      g.beginPath();
-      g.arc(h + Math.cos(a) * r, h + Math.sin(a) * r, 1 + rnd() * 3, 0, Math.PI * 2);
-      g.fill();
-    }
-    g.fillStyle = 'rgba(170,20,22,0.55)'; // wet shine in the middle
-    g.beginPath();
-    g.arc(h - 3, h - 3, h * 0.18, 0, Math.PI * 2);
-    g.fill();
-  });
-
 /** Soft round blob for puffs, sparks and drops (white, tinted by the material). */
 const softTexture = (): THREE.CanvasTexture =>
   canvasTexture(TEX_SIZE / 2, TEX_SIZE / 2, (g) => {
@@ -229,15 +196,6 @@ interface Hole {
   life: number;
 }
 
-interface Gib {
-  mesh: THREE.Mesh;
-  mat: THREE.MeshLambertMaterial;
-  vel: THREE.Vector3;
-  spin: THREE.Vector3;
-  floor: number;
-  life: number;
-}
-
 /** Where a blood splat lands: the first surface along a ray (point and its normal), or null. */
 export type SplatSurface = (
   from: THREE.Vector3,
@@ -274,13 +232,10 @@ export class Effects {
   private readonly tracerTex = tracerTexture();
   private readonly holeTex = holeTexture();
   private readonly softTex = softTexture();
-  private readonly bloodTex = bloodTexture();
-  private readonly gibGeo = new THREE.BoxGeometry(1, 1, 1);
   private readonly liveSplats: Hole[] = [];
-  private readonly liveGibs: Gib[] = [];
   private readonly splats = new Pool<Hole>(() => {
     const mat = new THREE.MeshLambertMaterial({
-      map: this.bloodTex,
+      map: fxFrame(FX.blood[0]),
       transparent: true,
       depthWrite: false,
       polygonOffset: true,
@@ -289,13 +244,6 @@ export class Effects {
     });
     return { mesh: new THREE.Mesh(this.holeGeo, mat), mat, life: 0 };
   }, SPLAT_CAP);
-  private readonly gibs = new Pool<Gib>(() => {
-    const mat = new THREE.MeshLambertMaterial({ transparent: true });
-    const mesh = new THREE.Mesh(this.gibGeo, mat);
-    mesh.castShadow = true;
-    return { mesh, mat, vel: new THREE.Vector3(), spin: new THREE.Vector3(), floor: 0, life: 0 };
-  }, GIB_CAP);
-
   private readonly liveTracers: Tracer[] = [];
   private readonly liveHoles: Hole[] = [];
   private readonly liveParticles: Particle[] = [];
@@ -426,6 +374,7 @@ export class Effects {
   private splat(at: THREE.Vector3, normal: THREE.Vector3, scale: number): void {
     if (this.liveSplats.length >= SPLAT_CAP) this.endSplat(0);
     const h = this.splats.acquire();
+    h.mat.map = fxFrame(pick(FX.blood));
     h.mesh.position.copy(at).addScaledVector(normal, HOLE_OFFSET * 2);
     h.mesh.quaternion.setFromUnitVectors(Z_AXIS, normal);
     h.mesh.rotateZ(Math.random() * Math.PI * 2);
@@ -443,30 +392,9 @@ export class Effects {
     this.liveSplats.splice(i, 1);
   }
 
-  /** A killed player bursts into blocks of its outfit colour and red, with blood around; `at` = the feet. */
-  shatter(at: THREE.Vector3, color: string): void {
+  /** A killed player: a burst of blood mist and drops, a pool under them and splats round about; `at` = the feet. */
+  shatter(at: THREE.Vector3): void {
     const centre = at.clone().setY(at.y + 1.1);
-    for (let i = 0; i < GIBS; i++) {
-      if (this.liveGibs.length >= GIB_CAP) break;
-      const g = this.gibs.acquire();
-      g.mat.color.set(i < GIB_RED ? (i % 2 ? BLOOD : BLOOD_DARK) : color);
-      g.mat.opacity = 1;
-      g.mesh.position.set(
-        centre.x + (Math.random() - 0.5) * 0.5,
-        centre.y + (Math.random() - 0.5) * 1.2,
-        centre.z + (Math.random() - 0.5) * 0.5,
-      );
-      g.mesh.scale.setScalar(GIB_SIZE * (0.7 + Math.random() * 0.8));
-      g.vel
-        .set(Math.random() - 0.5, 0.6 + Math.random() * 0.8, Math.random() - 0.5)
-        .normalize()
-        .multiplyScalar(GIB_SPEED * (0.5 + Math.random() * 0.6));
-      g.spin.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(14);
-      g.floor = at.y;
-      g.life = GIB_LIFE;
-      this.scene.add(g.mesh);
-      this.liveGibs.push(g);
-    }
     for (let i = 0; i < DROPS_PER_HIT * 2; i++)
       this.particle(
         centre,
@@ -480,8 +408,30 @@ export class Effects {
         UP,
         1,
       );
-    this.particle(centre, BLOOD, PUFF_SIZE * 3, PUFF_GROW * 3, PUFF_LIFE * 1.5, 0, -PUFF_RISE, 0.8, UP, 0.3);
-    this.splat(at.clone().setY(at.y + 0.01), UP, 2);
+    for (let i = 0; i < 3; i++)
+      this.particle(
+        centre,
+        BLOOD,
+        PUFF_SIZE * 5,
+        PUFF_GROW * 3,
+        PUFF_LIFE * 2,
+        0.6,
+        -PUFF_RISE,
+        1,
+        UP,
+        1,
+        false,
+        FX.debris,
+      );
+    this.splat(at.clone().setY(at.y + 0.01), UP, 2.2);
+    // Splats on whatever is round the body: nearby walls, or the floor further out
+    const dir = new THREE.Vector3();
+    for (let i = 0; i < KILL_SPLATS; i++) {
+      const a = (i / KILL_SPLATS) * Math.PI * 2 + Math.random();
+      dir.set(Math.cos(a), -0.35, Math.sin(a)).normalize();
+      const hit = this.surface?.(centre, dir, KILL_SPLAT_REACH * 2);
+      if (hit) this.splat(hit.point, hit.normal, 0.9 + Math.random() * 0.5);
+    }
   }
 
   /** A dark hole with a chipped rim on a wall, facing `normal`; fades out after a few seconds. */
@@ -508,14 +458,16 @@ export class Effects {
     this.particle(
       at,
       onPlayer ? BLOOD : WALL_DUST,
-      PUFF_SIZE * k,
+      PUFF_SIZE * k * (onPlayer ? 3.2 : 1.8),
       PUFF_GROW * k,
       PUFF_LIFE,
       0,
       -PUFF_RISE,
-      0.8,
+      onPlayer ? 1 : 0.85,
       n,
       0.3,
+      false,
+      onPlayer ? FX.debris : FX.dust,
     );
     const count = onPlayer ? DROPS_PER_HIT : pellet ? SPARKS_PER_PELLET : SPARKS_PER_HIT;
     for (let i = 0; i < count; i++) {
@@ -537,8 +489,11 @@ export class Effects {
     normal: THREE.Vector3,
     spread: number,
     additive = false,
+    frame: number | null = null,
   ): void {
     const p = this.particles.acquire();
+    p.mat.map = frame === null ? this.softTex : fxFrame(frame);
+    p.mat.rotation = frame === null ? 0 : Math.random() * Math.PI * 2;
     p.mat.color.setHex(color);
     p.mat.blending = additive ? THREE.AdditiveBlending : THREE.NormalBlending;
     p.mat.opacity = opacity;
@@ -559,12 +514,28 @@ export class Effects {
     this.liveParticles.push(p);
   }
 
-  /** Grenade blast: a fire ball, sparks and a cloud of smoke rising. */
+  /** Grenade blast: fire balls and a flash, sparks, then dark smoke and dust rising (Kenney's sprites). */
   explosion(at: THREE.Vector3): void {
-    this.particle(at, BLAST_FIRE, 1.2, 3.2, 0.35, 0, 0, 1, UP, 0, true);
+    this.particle(at, BLAST_FIRE, 2.4, 3, 0.18, 0, 0, 1, UP, 0, true, FX.glow);
+    for (let i = 0; i < BLAST_FIRE_BALLS; i++)
+      this.particle(at, 0xffffff, 1.4, 2.2, 0.45 + i * 0.05, 2.5, -1, 1, UP, 1, false, pick(FX.fire));
     for (let i = 0; i < BLAST_SPARKS; i++)
       this.particle(at, SPARK_COLOR, 0.08, 0, 0.6, 11, SPARK_GRAVITY, 1, UP, 1, true);
-    for (let i = 0; i < BLAST_SMOKE; i++) this.particle(at, BLAST_SMOKE_COLOR, 0.9, 2.4, 1.6, 1.6, -0.6, 0.55, UP, 1);
+    for (let i = 0; i < BLAST_SMOKE; i++)
+      this.particle(
+        at,
+        i % 2 ? 0xffffff : BLAST_SMOKE_COLOR,
+        1.2,
+        2.6,
+        1.8,
+        1.6,
+        -0.6,
+        0.8,
+        UP,
+        1,
+        false,
+        i % 2 ? FX.blackSmoke : pick(FX.puff),
+      );
   }
 
   damageNumber(at: readonly [number, number, number], dmg: number, head: boolean, kill: boolean): void {
@@ -572,7 +543,7 @@ export class Effects {
     const g = n.ctx;
     g.clearRect(0, 0, NUMBER_CANVAS_W, NUMBER_CANVAS_H);
     const px = (kill ? 32 : head ? 28 : 22) * 1.6;
-    g.font = `${px}px Bungee, 'Arial Black', sans-serif`;
+    g.font = `${px}px 'Black Ops One', 'Arial Black', sans-serif`;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     g.lineJoin = 'round';
@@ -608,7 +579,6 @@ export class Effects {
       h.mat.opacity = Math.min(1, h.life / SPLAT_FADE);
       if (h.life <= 0) this.endSplat(i);
     }
-    this.updateGibs(dt);
     for (let i = this.liveParticles.length - 1; i >= 0; i--) {
       const p = this.liveParticles[i]!;
       p.life -= dt;
@@ -660,33 +630,6 @@ export class Effects {
     }
   }
 
-  /** Blocks fly, spin and bounce on the floor where the player stood, then fade. */
-  private updateGibs(dt: number): void {
-    for (let i = this.liveGibs.length - 1; i >= 0; i--) {
-      const g = this.liveGibs[i]!;
-      g.life -= dt;
-      g.vel.y -= GIB_GRAVITY * dt;
-      g.mesh.position.addScaledVector(g.vel, dt);
-      const rest = g.floor + g.mesh.scale.y / 2;
-      if (g.mesh.position.y < rest) {
-        g.mesh.position.y = rest;
-        g.vel.y = -g.vel.y * GIB_BOUNCE;
-        g.vel.x *= 0.7;
-        g.vel.z *= 0.7;
-        g.spin.multiplyScalar(0.6);
-      }
-      g.mesh.rotation.x += g.spin.x * dt;
-      g.mesh.rotation.y += g.spin.y * dt;
-      g.mesh.rotation.z += g.spin.z * dt;
-      g.mat.opacity = Math.min(1, g.life / GIB_FADE);
-      if (g.life <= 0) {
-        this.scene.remove(g.mesh);
-        this.gibs.release(g);
-        this.liveGibs.splice(i, 1);
-      }
-    }
-  }
-
   private endHole(i: number): void {
     const h = this.liveHoles[i]!;
     this.scene.remove(h.mesh);
@@ -700,10 +643,9 @@ export class Effects {
     for (const p of this.liveParticles) this.scene.remove(p.sprite);
     for (const n of this.liveNumbers) this.scene.remove(n.sprite);
     for (const h of this.liveSplats) this.scene.remove(h.mesh);
-    for (const g of this.liveGibs) this.scene.remove(g.mesh);
     this.liveTracers.length = this.liveHoles.length = this.liveParticles.length = this.liveNumbers.length = 0;
-    this.liveSplats.length = this.liveGibs.length = 0;
-    const res = [this.tracerGeo, this.holeGeo, this.tracerTex, this.holeTex, this.softTex, this.bloodTex, this.gibGeo];
+    this.liveSplats.length = 0;
+    const res = [this.tracerGeo, this.holeGeo, this.tracerTex, this.holeTex, this.softTex];
     for (const r of res) r.dispose();
   }
 }

@@ -2,8 +2,19 @@
 // with bob, kick, reload dip, weapon swap, sprint lean, slide tilt and the knife slash.
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { WEAPON_HANDLING, type Weapon, type WeaponId } from '@blockshot/shared';
-import { buildArms, buildGun, type GunModel } from '../render/models';
+import { WEAPON_HANDLING, type CamoId, type FinishId, type Weapon, type WeaponId } from '@blockshot/shared';
+import { loadGun } from '../render/gunAssets';
+import { handsLoaded, handsReady } from '../render/hands';
+import { prop } from '../render/props';
+import {
+  KNIFE_PITCH,
+  KNIFE_ROLL,
+  KNIFE_YAW,
+  buildArms,
+  buildOffhandArm,
+  buildGun,
+  type GunModel,
+} from '../render/models';
 import { damp } from './util';
 
 const VM_FOV = 60;
@@ -17,13 +28,16 @@ const BOB_ADS_CUT = 0.85;
 const BOB_SPRINT = 1.2;
 const BOB_X = 0.014;
 const BOB_Y = 0.012;
-// Rest and aim positions: low and to the right, like Valorant/Krunker, clear of the ammo counter
-const HIP_X = 0.13;
-const HIP_Y = -0.19;
-const HIP_Z = -0.52;
+// Rest and aim positions: low and to the right, like Valorant/Krunker, clear of the ammo counter; high and close
+// enough for both gloves to show
+const HIP_X = 0.14;
+const HIP_Y = -0.105;
+const HIP_Z = -0.58;
 /** Slight muzzle-up pitch and inward yaw at the hip: the stock drops out of the bottom of the screen. */
 const HIP_RX = 0.05;
 const HIP_RY = 0.025;
+/** Canted a little at the hip so the right side of the gun and the hand on its grip face the camera. */
+const HIP_RZ = 0.22;
 /**
  * Gun position along the view while aiming: long guns sit with the eye over the stock (as with a real
  * cheek weld, so the stock stays below the view and the optic window reads well); handguns at arm's length.
@@ -42,10 +56,10 @@ const AIM_Z: Partial<Record<WeaponId, number>> = {
 };
 /** Hip position tweaks per gun (x, y, z, pitch): handguns a bit closer and higher, the knife blade up. */
 const HIP_OFFSET: Partial<Record<WeaponId, readonly [number, number, number, number]>> = {
-  pistol: [0, 0.035, 0.08, 0],
-  revolver: [0, 0.035, 0.08, 0],
-  mpistol: [0, 0.035, 0.08, 0],
-  knife: [-0.03, 0.1, 0.08, 0.45],
+  pistol: [-0.01, 0.075, -0.02, 0],
+  revolver: [-0.01, 0.075, -0.02, 0],
+  mpistol: [-0.01, 0.07, -0.02, 0],
+  knife: [0.03, 0.05, -0.02, KNIFE_PITCH - 0.05],
 };
 const NO_OFFSET = [0, 0, 0, 0] as const;
 const DEFAULT_AIM_Z = -0.2;
@@ -71,6 +85,24 @@ const SPRINT_RX = 0.3;
 const SPRINT_RY = 0.7;
 const SPRINT_RZ = 0.3;
 const SWING_MS = 280;
+/** The grenade hand: where it rests raised (left of the screen), how fast it comes up and the throw's length. */
+const OFFHAND_X = -0.2;
+const OFFHAND_Y = -0.14;
+const OFFHAND_Z = -0.42;
+const OFFHAND_RISE = 14;
+const OFFHAND_GRENADE = 0.075;
+const THROW_MS = 260;
+/** Abilities with an object in the left hand: pack model, size and how it sits in the fist (hand space). */
+export type Gadget = 'shield' | 'medkit' | 'radio';
+const GADGETS: Record<
+  Gadget,
+  { prop: 'shield' | 'medkit' | 'radio'; size: number; at: [number, number, number]; rot: [number, number, number] }
+> = {
+  // Riot shield: held up on the left, standing, its face to the front
+  shield: { prop: 'shield', size: 0.62, at: [-0.08, -0.32, -0.06], rot: [-Math.PI / 2 + 0.15, 0.5, 0] },
+  medkit: { prop: 'medkit', size: 0.13, at: [0, -0.06, 0], rot: [0, 0.4, 0] },
+  radio: { prop: 'radio', size: 0.12, at: [0, -0.06, 0], rot: [0, 0.3, 0] },
+};
 const FLASH_MS = 45;
 /** Muzzle flash: random size range and the brief light it throws on the gun and hands. */
 const FLASH_SCALE_MIN = 0.75;
@@ -91,14 +123,26 @@ export interface ViewModelFrame {
   swapUntil: number;
   swingAt: number;
   flashTime: number;
+  /** G held: the left hand brings a grenade up; released (thrownAt) it is thrown forward */
+  grenadeAim?: boolean;
+  thrownAt?: number;
 }
 
 export class ViewModel {
   readonly scene = new THREE.Scene();
   readonly camera: THREE.PerspectiveCamera;
   private readonly holder = new THREE.Group();
+  /** left hand with a grenade (G): rises while aiming, throws forward on release */
+  private readonly offhand = new THREE.Group();
+  private offhandUp = 0;
+  private offhandSkin = '';
+  /** an ability's object in the left hand (Tanque's shield, the medkit, the radar's radio) until `gadgetUntil` */
+  private gadget: Gadget | null = null;
+  private gadgetUntil = 0;
   private gun: GunModel | null = null;
   private gunId: WeaponId = 'knife';
+  /** bumps on every gun change, so a late pack model doesn't replace a newer gun */
+  private gunToken = 0;
   private bobT = 0;
   /** 0..1: how much of the slide tilt is applied (eased) */
   private slideTilt = 0;
@@ -114,6 +158,9 @@ export class ViewModel {
     this.scene.add(light);
     this.holder.scale.setScalar(HOLDER_SCALE);
     this.scene.add(this.holder);
+    this.offhand.scale.setScalar(HOLDER_SCALE);
+    this.offhand.visible = false;
+    this.scene.add(this.offhand);
     // Always in the scene (intensity 0 when idle): adding/removing lights would recompile shaders
     this.scene.add(this.flashLight);
   }
@@ -130,17 +177,84 @@ export class ViewModel {
     return this.holder.visible;
   }
 
-  setGun(id: WeaponId, color: string, skin: string): void {
-    this.holder.clear();
+  setGun(id: WeaponId, color: string, skin: string, camo: CamoId = 'liso', finish: FinishId = 'estandar'): void {
+    this.buildOffhand(skin, color, camo);
+    const hold = (gun: GunModel) => {
+      this.holder.clear();
+      this.gun = gun;
+      // The knife turns in the hand so the flat of the blade faces the camera
+      if (id === 'knife') gun.rotation.z = KNIFE_ROLL;
+      buildArms(gun, skin, color, camo);
+      this.holder.add(gun);
+    };
     this.gunId = id;
-    this.gun = buildGun(id, true, color);
-    buildArms(this.gun, skin, color);
-    this.holder.add(this.gun);
+    // The procedural gun shows at once; the pack's model with the chosen finish replaces it when loaded
+    hold(buildGun(id, true, color));
+    const token = ++this.gunToken;
+    void loadGun(id, { finish, color, camo, withFlash: true }).then((g) => {
+      if (token === this.gunToken) hold(g);
+    });
+    // The gloves load once: a gun shown before them gets its hands when they arrive
+    if (!handsLoaded())
+      void handsReady.then(() => {
+        if (token !== this.gunToken || !this.gun) return;
+        hold(this.gun);
+        this.buildOffhand(skin, color, camo);
+      });
+  }
+
+  /** The grenade hand: the left glove closed round Quaternius's grenade, with its sleeve. */
+  private buildOffhand(skin: string, color: string, camo: CamoId): void {
+    const key = `${skin}|${color}|${camo}|${handsLoaded()}`;
+    if (key === this.offhandSkin) return;
+    this.offhandSkin = key;
+    this.offhand.clear();
+    const arm = buildOffhandArm(skin, color, camo);
+    const nade = prop('grenade', OFFHAND_GRENADE);
+    nade.position.set(0, -OFFHAND_GRENADE / 2, 0);
+    nade.name = 'grenade';
+    this.offhand.add(arm, nade);
+    for (const [name, g] of Object.entries(GADGETS)) {
+      const item = prop(g.prop, g.size);
+      item.name = name;
+      item.position.set(...g.at);
+      item.rotation.set(...g.rot);
+      item.visible = false;
+      this.offhand.add(item);
+    }
+  }
+
+  /** Shows an ability's object in the left hand until `until` (ms, performance.now()). */
+  showGadget(g: Gadget, until: number): void {
+    this.gadget = g;
+    this.gadgetUntil = until;
+  }
+
+  private updateOffhand(dt: number, now: number, f: ViewModelFrame): void {
+    const throwT = (now - (f.thrownAt ?? -1e9)) / THROW_MS;
+    const gadget = now < this.gadgetUntil && !f.grenadeAim && throwT >= 1 ? this.gadget : null;
+    const aiming = !!f.grenadeAim || !!gadget;
+    this.offhandUp += ((aiming ? 1 : 0) - this.offhandUp) * damp(OFFHAND_RISE, dt);
+    for (const c of this.offhand.children) if (c.name && c.name !== 'grenade') c.visible = c.name === gadget;
+    const throwing = throwT < 1;
+    this.offhand.visible = this.offhandUp > 0.02 || throwing;
+    if (!this.offhand.visible) return;
+    // Raised by the left side of the screen; the throw pushes it forward and in, then it drops away
+    const k = throwing ? Math.sin(throwT * Math.PI * 0.5) : 0;
+    const drop = throwing ? Math.max(0, throwT - 0.5) * 2 : 1 - this.offhandUp;
+    this.offhand.position.set(OFFHAND_X + k * 0.08, OFFHAND_Y - drop * 0.35, OFFHAND_Z - k * 0.16);
+    this.offhand.rotation.set(-0.3 - k * 0.35, 0.35 - k * 0.2, 0.2);
+    // The grenade itself has gone once thrown; with an ability's object the hand holds that instead
+    this.offhand.getObjectByName('grenade')!.visible = !throwing && !gadget && this.offhandUp > 0.02;
   }
 
   update(dt: number, now: number, show: boolean, f: ViewModelFrame | null): void {
     this.holder.visible = show;
-    if (!show || !f || !this.gun) return;
+    if (!show || !f || !this.gun) {
+      this.offhand.visible = false;
+      return;
+    }
+    this.updateOffhand(dt, now, f);
     const w = f.weapon;
     if (f.grounded && !f.sliding) this.bobT += dt * f.speed * BOB_RATE;
     const sp = f.sprintLerp;
@@ -171,8 +285,8 @@ export class ViewModel {
     y -= sp * SPRINT_Y;
     rx -= sp * SPRINT_RX;
 
-    let ry = sp * SPRINT_RY + HIP_RY * (1 - t);
-    let rz = this.slideTilt * SLIDE_RZ + sp * SPRINT_RZ;
+    let ry = sp * SPRINT_RY + (this.gunId === 'knife' ? KNIFE_YAW : HIP_RY) * (1 - t);
+    let rz = this.slideTilt * SLIDE_RZ + sp * SPRINT_RZ + (this.gunId === 'knife' ? 0 : HIP_RZ * (1 - t));
     // Knife: right-to-left slash
     const sw = (now - f.swingAt) / SWING_MS;
     if (w.melee && sw < 1) {

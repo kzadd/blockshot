@@ -1,12 +1,14 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { rng, type BoxKind, type GameMap, type MapBox, type MapColors, type MapId } from '@blockshot/shared'; // seeded random: the scenery is the same every time
+import { rng, type BoxKind, type GameMap, type MapBox, type MapId } from '@blockshot/shared'; // seeded random: the scenery is the same every time
+import { FX, fxFrame } from './fxAtlas';
+import { WorldModels } from './worldModels';
 
 // =====================================================================
 //  Map rendering. The boxes (collision) come from the shared package; here we only
-//  decide how they look: canvas-painted textures, props with their own shape
-//  (barrels, trees, lamps, cacti) and the scenery outside the walls,
-//  which is decoration only. Meshes are merged per material so it runs smoothly.
+//  decide how they look: canvas-painted textures for walls and floors, pack models for the props
+//  (crates, containers, barrels, trees, cars… see worldModels.ts) and the scenery outside the walls,
+//  which is decoration only. Meshes are merged per material and models instanced, so it runs smoothly.
 // =====================================================================
 
 // ------------------------------------------------------------ Textures
@@ -18,9 +20,9 @@ const TEX_SEED_ADD = 13;
 const ANISOTROPY = 8;
 type Ctx = CanvasRenderingContext2D;
 type Rand = () => number;
-type TexName = keyof typeof GEN;
+type TexName = keyof typeof GEN | PackTex;
 
-function canvasTex(name: TexName): THREE.CanvasTexture {
+function canvasTex(name: keyof typeof GEN): THREE.CanvasTexture {
   const c = document.createElement('canvas');
   c.width = c.height = S;
   const g = c.getContext('2d')!;
@@ -55,227 +57,6 @@ function blotches(g: Ctx, rand: Rand, n: number, alpha: number, r0 = 10, r1 = 40
 }
 
 const GEN = {
-  concrete(g, rand) {
-    g.fillStyle = gray(222);
-    g.fillRect(0, 0, S, S);
-    speckle(g, rand, 3500, 195, 245);
-    blotches(g, rand, 30, 0.06);
-    g.strokeStyle = 'rgba(0,0,0,0.18)';
-    g.lineWidth = 2;
-    g.strokeRect(1, 1, S - 2, S - 2);
-  },
-  paving(g, rand) {
-    g.fillStyle = gray(150);
-    g.fillRect(0, 0, S, S);
-    const n = 4;
-    const t = S / n;
-    for (let r = 0; r < n; r++) {
-      for (let c = 0; c < n * 2; c++) {
-        const off = r % 2 ? t / 2 : 0;
-        const x = c * t * 0.5 * 2 - off;
-        g.fillStyle = gray(205 + rand() * 35);
-        g.fillRect(x + 3, r * t + 3, t - 6, t - 6);
-      }
-    }
-    speckle(g, rand, 2500, 180, 240);
-    blotches(g, rand, 18, 0.07);
-  },
-  brick(g, rand) {
-    g.fillStyle = gray(205);
-    g.fillRect(0, 0, S, S);
-    const rows = 8;
-    const h = S / rows;
-    const w = S / 4;
-    for (let r = 0; r < rows; r++) {
-      const off = r % 2 ? w / 2 : 0;
-      for (let c = -1; c < 5; c++) {
-        const v = 170 + rand() * 60;
-        g.fillStyle = gray(v);
-        g.fillRect(c * w + off + 3, r * h + 3, w - 6, h - 6);
-        g.fillStyle = gray(v - 35, 0.5);
-        g.fillRect(c * w + off + 3, r * h + h - 7, w - 6, 4);
-      }
-    }
-    speckle(g, rand, 2500, 140, 230);
-    blotches(g, rand, 10, 0.08);
-  },
-  plaster(g, rand) {
-    g.fillStyle = gray(232);
-    g.fillRect(0, 0, S, S);
-    speckle(g, rand, 3000, 205, 250);
-    blotches(g, rand, 26, 0.07, 15, 60);
-    g.strokeStyle = 'rgba(0,0,0,0.22)';
-    g.lineWidth = 1;
-    for (let i = 0; i < 4; i++) {
-      let x = rand() * S;
-      let y = rand() * S;
-      g.beginPath();
-      g.moveTo(x, y);
-      for (let k = 0; k < 6; k++) g.lineTo((x += (rand() - 0.5) * 30), (y += rand() * 18));
-      g.stroke();
-    }
-  },
-  planks(g, rand) {
-    const n = 4;
-    const h = S / n;
-    for (let i = 0; i < n; i++) {
-      g.fillStyle = gray(190 + rand() * 50);
-      g.fillRect(0, i * h, S, h);
-      g.strokeStyle = 'rgba(0,0,0,0.09)';
-      for (let k = 0; k < 14; k++) {
-        const y = i * h + rand() * h;
-        g.beginPath();
-        g.moveTo(0, y);
-        g.bezierCurveTo(S / 3, y + (rand() - 0.5) * 8, (2 * S) / 3, y + (rand() - 0.5) * 8, S, y);
-        g.stroke();
-      }
-      g.fillStyle = 'rgba(0,0,0,0.45)';
-      g.fillRect(0, i * h, S, 3);
-      g.fillStyle = 'rgba(0,0,0,0.5)';
-      for (const x of [10, S - 14]) g.fillRect(x, i * h + h / 2 - 2, 4, 4);
-    }
-  },
-  crate(g, rand) {
-    GEN.planks(g, rand);
-    g.fillStyle = 'rgba(0,0,0,0.0)';
-    g.strokeStyle = 'rgba(60,40,20,0.55)';
-    g.lineWidth = 22;
-    g.strokeRect(11, 11, S - 22, S - 22);
-    g.lineWidth = 20;
-    g.beginPath();
-    g.moveTo(22, S - 22);
-    g.lineTo(S - 22, 22);
-    g.stroke();
-    g.strokeStyle = 'rgba(255,255,255,0.18)';
-    g.lineWidth = 3;
-    g.strokeRect(22, 22, S - 44, S - 44);
-  },
-  corrugated(g, rand) {
-    const w = 16;
-    for (let x = 0; x < S; x += w) {
-      const grad = g.createLinearGradient(x, 0, x + w, 0);
-      grad.addColorStop(0, gray(170));
-      grad.addColorStop(0.5, gray(240));
-      grad.addColorStop(1, gray(165));
-      g.fillStyle = grad;
-      g.fillRect(x, 0, w, S);
-    }
-    blotches(g, rand, 14, 0.12, 6, 30);
-    speckle(g, rand, 1200, 120, 200, 1);
-  },
-  diamond(g, rand) {
-    g.fillStyle = gray(200);
-    g.fillRect(0, 0, S, S);
-    speckle(g, rand, 1500, 170, 225);
-    for (let y = 0; y < S; y += 16) {
-      for (let x = (y / 16) % 2 ? 8 : 0; x < S; x += 16) {
-        g.save();
-        g.translate(x + 4, y + 8);
-        g.rotate(((y / 16) % 2 ? 1 : -1) * 0.7);
-        g.fillStyle = gray(240);
-        g.fillRect(-5, -1.5, 10, 3);
-        g.fillStyle = gray(130, 0.6);
-        g.fillRect(-5, 1.5, 10, 1.5);
-        g.restore();
-      }
-    }
-  },
-  rock(g, rand) {
-    g.fillStyle = gray(210);
-    g.fillRect(0, 0, S, S);
-    blotches(g, rand, 60, 0.1, 8, 45);
-    blotches(g, rand, 30, 0.15, 8, 35, false);
-    // rock strata
-    for (let i = 0; i < 9; i++) {
-      let y = rand() * S;
-      g.strokeStyle = `rgba(0,0,0,${0.08 + rand() * 0.12})`;
-      g.lineWidth = 1 + rand() * 3;
-      g.beginPath();
-      g.moveTo(0, y);
-      for (let x = 0; x <= S; x += 16) g.lineTo(x, (y += (rand() - 0.5) * 5));
-      g.stroke();
-    }
-    speckle(g, rand, 2500, 150, 245);
-  },
-  sand(g, rand) {
-    g.fillStyle = gray(228);
-    g.fillRect(0, 0, S, S);
-    speckle(g, rand, 6000, 200, 250, 1.5);
-    blotches(g, rand, 20, 0.05, 20, 70);
-    g.strokeStyle = 'rgba(0,0,0,0.06)';
-    g.lineWidth = 2;
-    for (let i = 0; i < 10; i++) {
-      const y = rand() * S;
-      g.beginPath();
-      g.moveTo(0, y);
-      g.bezierCurveTo(S / 3, y - 10, (2 * S) / 3, y + 10, S, y);
-      g.stroke();
-    }
-  },
-  grass(g, rand) {
-    g.fillStyle = gray(200);
-    g.fillRect(0, 0, S, S);
-    blotches(g, rand, 40, 0.1, 15, 50);
-    for (let i = 0; i < 5000; i++) {
-      g.fillStyle = gray(150 + rand() * 105);
-      g.fillRect(rand() * S, rand() * S, 1.5, 3 + rand() * 3);
-    }
-  },
-  asphalt(g, rand) {
-    g.fillStyle = gray(180);
-    g.fillRect(0, 0, S, S);
-    speckle(g, rand, 7000, 130, 230, 1.5);
-    blotches(g, rand, 20, 0.08, 20, 60);
-  },
-  sandbag(g, rand) {
-    g.fillStyle = gray(110);
-    g.fillRect(0, 0, S, S);
-    const rows = 4;
-    const h = S / rows;
-    for (let r = 0; r < rows; r++) {
-      const off = r % 2 ? S / 4 : 0;
-      for (let c = -1; c < 2; c++) {
-        const x = c * (S / 2) + off;
-        const grad = g.createLinearGradient(0, r * h, 0, r * h + h);
-        grad.addColorStop(0, gray(245));
-        grad.addColorStop(1, gray(180));
-        g.fillStyle = grad;
-        g.beginPath();
-        g.roundRect(x + 4, r * h + 4, S / 2 - 8, h - 8, 18);
-        g.fill();
-      }
-    }
-    speckle(g, rand, 2000, 150, 230, 1);
-  },
-  barrel(g, rand) {
-    g.fillStyle = gray(225);
-    g.fillRect(0, 0, S, S);
-    blotches(g, rand, 12, 0.12, 6, 25);
-    for (const y of [0.2, 0.5, 0.8]) {
-      g.fillStyle = gray(150);
-      g.fillRect(0, y * S - 5, S, 10);
-      g.fillStyle = gray(250, 0.6);
-      g.fillRect(0, y * S - 5, S, 2);
-    }
-  },
-  bark(g, rand) {
-    g.fillStyle = gray(190);
-    g.fillRect(0, 0, S, S);
-    for (let i = 0; i < 60; i++) {
-      g.fillStyle = gray(110 + rand() * 60, 0.7);
-      g.fillRect(rand() * S, 0, 2 + rand() * 4, S);
-    }
-  },
-  leaves(g, rand) {
-    g.fillStyle = gray(190);
-    g.fillRect(0, 0, S, S);
-    for (let i = 0; i < 900; i++) {
-      g.fillStyle = gray(120 + rand() * 135);
-      g.beginPath();
-      g.arc(rand() * S, rand() * S, 3 + rand() * 6, 0, Math.PI * 2);
-      g.fill();
-    }
-  },
   windows(g, rand) {
     g.fillStyle = gray(235);
     g.fillRect(0, 0, S, S);
@@ -296,7 +77,10 @@ const GEN = {
   },
   // Concrete cast in panels: seams and tie holes
   panels(g, rand) {
-    GEN.concrete(g, rand);
+    g.fillStyle = gray(205);
+    g.fillRect(0, 0, S, S);
+    blotches(g, rand, 20, 0.05);
+    speckle(g, rand, 900, 150, 235);
     g.fillStyle = 'rgba(0,0,0,0.16)';
     g.fillRect(0, S / 2 - 1, S, 2);
     g.fillRect(S / 2 - 1, 0, 2, S);
@@ -314,29 +98,6 @@ const GEN = {
     for (let i = 0; i < 18; i++) {
       g.fillStyle = gray(0, 0.03 + rand() * 0.04);
       g.fillRect(rand() * S, 0, 2 + rand() * 6, S * (0.2 + rand() * 0.6));
-    }
-  },
-  // Narrow floorboards with staggered joints
-  woodFloor(g, rand) {
-    const n = 8;
-    const h = S / n;
-    for (let i = 0; i < n; i++) {
-      const v = 175 + rand() * 60;
-      g.fillStyle = gray(v);
-      g.fillRect(0, i * h, S, h);
-      g.strokeStyle = gray(v - 40, 0.25);
-      g.lineWidth = 1;
-      for (let k = 0; k < 5; k++) {
-        const y = i * h + 3 + rand() * (h - 6);
-        g.beginPath();
-        g.moveTo(0, y);
-        g.bezierCurveTo(S / 3, y + (rand() - 0.5) * 4, (2 * S) / 3, y + (rand() - 0.5) * 4, S, y);
-        g.stroke();
-      }
-      g.fillStyle = 'rgba(0,0,0,0.4)';
-      g.fillRect(0, i * h, S, 2);
-      const joint = rand() * S;
-      g.fillRect(joint, i * h, 2, h);
     }
   },
   // Painted metal panels with seams and rivets
@@ -379,31 +140,6 @@ const GEN = {
     }
     blotches(g, rand, 8, 0.06, 20, 50);
   },
-  // Ceramic floor tiles, slightly uneven in tone
-  tiles(g, rand) {
-    const n = 4;
-    const t = S / n;
-    g.fillStyle = gray(150);
-    g.fillRect(0, 0, S, S);
-    for (let r = 0; r < n; r++) {
-      for (let c = 0; c < n; c++) {
-        g.fillStyle = gray((r + c) % 2 ? 235 - rand() * 12 : 200 - rand() * 12);
-        g.fillRect(c * t + 2, r * t + 2, t - 4, t - 4);
-      }
-    }
-    speckle(g, rand, 1500, 170, 245, 1);
-    blotches(g, rand, 10, 0.05, 15, 40);
-  },
-  // Flat roof: gravel over a membrane, with seams
-  gravel(g, rand) {
-    g.fillStyle = gray(200);
-    g.fillRect(0, 0, S, S);
-    speckle(g, rand, 9000, 140, 250, 2);
-    blotches(g, rand, 16, 0.08, 20, 60);
-    g.fillStyle = 'rgba(0,0,0,0.12)';
-    g.fillRect(0, 0, S, 3);
-    g.fillRect(0, 0, 3, S);
-  },
   // Hazard stripes: already coloured (the material is white)
   hazard(g: Ctx) {
     g.fillStyle = '#e8b923';
@@ -421,10 +157,42 @@ const GEN = {
 } satisfies Record<string, (g: Ctx, rand: Rand) => void>;
 const COLORED = new Set<string>(['hazard']);
 
-const texCache = new Map<string, THREE.CanvasTexture>();
-function tex(name: TexName): THREE.CanvasTexture {
+/**
+ * Surfaces from ambientCG (CC0, see ASSETS_CREDITS.md): photo textures turned light grey with their detail kept,
+ * so the map colour tints them like the canvas ones (public/textures). The rest (windows, shutters, awnings, crates,
+ * stripes…) are still drawn on a canvas.
+ */
+type PackTex = (typeof PACK)[number];
+const PACK = [
+  'concrete',
+  'paving',
+  'brick',
+  'plaster',
+  'planks',
+  'corrugated',
+  'diamond',
+  'rock',
+  'sand',
+  'grass',
+  'asphalt',
+  'tiles',
+  'gravel',
+  'woodFloor',
+] as const;
+const PACK_TEX = new Set<string>(PACK);
+const loader = new THREE.TextureLoader();
+const texCache = new Map<string, THREE.Texture>();
+function tex(name: TexName): THREE.Texture {
   let t = texCache.get(name);
-  if (!t) texCache.set(name, (t = canvasTex(name)));
+  if (!t) {
+    if (PACK_TEX.has(name)) {
+      t = loader.load(`${import.meta.env.BASE_URL}textures/${name}.jpg`);
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = ANISOTROPY;
+    } else t = canvasTex(name as keyof typeof GEN);
+    texCache.set(name, t);
+  }
   return t;
 }
 
@@ -432,26 +200,14 @@ function tex(name: TexName): THREE.CanvasTexture {
 /** [texture, metres per repetition] · null texture = flat colour */
 type Look = [TexName | null, number?];
 const COMMON: Partial<Record<BoxKind, Look>> = {
-  crate: ['crate', 0],
-  crate2: ['crate', 0],
-  cont1: ['corrugated', 2.6],
-  cont2: ['corrugated', 2.6],
-  cont3: ['corrugated', 2.6],
   rail: ['hazard', 1],
   bridge: ['planks', 2],
-  rock: ['rock', 3],
-  sandbag: ['sandbag', 1.4],
-  pallet: ['planks', 1.2],
   planter: ['concrete', 1.6],
-  lamp: [null],
-  cactus: [null],
-  trunk: ['bark', 1],
-  barrel: ['barrel', 0],
   roof: ['planks', 2],
-  bld1: ['windows', 4],
-  bld2: ['windows', 4],
-  bld3: ['windows', 4],
-  bld4: ['windows', 4],
+  bld1: ['plaster', 3],
+  bld2: ['brick', 2.4],
+  bld3: ['plaster', 3],
+  bld4: ['concrete', 3],
   brick: ['brick', 2.4],
   plaster: ['plaster', 3],
   concrete: ['panels', 3],
@@ -471,7 +227,7 @@ interface Theme extends Partial<Record<BoxKind, Look>> {
   ground: [TexName, number, string];
   sun: number;
   sky: string;
-  scenery: (batch: Batch, map: GameMap, rand: Rand) => void;
+  scenery: (batch: Batch, map: GameMap, rand: Rand, models: WorldModels) => void;
 }
 
 const THEMES: Record<MapId, Theme> = {
@@ -540,6 +296,12 @@ const THEMES: Record<MapId, Theme> = {
   },
 };
 const CAR_COLORS = ['#c0503e', '#3d6e9e', '#e8e4dc', '#2b2f36', '#c9a13a', '#4f7a45'];
+const HOUSES = ['a', 'c', 'e', 'h', 'k', 'o'].map((k) => `world/u-building-type-${k}`);
+const FACTORIES = ['a', 'c', 'e', 'g', 'k'].map((k) => `world/i-building-${k}`);
+const TOWERS = ['a', 'b', 'c', 'd', 'e'].map((k) => `world/c-building-skyscraper-${k}`);
+const BLOCKS = ['a', 'c', 'e', 'g', 'i'].map((k) => `world/c-low-detail-building-${k}`);
+const CLOUDS = 14;
+const CRANE_YELLOW = '#e9b824';
 
 // Box with UVs scaled to its real size: the texture always has the same size
 function tiledBox(w: number, h: number, d: number, tile: number | undefined): THREE.BoxGeometry {
@@ -691,103 +453,127 @@ function mat(
 const glow = (color: string): THREE.MeshLambertMaterial => mat(color, null, { emissive: color, emissiveIntensity: 1 });
 
 const BOX = new THREE.BoxGeometry(1, 1, 1);
-const CYL = new THREE.CylinderGeometry(0.5, 0.5, 1, 14);
 const CONE4 = new THREE.ConeGeometry(0.71, 1, 4);
 const BLOB = new THREE.IcosahedronGeometry(0.5, 1);
-const BARREL_COLORS = ['#3d6e9e', '#b04a3a', '#c9a13a', '#4f7a45'];
 
-// ------------------------------------------------------------ Props with their own shape
-function addTree(batch: Batch, x: number, y: number, z: number, s: number, rand: Rand, leafColor = '#4f8f3e'): void {
-  batch.add(BOX, mat('#6b4a2b', 'bark'), x, y + 1.3 * s, z, 0, 0.35 * s, 2.6 * s, 0.35 * s);
-  const leaves = mat(leafColor, 'leaves');
-  const top = y + 2.6 * s;
-  batch.add(BOX, leaves, x, top + 0.6 * s, z, rand() * 3, 2.3 * s, 1.6 * s, 2.3 * s);
-  batch.add(BOX, leaves, x + 0.4 * s, top + 1.5 * s, z - 0.2 * s, rand() * 3, 1.6 * s, 1.1 * s, 1.6 * s);
-  batch.add(
-    BOX,
-    mat(leafColor, 'leaves', { color: new THREE.Color(leafColor).multiplyScalar(0.85) }),
-    x - 0.5 * s,
-    top + 0.2 * s,
-    z + 0.5 * s,
-    rand() * 3,
-    1.4 * s,
-    1 * s,
-    1.4 * s,
-  );
-}
+// ------------------------------------------------------------ Props: pack models (worldModels.ts)
+const TREES = ['world/n-tree_oak', 'world/n-tree_detailed', 'world/n-tree_default'];
+const CARS = ['world/q-car-sedan', 'world/q-car-hatch', 'world/q-car-suv'];
+const BARRELS = ['#3d6e9e', '#b04a3a', '#c9a13a', '#4f7a45'];
+/** Spot of a tree: its height (m) in the arena; outside they are bigger. */
+const TREE_H = 5.2;
 
 type PropBox = Pick<MapBox, 'x' | 'y' | 'z' | 'w' | 'h' | 'd' | 'c'>;
-function addProp(batch: Batch, b: PropBox, colors: Partial<MapColors>, rand: Rand, i: number): boolean {
-  const cx = b.x;
-  const cy = b.y + b.h / 2;
-  const cz = b.z;
+/** Props drawn with a pack model (false: drawn as a box). The model fills the prop's collision box. */
+function addProp(models: WorldModels, b: PropBox, rand: Rand, i: number): boolean {
+  const at = { x: b.x, y: b.y, z: b.z, w: b.w, h: b.h, d: b.d };
+  // Containers, cars and pallets lie along their longer side; the models run along z
+  const turn = b.w > b.d ? Math.PI / 2 : 0;
+  const along = turn ? { w: b.d, d: b.w } : {};
   switch (b.c) {
-    case 'barrel': {
-      const color = pick(BARREL_COLORS, i);
-      batch.add(CYL, mat(color, 'barrel'), cx, cy, cz, rand() * 6, b.w, b.h, b.d);
-      batch.add(CYL, mat('#2b2f36', null), cx, b.y + b.h + 0.01, cz, 0, b.w * 0.92, 0.03, b.d * 0.92);
+    case 'barrel':
+      models.add('world/s-barrel', { ...at, ry: rand() * 6, tint: pick(BARRELS, i) });
       return true;
-    }
     case 'trunk':
-      addTree(batch, cx, b.y, cz, 1, rand);
+      models.add(pick(TREES, i), { ...at, h: TREE_H * (0.85 + rand() * 0.3), fit: 'height', ry: rand() * 6 });
       return true;
-    case 'planter':
-      batch.add(BOX, mat(colors.planter!, 'concrete'), cx, cy, cz, 0, b.w, b.h, b.d);
-      batch.add(BOX, mat('#4a3424', 'sand'), cx, b.y + b.h + 0.005, cz, 0, b.w - 0.2, 0.02, b.d - 0.2);
+    case 'lamp':
+      models.add('world/q-lamp', { ...at, h: b.h + 0.4, fit: 'height', ry: rand() < 0.5 ? 0 : Math.PI });
       return true;
-    case 'lamp': {
-      const top = b.y + b.h;
-      const metal = mat(colors.lamp!, null);
-      batch.add(CYL, metal, cx, cy, cz, 0, b.w, b.h, b.d);
-      batch.add(CYL, metal, cx, b.y + 0.3, cz, 0, b.w * 1.8, 0.6, b.d * 1.8);
-      batch.add(BOX, metal, cx, top, cz, 0, 0.5, 0.25, 0.5);
-      batch.add(BOX, glow('#fff3c4'), cx, top - 0.16, cz, 0, 0.36, 0.08, 0.36);
+    case 'car':
+      models.add(pick(CARS, i), { ...at, ...along, h: b.h + 0.75, ry: turn, tint: pick(CAR_COLORS, i) });
       return true;
-    }
-    case 'car': {
-      const color = pick(CAR_COLORS, i);
-      const alongX = b.w > b.d;
-      batch.add(BOX, mat(color, 'barrel'), cx, b.y + 0.55, cz, 0, b.w, 0.7, b.d);
-      const dark = mat('#1c1f24', null);
-      for (const s of [1, -1]) {
-        for (const t of [1, -1]) {
-          const [wx, wz] = alongX ? [s * b.w * 0.32, t * (b.d / 2 - 0.1)] : [t * (b.w / 2 - 0.1), s * b.d * 0.32];
-          batch.add(BOX, dark, cx + wx, b.y + 0.35, cz + wz, 0, alongX ? 0.7 : 0.25, 0.7, alongX ? 0.25 : 0.7);
-        }
-        // headlights
-        const [fx, fz] = alongX ? [s * (b.w / 2), b.d * 0.3] : [b.w * 0.3, s * (b.d / 2)];
-        for (const q of [1, -1])
-          batch.add(
-            BOX,
-            glow(s > 0 ? '#fff6d6' : '#ff4d4d'),
-            cx + (alongX ? fx : q * fx),
-            b.y + 0.65,
-            cz + (alongX ? q * fz : fz),
-            0,
-            alongX ? 0.04 : 0.3,
-            0.16,
-            alongX ? 0.3 : 0.04,
-          );
-      }
+    case 'carTop':
+      return true; // the car model already has its roof
+    case 'cactus':
+      models.add('world/n-cactus_tall', { ...at, h: b.h, fit: 'height', ry: rand() * 6 });
       return true;
-    }
-    case 'carTop': {
-      batch.add(BOX, mat('#22303d', null), cx, cy - 0.05, cz, 0, b.w, b.h - 0.1, b.d);
-      batch.add(BOX, mat(pick(CAR_COLORS, i), 'barrel'), cx, b.y + b.h - 0.05, cz, 0, b.w + 0.04, 0.1, b.d + 0.04);
+    case 'crate':
+    case 'crate2':
+      models.add(b.c === 'crate' ? 'world/q-crate' : 'world/q-crate2', {
+        ...at,
+        ry: Math.round(rand() * 4) * (Math.PI / 2),
+      });
       return true;
-    }
-    case 'cactus': {
-      const green = mat(colors.cactus!, 'bark');
-      batch.add(BOX, green, cx, cy, cz, 0, b.w, b.h, b.d);
-      const side = rand() < 0.5 ? 1 : -1;
-      batch.add(BOX, green, cx + side * 0.4, b.y + b.h * 0.5, cz, 0, 0.4, 0.25, 0.25);
-      batch.add(BOX, green, cx + side * 0.55, b.y + b.h * 0.68, cz, 0, 0.25, 0.6, 0.25);
-      batch.add(BOX, green, cx - side * 0.35, b.y + b.h * 0.62, cz, 0, 0.3, 0.2, 0.22);
-      batch.add(BOX, green, cx - side * 0.45, b.y + b.h * 0.75, cz, 0, 0.2, 0.4, 0.22);
+    case 'cont1':
+    case 'cont2':
+    case 'cont3':
+      models.add(`world/i-shipping-container-${'abc'[Number(b.c[4]) - 1]}`, { ...at, ...along, ry: turn });
       return true;
-    }
+    case 'pallet':
+      models.add('world/q-pallet', { ...at, ...along, ry: turn });
+      return true;
+    case 'sandbag':
+      models.add('props/sacks', { ...at, ...along, ry: turn });
+      return true;
+    case 'rock':
+      models.add(rand() < 0.5 ? 'world/s-rock-sand-a' : 'world/s-rock-sand-b', {
+        ...at,
+        ry: Math.round(rand() * 4) * (Math.PI / 2),
+      });
+      return true;
     default:
       return false;
+  }
+}
+
+// ------------------------------------------------------------ Windows: Quaternius's windows (CC0, Poly Pizza)
+/** A closed facade window (decor 'shutter' box): a window model in its place, facing out of the wall. */
+function addWindow(models: WorldModels, b: MapBox): void {
+  const facesX = b.w < b.d;
+  models.add(b.h > b.w + 0.4 || b.h > b.d + 0.4 ? 'world/q-window-small' : 'world/q-window-large', {
+    x: b.x,
+    y: b.y,
+    z: b.z,
+    w: facesX ? b.d : b.w,
+    h: b.h,
+    d: WINDOW_DEPTH,
+    ry: facesX ? Math.PI / 2 : 0,
+  });
+}
+
+/**
+ * Windows on every free face of a solid block of flats: a row per story, spread along the face. A face against
+ * another box (a neighbour, the outer wall) gets none.
+ */
+const STORY_H = 3;
+const WINDOW_W = 1.2;
+const WINDOW_H = 1.5;
+const WINDOW_SILL = 1.1;
+const WINDOW_GAP = 2.8;
+const WINDOW_DEPTH = 0.12;
+function facadeWindows(models: WorldModels, b: MapBox, boxes: readonly MapBox[]): void {
+  const blocked = (x: number, y: number, z: number) =>
+    boxes.some(
+      (o) => o !== b && Math.abs(x - o.x) < o.w / 2 && Math.abs(z - o.z) < o.d / 2 && y > o.y && y < o.y + o.h,
+    );
+  const file = b.c === 'bld2' || b.c === 'bld4' ? 'world/q-window-small' : 'world/q-window-large';
+  for (const [nx, nz] of [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ] as const) {
+    const along = nx ? b.d : b.w;
+    const n = Math.floor((along - 1) / WINDOW_GAP);
+    if (n < 1) continue;
+    for (let y = b.y + WINDOW_SILL; y + WINDOW_H < b.y + b.h - 0.5; y += STORY_H) {
+      for (let i = 0; i < n; i++) {
+        const a = -along / 2 + (i + 0.5) * (along / n);
+        const x = b.x + (nx ? (nx * b.w) / 2 : a);
+        const z = b.z + (nz ? (nz * b.d) / 2 : a);
+        if (blocked(x + nx * 0.3, y + WINDOW_H / 2, z + nz * 0.3)) continue;
+        models.add(file, {
+          x: x + nx * (WINDOW_DEPTH / 2 - 0.02),
+          y,
+          z: z + nz * (WINDOW_DEPTH / 2 - 0.02),
+          w: WINDOW_W,
+          h: WINDOW_H,
+          d: WINDOW_DEPTH,
+          ry: nx ? Math.PI / 2 : 0,
+        });
+      }
+    }
   }
 }
 
@@ -846,37 +632,32 @@ function addSky(scene: THREE.Scene, map: GameMap, theme: Theme): void {
   sun.lookAt(0, 0, 0);
   scene.add(sun);
 
-  // Block clouds
+  // Clouds: a few of Kenney's white puffs each, high up (no fog: they belong to the sky)
   const rand = rng(map.half * 31 + map.id.length);
-  const batch = new Batch();
-  const cloud = new THREE.MeshLambertMaterial({
-    color: 0xffffff,
-    emissive: 0xffffff,
-    emissiveIntensity: 0.45,
-    fog: false,
-  });
-  for (let i = 0; i < 16; i++) {
+  for (let i = 0; i < CLOUDS; i++) {
     const a = rand() * Math.PI * 2;
     const r = map.half * (1 + rand() * 3);
     const x = Math.cos(a) * r;
     const z = Math.sin(a) * r;
-    const y = 45 + rand() * 30;
-    const n = 3 + Math.floor(rand() * 4);
+    const y = 80 + rand() * 40;
+    const n = 4 + Math.floor(rand() * 3);
     for (let k = 0; k < n; k++) {
-      batch.add(
-        BOX,
-        cloud,
-        x + (rand() - 0.5) * 18,
-        y + rand() * 3,
-        z + (rand() - 0.5) * 10,
-        0,
-        8 + rand() * 10,
-        2.5 + rand() * 2,
-        6 + rand() * 6,
+      const puff = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map: fxFrame(FX.puff[(i + k) % FX.puff.length]!),
+          color: 0xffffff,
+          transparent: true,
+          opacity: 0.75,
+          depthWrite: false,
+          fog: false,
+          rotation: rand() * Math.PI * 2,
+        }),
       );
+      puff.position.set(x + (rand() - 0.5) * 40, y + rand() * 6, z + (rand() - 0.5) * 24);
+      puff.scale.setScalar(30 + rand() * 24);
+      scene.add(puff);
     }
   }
-  batch.build(scene);
 }
 
 // ------------------------------------------------------------ Scenery outside the walls
@@ -890,27 +671,22 @@ function outside(rand: Rand, H: number, near: number, far: number, radius = 0): 
   }
 }
 
-function town(batch: Batch, map: GameMap, rand: Rand): void {
+function town(batch: Batch, map: GameMap, rand: Rand, models: WorldModels): void {
   const H = map.half;
   for (let i = 0; i < 70; i++) {
     const [x, z] = outside(rand, H, 3, 45);
-    addTree(batch, x, 0, z, 1.3 + rand() * 1.2, rand, rand() < 0.3 ? '#3f7a35' : '#5a9a44');
+    models.add(pick(TREES, i), { x, y: 0, z, w: 1, h: 6.5 + rand() * 4, d: 1, fit: 'height', ry: rand() * 6 });
   }
-  const walls = ['#e8dcc4', '#d9c4a8', '#f0e6d2', '#c9b79a', '#e3cfb0'];
-  const roofs = ['#a5523c', '#8a4a35', '#6e5a4a', '#b8653f'];
+  // Kenney's suburban houses round the yard
   for (let i = 0; i < 18; i++) {
-    const [x, z] = outside(rand, H, 12, 55);
-    const w = 7 + rand() * 6;
-    const d = 7 + rand() * 5;
-    const h = 4 + Math.floor(rand() * 3) * 3;
+    const [x, z] = outside(rand, H, 12, 55, 6);
     const ry = Math.round(rand() * 4) * (Math.PI / 2);
-    batch.add(tiledBoxCached(1), mat(pick(walls, i), 'windows'), x, h / 2, z, ry, w, h, d);
-    batch.add(CONE4, mat(pick(roofs, i), 'planks'), x, h + 1.6, z, ry + Math.PI / 4, w * 1.1, 3.2, d * 1.1);
+    models.add(pick(HOUSES, i), { x, y: 0, z, w: 1, h: 7 + rand() * 3, d: 1, fit: 'height', ry });
   }
   hills(batch, map, rand, '#5f8f45');
 }
 
-function industrial(batch: Batch, map: GameMap, rand: Rand): void {
+function industrial(batch: Batch, map: GameMap, rand: Rand, models: WorldModels): void {
   const H = map.half;
   // Warehouse roof structure: trusses and hanging lights
   const steel = mat('#4a5562', null);
@@ -924,60 +700,101 @@ function industrial(batch: Batch, map: GameMap, rand: Rand): void {
     }
   }
   for (const z of [-H / 2, 0, H / 2]) batch.add(BOX, steel, 0, y + 0.5, z, 0, 2 * H + 1, 0.35, 0.35);
-  // Sheds and chimneys around
-  const cols = ['#8a96a3', '#a3a9b0', '#7b8794', '#b0a48e'];
+  // Kenney's factories, tanks and chimneys around
   for (let i = 0; i < 16; i++) {
-    const w = 14 + rand() * 18;
-    const d = 12 + rand() * 14;
-    const h = 9 + rand() * 9;
-    const [x, z] = outside(rand, H, 8, 60, Math.max(w, d) / 2 + 0.3);
-    batch.add(tiledBoxCached(1), mat(pick(cols, i), 'corrugated'), x, h / 2, z, 0, w, h, d);
-    batch.add(BOX, mat('#5d6670', 'diamond'), x, h + 0.3, z, 0, w + 0.6, 0.6, d + 0.6);
+    const h = 10 + rand() * 8;
+    const [x, z] = outside(rand, H, 8, 60, h * 1.2);
+    models.add(pick(FACTORIES, i), {
+      x,
+      y: 0,
+      z,
+      w: 1,
+      h,
+      d: 1,
+      fit: 'height',
+      ry: Math.round(rand() * 4) * (Math.PI / 2),
+    });
   }
   for (let i = 0; i < 6; i++) {
     const [x, z] = outside(rand, H, 20, 60);
-    const h = 25 + rand() * 20;
-    batch.add(CYL, mat('#9a7b6a', 'brick'), x, h / 2, z, 0, 2.6, h, 2.6);
-    batch.add(CYL, mat('#c0503e', null), x, h - 1.5, z, 0, 2.75, 1.2, 2.75);
+    models.add(i % 3 ? 'world/i-chimney-large' : 'world/i-water-tower', {
+      x,
+      y: 0,
+      z,
+      w: 1,
+      h: 22 + rand() * 18,
+      d: 1,
+      fit: 'height',
+    });
   }
 }
 
-function desert(batch: Batch, map: GameMap, rand: Rand): void {
+function desert(_batch: Batch, map: GameMap, rand: Rand, models: WorldModels): void {
   const H = map.half;
-  const rockCols = ['#c98a5a', '#b0704a', '#d19a64', '#a86a48'];
+  const rockCols = ['#e0a070', '#c98a5a', '#e8b07a', '#c27a52'];
+  // Mesas and buttes: Kenney's tall rocks stretched big and tinted to the desert's rock
   for (let i = 0; i < 22; i++) {
     const w = 18 + rand() * 30;
     const d = 18 + rand() * 30;
     const h = 12 + rand() * 30;
-    // Turned at random: the half diagonal is how far it can reach towards the arena
     const [x, z] = outside(rand, H, 15, 110, Math.hypot(w, d) / 2);
-    batch.add(tiledBoxCached(8), mat(pick(rockCols, i), 'rock'), x, h / 2, z, rand() * 3, w, h, d);
-    batch.add(tiledBoxCached(8), mat(pick(rockCols, i + 1), 'rock'), x, h + 2, z, rand() * 3, w * 0.7, 4, d * 0.7);
+    const ry = rand() * 3;
+    const tint = pick(rockCols, i);
+    models.add(i % 2 ? 'world/n-rock_tallA' : 'world/n-rock_tallC', { x, y: 0, z, w, h: h + 6, d, ry, tint });
   }
   for (let i = 0; i < 40; i++) {
     const [x, z] = outside(rand, H, 2, 50);
-    const s = 1 + rand() * 0.8;
-    addProp(batch, { c: 'cactus', x, y: 0, z, w: 0.45 * s, h: 2.3 * s, d: 0.45 * s }, { cactus: '#4f8a45' }, rand, i);
+    models.add(i % 3 ? 'world/n-cactus_tall' : 'world/n-cactus_short', {
+      x,
+      y: 0,
+      z,
+      w: 1,
+      h: 2 + rand() * 1.6,
+      d: 1,
+      fit: 'height',
+      ry: rand() * 6,
+    });
+  }
+  for (let i = 0; i < 16; i++) {
+    const [x, z] = outside(rand, H, 4, 40);
+    const s = 1.5 + rand() * 3;
+    models.add(i % 2 ? 'world/n-rock_largeA' : 'world/n-rock_largeC', {
+      x,
+      y: 0,
+      z,
+      w: s * 2,
+      h: s * 0.8,
+      d: s * 2,
+      ry: rand() * 6,
+      tint: pick(rockCols, i),
+    });
   }
 }
 
-function city(batch: Batch, map: GameMap, rand: Rand): void {
+function city(_batch: Batch, map: GameMap, rand: Rand, models: WorldModels): void {
   const H = map.half;
-  const cols = ['#9fb0c4', '#c9b79a', '#8a96a3', '#d8c8b0', '#7b8794', '#b58c74'];
+  // Kenney's towers and blocks: tall ones further out
   for (let i = 0; i < 40; i++) {
-    const w = 10 + rand() * 14;
-    const d = 10 + rand() * 14;
     const h = 16 + rand() * 45;
-    const [x, z] = outside(rand, H, 6, 70, Math.max(w, d) / 2);
-    batch.add(tiledBoxCached(Math.round(h / 6)), mat(pick(cols, i), 'windows'), x, h / 2, z, 0, w, h, d);
-    batch.add(BOX, mat('#4a5562', 'concrete'), x, h + 0.4, z, 0, w * 0.5, 0.8, d * 0.5);
+    const [x, z] = outside(rand, H, 6, 70, h * 0.18 + 4);
+    const tall = h > 34;
+    models.add(tall ? pick(TOWERS, i) : pick(BLOCKS, i), {
+      x,
+      y: 0,
+      z,
+      w: 1,
+      h,
+      d: 1,
+      fit: 'height',
+      ry: Math.round(rand() * 4) * (Math.PI / 2),
+    });
   }
 }
 
 // Around the site: more concrete skeletons, tower cranes and the city behind
-function construction(batch: Batch, map: GameMap, rand: Rand): void {
+function construction(batch: Batch, map: GameMap, rand: Rand, models: WorldModels): void {
   const H = map.half;
-  city(batch, map, rand);
+  city(batch, map, rand, models);
   const concrete = mat('#b3afa6', 'concrete');
   for (let i = 0; i < 5; i++) {
     const [x, z] = outside(rand, H, 14, 40);
@@ -1000,14 +817,44 @@ function construction(batch: Batch, map: GameMap, rand: Rand): void {
       }
     }
   }
-  const yellow = mat('#e9b824', 'hazard');
+  // Tower cranes from pack parts: lakescorp's scaffolding truss as mast and jib (painted crane yellow), cg_world's
+  // hook on its cable at the tip, and Kenney's concrete barriers as the counterweight
   for (let i = 0; i < 3; i++) {
     const [x, z] = outside(rand, H, 20, 55);
     const h = 30 + rand() * 12;
     const ry = rand() * Math.PI;
-    batch.add(BOX, yellow, x, h / 2, z, 0, 1.6, h, 1.6);
-    batch.add(BOX, yellow, x + Math.cos(ry) * 10, h + 0.6, z - Math.sin(ry) * 10, ry, 30, 1, 1);
-    batch.add(BOX, mat('#8a8f99', 'concrete'), x - Math.cos(ry) * 6, h - 0.4, z + Math.sin(ry) * 6, ry, 3, 2, 2);
+    const ax = Math.cos(ry);
+    const az = -Math.sin(ry);
+    const yellow = CRANE_YELLOW;
+    models.add('world/lk-truss', { x, y: h / 2, z, w: 1.6, h: 1.6, d: h, rx: -Math.PI / 2, tint: yellow });
+    models.add('world/lk-truss', {
+      x: x + ax * 10,
+      y: h,
+      z: z + az * 10,
+      w: 1.2,
+      h: 1.2,
+      d: 30,
+      ry: ry + Math.PI / 2,
+      tint: yellow,
+    });
+    models.add('world/cw-crane-hook', {
+      x: x + ax * 22,
+      y: h * 0.35,
+      z: z + az * 22,
+      w: 1,
+      h: h * 0.65,
+      d: 1,
+      fit: 'height',
+    });
+    models.add('world/r-construction-barrier', {
+      x: x - ax * 4,
+      y: h + 0.6,
+      z: z - az * 4,
+      w: 1.6,
+      h: 1.6,
+      d: 3,
+      ry: ry + Math.PI / 2,
+    });
   }
 }
 
@@ -1040,7 +887,7 @@ const STEP_CAP_H = 0.05;
 const STEP_CAP_LIFT = 0.005;
 const STEP_NOSING = 0.03;
 const STEP_CAP_TINT = 1.18;
-export function buildWorld(scene: THREE.Scene, map: GameMap): void {
+export function buildWorld(scene: THREE.Scene, map: GameMap, shadowMap = 2048): void {
   const H = map.half;
   const theme = THEMES[map.id];
   scene.background = new THREE.Color(map.sky);
@@ -1050,7 +897,7 @@ export function buildWorld(scene: THREE.Scene, map: GameMap): void {
   const sun = new THREE.DirectionalLight(theme.sun, SUN_INTENSITY);
   sun.position.set(30, 50, 20);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.mapSize.set(shadowMap, shadowMap);
   Object.assign(sun.shadow.camera, { left: -H - 8, right: H + 8, top: H + 8, bottom: -H - 8, near: 1, far: H * 4 });
   sun.shadow.bias = -0.0005;
   sun.shadow.normalBias = 0.02;
@@ -1060,6 +907,7 @@ export function buildWorld(scene: THREE.Scene, map: GameMap): void {
   const rand = rng(H * 97 + map.id.length);
   const arena = new Batch(skyShade(map.boxes));
   const props = new Batch();
+  const models = new WorldModels(true);
   const solid = (b: MapBox, tint?: string) => {
     const [texName, tile] = theme[b.c] || COMMON[b.c] || theme.wall;
     const color = tint ?? (map.colors[b.c] || map.colors.wall);
@@ -1068,7 +916,7 @@ export function buildWorld(scene: THREE.Scene, map: GameMap): void {
   };
   let n = 0;
   for (const b of map.boxes) {
-    if (b.p && addProp(props, b, map.colors, rand, b.c === 'car' ? ++n : n)) continue;
+    if (addProp(models, b, rand, b.c === 'car' || b.c === 'barrel' || b.c === 'trunk' ? ++n : n)) continue;
     if (b.c === 'railing') {
       addRailing(props, b, map.colors.railing ?? map.colors.wall);
       continue;
@@ -1080,9 +928,11 @@ export function buildWorld(scene: THREE.Scene, map: GameMap): void {
       props.add(BOX, glow('#eafff2'), b.x, b.y + b.h + 0.005, b.z, Math.PI / 4, 0.5, 0.01, 0.5);
       continue;
     }
-    // Buildings: rooftop with a concrete coping
-    if (b.c.startsWith('bld'))
+    // Buildings: rooftop with a concrete coping and the pack's windows on their faces
+    if (b.c.startsWith('bld')) {
       props.add(BOX, mat('#7d7f84', 'concrete'), b.x, b.y + b.h + 0.15, b.z, 0, b.w + 0.3, 0.3, b.d + 0.3);
+      facadeWindows(models, b, map.boxes);
+    }
     solid(b);
     // Steps: a lighter cap on top so every step reads on its own
     if (b.c === 'stair' || b.c === 'step') {
@@ -1093,7 +943,10 @@ export function buildWorld(scene: THREE.Scene, map: GameMap): void {
       );
     }
   }
-  for (const b of map.decor) solid(b);
+  for (const b of map.decor) {
+    if (b.c === 'shutter') addWindow(models, b);
+    else solid(b);
+  }
   arena.build(scene, { cast: true, receive: true });
   props.build(scene, { cast: true, receive: true });
 
@@ -1117,7 +970,11 @@ export function buildWorld(scene: THREE.Scene, map: GameMap): void {
   gm.position.y = -0.03;
   scene.add(gm);
 
+  models.build(scene);
   const scenery = new Batch();
-  theme.scenery(scenery, map, rng(H * 131 + map.id.length * 7));
+  // Outside the walls: no shadows (the sun's shadow map only covers the arena)
+  const far = new WorldModels(false);
+  theme.scenery(scenery, map, rng(H * 131 + map.id.length * 7), far);
   scenery.build(scene);
+  far.build(scene);
 }

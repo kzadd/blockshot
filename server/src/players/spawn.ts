@@ -2,6 +2,8 @@ import {
   PLAYER,
   createMoveState,
   grenadesFor,
+  isCamoId,
+  isFinishId,
   isOutfitColor,
   isSkinId,
   type Character,
@@ -39,7 +41,15 @@ export function pickSpawn(room: Room, me: Player): Spawn {
 }
 
 /** Puts the player on a spawn point with full health and ammo, and tells its client. */
-export function spawnPlayer(room: Room, p: Player, ch: Character, skin: string | undefined, color?: string): void {
+export function spawnPlayer(
+  room: Room,
+  p: Player,
+  ch: Character,
+  skin: string | undefined,
+  color?: string,
+  camo?: string,
+  finish?: string,
+): void {
   const now = Date.now();
   const [x, y, z, ry] = pickSpawn(room, p);
   const hp = Math.round(ch.hp * (room.mode.hpFactor?.(p) ?? 1));
@@ -47,6 +57,8 @@ export function spawnPlayer(room: Room, p: Player, ch: Character, skin: string |
     characterId: ch.id,
     skin: isSkinId(skin) ? skin : 'base',
     color: isOutfitColor(color) ? color : ch.color,
+    camo: isCamoId(camo) ? camo : 'liso',
+    finish: isFinishId(finish) ? finish : 'estandar',
     alive: true,
     hp,
     maxHp: hp,
@@ -83,6 +95,8 @@ export function spawnPlayer(room: Room, p: Player, ch: Character, skin: string |
       characterId: ch.id,
       skin: p.skin,
       color: p.color,
+      camo: p.camo,
+      finish: p.finish,
       hp,
       level: p.level,
       team: p.team,

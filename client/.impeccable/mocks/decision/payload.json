@@ -1,0 +1,165 @@
+{
+  "title": "BLOCKSHOT · Elige el mundo visual",
+  "question": "Cada tarjeta es una dirección completa para el lobby (y luego personajes, HUD y juego). Quédate con la primera, elige otra o pide otra tanda.",
+  "options": [
+    {
+      "id": "assigned",
+      "kind": "assigned",
+      "label": "Tablero de parchís",
+      "kicker": "THE ROLL",
+      "lineage": "El parchís y los juegos de mesa de caja: tablero simétrico, cuatro colores impresos, fichas redondas",
+      "thesis": "El lobby es un tablero simétrico y cada jugador es una ficha de su color: estar listo es poner tu ficha en la salida.",
+      "palette": ["#f2efe8", "#d7263d", "#1d5fbf", "#f2b705", "#1f9d55", "#16181d"],
+      "materials": ["cartón impreso con tinta plana", "fichas de plástico con canto", "trazo negro de imprenta"],
+      "viewport": "Tablero claro dividido en dos mitades (crear | unirse) con la casilla central para tu nombre; las salas son casillas con sus fichas de jugadores; el botón principal es la casilla de salida.",
+      "risk": "Si se exagera el tablero parece un juego infantil; el tablero solo pone color, ritmo y la ficha, nunca la navegación.",
+      "raised": [
+        {
+          "from": "challenger-acetate",
+          "raise": "Un color de sección a plena intensidad por modo de juego, como las divisiones de un manual: el modo se reconoce por su color antes de leerlo."
+        },
+        {
+          "from": "challenger-jcard",
+          "raise": "Mitades duras A/B: en equipos el lobby y el marcador se parten en dos mitades simétricas, rojo a un lado, azul al otro."
+        },
+        {
+          "from": "challenger-warm",
+          "raise": "El amarillo de acción solo aparece en lo que se puede pulsar; nada decorativo lo usa."
+        },
+        {
+          "from": "challenger-atlas",
+          "raise": "Estadísticas en una rampa fija de puntos, como las caras de un dado: vida, velocidad y alcance se comparan de un vistazo."
+        }
+      ],
+      "html": ".impeccable/mocks/decision/assigned.html"
+    },
+    {
+      "id": "model-pick",
+      "kind": "pick",
+      "label": "Álbum de cromos",
+      "kicker": "IMPECCABLE’S PICK",
+      "lineage": "Álbumes de cromos de fútbol: página de temporada, cromo con borde blanco, brillo dorado del cromo especial",
+      "thesis": "Cada personaje y cada skin es un cromo, y el lobby es la página del álbum de la temporada de la clase.",
+      "palette": ["#0b2e6b", "#e8edf5", "#ffffff", "#e63946", "#ffc93c", "#0f1626"],
+      "materials": [
+        "papel satinado del álbum",
+        "cromo con borde blanco y esquinas redondeadas",
+        "lámina dorada para el especial"
+      ],
+      "viewport": "Doble página: a la izquierda las salas como partidos de la jornada, a la derecha tu cromo con nombre y personaje; crear sala es abrir una página nueva.",
+      "risk": "Es la dirección más obvia para un juego de personajes coleccionables; puede sentirse de colección infantil si los bordes blancos lo invaden todo.",
+      "html": ".impeccable/mocks/decision/model-pick.html"
+    },
+    {
+      "id": "challenger-splitflap",
+      "kind": "challenger",
+      "catalogId": "signals-instruments-split-flap-concourse",
+      "label": "Panel de salidas",
+      "verdict": "competitive",
+      "lineage": "Paneles de paletas de estación: filas por hora, columnas fijas, letras que caen en cascada",
+      "thesis": "Las salas son salidas: mapa, modo y plazas en columnas fijas; cuando cambia algo las letras caen en cascada.",
+      "palette": ["#0e0f11", "#f4f4f0", "#ffb000", "#c0392b", "#8a8f98"],
+      "materials": ["paletas negras mate", "letra blanca pintada", "marco de acero cepillado", "piloto ámbar"],
+      "viewport": "Panel de salas a todo el ancho arriba (sala, mapa, modo, jugadores, estado EN ESPERA / EN JUEGO); debajo, crear sala y tu nombre.",
+      "case": "Gana en claridad para la lista de salas y el estado listo/en juego; pierde en identificación: no es el mundo de la clase.",
+      "risk": "Fuera de la lista de salas (personajes, HUD) el panel se queda sin papel y se vuelve disfraz.",
+      "hero": "https://impeccable.style/worlds/cards/signals-instruments-split-flap-concourse-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/signals-instruments-split-flap-concourse.webp",
+      "html": ".impeccable/mocks/decision/challenger-splitflap.html"
+    },
+    {
+      "id": "challenger-roster",
+      "kind": "challenger",
+      "catalogId": "pop-culture-shelf-character-goods-catalog",
+      "label": "Catálogo de personajes",
+      "verdict": "competitive",
+      "lineage": "Catálogos de mascotas: retrato redondeado, cinta de color propia, placa con nombre y una línea de personalidad",
+      "thesis": "El elenco manda: cada personaje tiene su cinta de color, su placa y una línea de carácter, y la pantalla entera se tiñe con el elegido.",
+      "palette": ["#fdf3e7", "#ff6b4a", "#3a86ff", "#ffbe0b", "#8338ec", "#1b1b2f"],
+      "materials": ["relleno plano", "contorno blanco alrededor de cada retrato", "cinta de color por personaje"],
+      "viewport": "Lobby con el elenco de 7 personajes como fila de retratos arriba y las salas debajo; la selección de personaje se vuelve la pantalla protagonista.",
+      "case": "Gana en claridad en la selección de personajes; pierde en identificación: tono demasiado tierno para un shooter de clase de adultos.",
+      "risk": "En el lobby y el HUD no aporta orden propio y el pastel resta contraste en combate.",
+      "hero": "https://impeccable.style/worlds/cards/pop-culture-shelf-character-goods-catalog-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/pop-culture-shelf-character-goods-catalog.webp",
+      "html": ".impeccable/mocks/decision/challenger-roster.html"
+    },
+    {
+      "id": "challenger-acetate",
+      "kind": "challenger",
+      "catalogId": "rw-manual-acetate-tab-board",
+      "label": "Manual con pestañas",
+      "verdict": "declined",
+      "lineage": "Manuales de software en caja con separadores de color",
+      "thesis": "Cada sección del juego es una división de manual con su color y su pestaña.",
+      "palette": ["#e0602a", "#f2c200", "#3a9d3a", "#1d8a8a", "#2a3fbf", "#f4f6f2"],
+      "materials": ["acetato lechoso", "cartulina de color"],
+      "viewport": "Raíl de pestañas por modo a la derecha, hojas superpuestas a la izquierda.",
+      "case": "Pierde en identificación (nadie de la clase usó esos manuales) y en claridad (las capas ocultan estado).",
+      "risk": "Se lee como documentación, no como juego.",
+      "kept": "Un color de sección a plena intensidad por modo de juego.",
+      "hero": "https://impeccable.style/worlds/cards/rw-manual-acetate-tab-board-hero.webp"
+    },
+    {
+      "id": "challenger-jcard",
+      "kind": "challenger",
+      "catalogId": "vernacular-ephemera-cassette-j-card",
+      "label": "Carátula de casete",
+      "verdict": "declined",
+      "lineage": "Carátulas de casete rotuladas a boli, cara A y cara B",
+      "thesis": "Las salas como lista de canciones rotulada a mano, cara A y cara B.",
+      "palette": ["#f7f7f2", "#2b3a8c", "#9a9a9a", "#c8102e"],
+      "materials": ["cartulina con renglones", "tinta de bolígrafo"],
+      "viewport": "Una carátula desplegada con el lobby a la izquierda y la sala a la derecha.",
+      "case": "Pierde en claridad (letra a mano en un juego de reflejos) y en identificación.",
+      "risk": "Lo manuscrito resta legibilidad a todo.",
+      "kept": "Mitades duras A/B: rojo y azul en dos mitades simétricas.",
+      "hero": "https://impeccable.style/worlds/cards/vernacular-ephemera-cassette-j-card-hero.webp"
+    },
+    {
+      "id": "challenger-warm",
+      "kind": "challenger",
+      "catalogId": "digital-design-canon-warm-consumer-app-surface",
+      "label": "App de consumo cálida",
+      "verdict": "declined",
+      "lineage": "Apps con tarjetas redondeadas sobre fondo cálido",
+      "thesis": "Tarjetas amables y un único color para lo que se puede pulsar.",
+      "palette": ["#faf3ec", "#ffffff", "#ff5a36", "#2d2a26"],
+      "materials": ["tarjetas blancas", "esquinas grandes"],
+      "viewport": "Columna de tarjetas con barra inferior.",
+      "case": "Pierde en identificación (no parece un juego) y en claridad de estado de partida.",
+      "risk": "Indistinguible de cualquier app.",
+      "kept": "El color de acción solo en lo que se puede pulsar.",
+      "hero": "https://impeccable.style/worlds/cards/digital-design-canon-warm-consumer-app-surface-hero.webp"
+    },
+    {
+      "id": "challenger-atlas",
+      "kind": "challenger",
+      "catalogId": "notation-diagram-systems-star-atlas",
+      "label": "Atlas estelar",
+      "verdict": "declined",
+      "lineage": "Cartas celestes con magnitudes por tamaño de punto",
+      "thesis": "Los mapas como cartas del cielo, la importancia como tamaño de punto.",
+      "palette": ["#0d1b3d", "#f2f2ea", "#ff9e3d", "#c0392b"],
+      "materials": ["tinta sobre azul noche"],
+      "viewport": "Mapas como cartas con rejilla de coordenadas.",
+      "case": "Pierde en identificación y en claridad: poético pero ajeno a una partida.",
+      "risk": "Bonito y lento.",
+      "kept": "Jerarquía por una rampa fija: stats como puntos de tamaño fijo.",
+      "hero": "https://impeccable.style/worlds/cards/notation-diagram-systems-star-atlas-hero.webp"
+    }
+  ],
+  "reroll": { "registers": ["safer", "bolder"] },
+  "canon": true,
+  "canonCard": {
+    "kind": "canon",
+    "label": "El estándar del género",
+    "thesis": "UI táctica oscura de shooter competitivo (Valorant, Krunker): pizarra oscura y un único acento.",
+    "palette": ["#12161c", "#1d242c", "#ece3cf", "#ffc531", "#ff4655"],
+    "materials": ["paneles oscuros", "vidrio esmerilado", "tipografía condensada"],
+    "viewport": "Lo que el jugador espera de un shooter, hecho con todo el oficio.",
+    "risk": "Es casi lo que ya tienes: se distingue poco de cualquier otro shooter.",
+    "html": ".impeccable/mocks/decision/canon.html"
+  },
+  "steer": true
+}

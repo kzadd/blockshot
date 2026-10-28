@@ -38,7 +38,7 @@ export function adminSwitchTeam(room: Room, p: Player): void {
   const team: SideTeam = p.team === 1 ? 2 : 1;
   Object.assign(p, { team, teamAt: Date.now(), streak: 0 });
   notice(room, `El admin pasó a ${p.name} a ${teamName(room.modeId, team)}`);
-  if (p.alive && p.characterId) spawnPlayer(room, p, CHAR_BY_ID[p.characterId], p.skin, p.color);
+  if (p.alive && p.characterId) spawnPlayer(room, p, CHAR_BY_ID[p.characterId], p.skin, p.color, p.camo, p.finish);
 }
 
 /** A fresh match now: scores reset and everybody respawns (with no end of match screen). */

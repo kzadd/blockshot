@@ -5,7 +5,8 @@ import prettier from 'eslint-config-prettier';
 import globals from 'globals';
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/node_modules/**', '**/coverage/**', '**/.claude/**'] },
+  // .impeccable: design mocks and prototypes (the proposal's HTML), not part of the build
+  { ignores: ['**/dist/**', '**/node_modules/**', '**/coverage/**', '**/.claude/**', '**/.impeccable/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

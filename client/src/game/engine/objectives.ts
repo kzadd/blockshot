@@ -85,7 +85,7 @@ function zoneMarker(): { sprite: THREE.Sprite; paint: (letter: string, color: st
     g.fill();
     g.stroke();
     g.fillStyle = INK;
-    g.font = '700 32px Bungee, sans-serif';
+    g.font = "32px 'Black Ops One', sans-serif";
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     g.fillText(letter, 32, 35);

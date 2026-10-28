@@ -6,3 +6,6 @@ coverage
 # runtime data (ranking)
 data
 .claude/worktrees
+
+# impeccable design tool caches
+**/.impeccable/hook.cache.json

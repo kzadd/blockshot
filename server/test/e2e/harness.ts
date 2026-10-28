@@ -2,6 +2,7 @@
 // The tests only use the public protocol, so they keep passing through internal refactors.
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { io, type Socket } from 'socket.io-client';
@@ -44,7 +45,14 @@ export async function startServer(): Promise<TestServer> {
   let out = '';
   const child: ChildProcess = spawn(process.execPath, ['--import', 'tsx', SERVER_ENTRY], {
     cwd: SERVER_DIR,
-    env: { ...process.env, PORT: String(port), NOMBRE: `test${port}`, LOG_LEVEL: 'warn' },
+    // Its own ranking file in the temp folder: test matches must never land in the real data/ranking.json
+    env: {
+      ...process.env,
+      PORT: String(port),
+      NOMBRE: `test${port}`,
+      LOG_LEVEL: 'warn',
+      RANKING: path.join(os.tmpdir(), `blockshot-test-ranking-${port}.json`),
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   child.stdout?.on('data', (d: Buffer) => (out += d.toString()));

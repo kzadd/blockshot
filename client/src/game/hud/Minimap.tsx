@@ -130,7 +130,7 @@ export default function Minimap({
         g.strokeStyle = INK;
         g.stroke();
         g.fillStyle = INK;
-        g.font = '700 10px Bungee, sans-serif';
+        g.font = "10px 'Black Ops One', sans-serif";
         g.textAlign = 'center';
         g.textBaseline = 'middle';
         g.fillText(zn.letter, x, y + 1);
@@ -152,7 +152,7 @@ export default function Minimap({
         g.translate(toPx(view.me.x), toPx(view.me.z));
         g.rotate(-view.me.yaw);
         arrow(22, 24, INK);
-        arrow(14, 16, '#ffc531');
+        arrow(14, 16, '#ff7a1a');
         g.restore();
       }
     };

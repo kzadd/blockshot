@@ -37,23 +37,29 @@ describe('message schemas', () => {
     expect(ok(SpawnSchema, { characterId: 'rayo', color: 'red' })).toBe(false);
   });
 
+  it('accepts the listed camouflages and finishes, or none, and nothing else', () => {
+    expect(ok(SpawnSchema, { characterId: 'soldado', camo: 'tigre', finish: 'oro' })).toBe(true);
+    expect(ok(SpawnSchema, { characterId: 'soldado', camo: 'rosa' })).toBe(false);
+    expect(ok(SpawnSchema, { characterId: 'soldado', finish: 'diamante' })).toBe(false);
+  });
+
   it('every character can spawn in its own colour (the client sends it when nothing else was picked)', () => {
     for (const c of CHARACTERS) expect(ok(SpawnSchema, { characterId: c.id, color: c.color }), c.name).toBe(true);
   });
 });
 
 describe('cosmetics', () => {
-  it('has six skins with unique ids that the server accepts', () => {
-    expect(SKINS).toHaveLength(10);
+  it('has twenty skins with unique ids that the server accepts', () => {
+    expect(SKINS).toHaveLength(20);
     expect(isSkinId('camo')).toBe(false); // the old pattern skins are gone (stored picks fall back to Humano)
     expect(new Set(SKINS.map((k) => k.id)).size).toBe(SKINS.length);
     for (const k of SKINS) expect(isSkinId(k.id)).toBe(true);
     expect(isSkinId('rgb')).toBe(false);
   });
 
-  it('offers nine distinct outfit colours as #rrggbb', () => {
-    expect(OUTFIT_COLORS).toHaveLength(9);
-    expect(new Set(OUTFIT_COLORS.map((c) => c.hex)).size).toBe(9);
+  it('offers ten distinct outfit colours as #rrggbb', () => {
+    expect(OUTFIT_COLORS).toHaveLength(10);
+    expect(new Set(OUTFIT_COLORS.map((c) => c.hex)).size).toBe(10);
     for (const c of OUTFIT_COLORS) expect(c.hex).toMatch(/^#[0-9a-f]{6}$/);
     expect(isOutfitColor('#3f7fe0')).toBe(true);
     expect(isOutfitColor('#000000')).toBe(false);

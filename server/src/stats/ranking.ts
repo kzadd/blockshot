@@ -3,13 +3,17 @@
 // overwritten, and a new season keeps a copy of the old one.
 import fs from 'node:fs';
 import path from 'node:path';
-import type { RankingRow, Team } from '@blockshot/shared';
+import { isCharacterId, type CharacterId, type RankingRow, type Team } from '@blockshot/shared';
 import type { Logger } from '../logger';
 import { isBot } from '../players/bot';
 import type { Room } from '../rooms/room';
 
-type Totals = Omit<RankingRow, 'name'>;
 const FIELDS = ['matches', 'wins', 'kills', 'deaths', 'shots', 'hits', 'heads', 'medals', 'caps'] as const;
+/** What the file keeps per name: the counters, spawns per character and the colour last worn with each */
+type Totals = Record<(typeof FIELDS)[number], number> & {
+  picks: Partial<Record<CharacterId, number>>;
+  colors: Partial<Record<CharacterId, string>>;
+};
 const empty = (): Totals => ({
   matches: 0,
   wins: 0,
@@ -20,6 +24,8 @@ const empty = (): Totals => ({
   heads: 0,
   medals: 0,
   caps: 0,
+  picks: {},
+  colors: {},
 });
 
 const rows = new Map<string, Totals>();
@@ -45,6 +51,11 @@ export function loadRanking(at: string, logger: Logger): void {
       if (typeof r?.name !== 'string') continue;
       const t = empty();
       for (const k of FIELDS) t[k] = Number.isFinite(r[k]) ? Math.max(0, Math.floor(r[k])) : 0;
+      // Older files have no picks/colors: those players simply have no favourite yet
+      for (const [c, n] of Object.entries(r.picks ?? {}))
+        if (isCharacterId(c) && Number.isFinite(n)) t.picks[c] = Math.max(0, Math.floor(n as number));
+      for (const [c, col] of Object.entries(r.colors ?? {}))
+        if (isCharacterId(c) && typeof col === 'string') t.colors[c] = col;
       rows.set(r.name, t);
     }
     logger.info({ file: at, players: rows.size }, 'ranking loaded');
@@ -62,7 +73,7 @@ function save(): void {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     // Write then rename: a crash mid-write never leaves half a file
     const tmp = `${file}.tmp`;
-    const json = JSON.stringify({ version: 1, rows: rankingRows() }, null, 2);
+    const json = JSON.stringify({ version: 1, rows: [...rows].map(([name, t]) => ({ name, ...t })) }, null, 2);
     fs.writeFileSync(tmp, json);
     try {
       fs.renameSync(tmp, file);
@@ -91,6 +102,8 @@ export function recordMatch(room: Room, winnerName: string, winnerTeam: Team): v
     t.heads += p.heads;
     t.medals += p.medals;
     t.caps += p.caps;
+    for (const [c, n] of Object.entries(p.picks) as [CharacterId, number][]) t.picks[c] = (t.picks[c] ?? 0) + n;
+    if (p.characterId && p.color) t.colors[p.characterId] = p.color;
     rows.set(p.name, t);
     changed = true;
   }
@@ -100,7 +113,11 @@ export function recordMatch(room: Room, winnerName: string, winnerTeam: Team): v
 /** Best first: most wins, then most kills, then fewest deaths. */
 export function rankingRows(): RankingRow[] {
   return [...rows]
-    .map(([name, t]) => ({ name, ...t }))
+    .map(([name, { picks, colors, ...t }]) => {
+      let fav: CharacterId | null = null;
+      for (const [c, n] of Object.entries(picks) as [CharacterId, number][]) if (n > (fav ? picks[fav]! : 0)) fav = c;
+      return { name, ...t, fav, favColor: (fav && colors[fav]) || '' };
+    })
     .sort((a, b) => b.wins - a.wins || b.kills - a.kills || a.deaths - b.deaths);
 }
 

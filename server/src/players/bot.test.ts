@@ -33,6 +33,8 @@ describe('practice bots', () => {
     const bot = [...f.room.players.values()].find(isBot)!;
     run(f, STEP_MS);
     expect(bot.alive).toBe(true);
+    // A hitscan gun: the bot's random pick could be the Artillero, whose launcher shells this loop never flies
+    spawnPlayer(f.room, bot, CHAR_BY_ID.soldado, 'base');
     f.place(bot, 0, 8);
     bot.protUntil = 0;
     me.protUntil = Number.MAX_SAFE_INTEGER; // no damage yet: the bot must not fire before its reaction time

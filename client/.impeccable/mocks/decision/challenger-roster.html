@@ -1,0 +1,616 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>BLOCKSHOT · Lobby</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700;6..12,800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ground: #fdf3e7;
+        --card: #fffaf3;
+        --ink: #1b1b2f;
+        --mute: #5c5668;
+        --line: #ecdcc8;
+        --sol: #3a86ff;
+        --caz: #2fa84f;
+        --tan: #ff6b4a;
+        --ray: #ffbe0b;
+        --bas: #8338ec;
+        --exp: #0fa3a3;
+        --art: #fb8500;
+        --rojo: #c8102e;
+        --azul: #1f3fbf;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1440px;
+        height: 900px;
+        overflow: hidden;
+        margin: 0;
+      }
+      body {
+        background: var(--ground);
+        color: var(--ink);
+        font:
+          15px/1.4 'Nunito Sans',
+          sans-serif;
+        padding: 0 48px;
+      }
+      .bub {
+        font-family: 'Baloo 2', sans-serif;
+      }
+      header {
+        height: 76px;
+        display: flex;
+        align-items: center;
+        gap: 28px;
+      }
+      .logo {
+        font: 800 34px/1 'Baloo 2';
+        letter-spacing: 0.5px;
+      }
+      .logo span {
+        display: inline-block;
+        width: 22px;
+        height: 22px;
+        background: var(--tan);
+        border: 3px solid #fff;
+        outline: 2px solid var(--ink);
+        border-radius: 6px;
+        margin-right: 10px;
+        vertical-align: 2px;
+      }
+      .nick {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+        font-size: 13px;
+        color: var(--mute);
+      }
+      input {
+        font: 600 15px 'Nunito Sans';
+        color: var(--ink);
+        background: #fff;
+        border: 2px solid var(--line);
+        border-radius: 12px;
+        padding: 9px 14px;
+        width: 200px;
+      }
+      input:focus {
+        outline: none;
+        border-color: var(--ink);
+      }
+      nav {
+        margin-left: auto;
+        display: flex;
+        gap: 6px;
+      }
+      nav a {
+        font-weight: 700;
+        font-size: 14px;
+        color: var(--ink);
+        text-decoration: none;
+        padding: 8px 14px;
+        border-radius: 10px;
+        border: 2px solid transparent;
+      }
+      nav a:hover {
+        border-color: var(--line);
+      }
+      /* signature: cast row */
+      .cast-h {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        margin: 6px 0 10px;
+      }
+      .cast-h h2 {
+        font: 700 20px/1 'Baloo 2';
+        margin: 0;
+      }
+      .cast-h p {
+        margin: 0;
+        font-size: 13px;
+        color: var(--mute);
+      }
+      .cast {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 14px;
+      }
+      .ch {
+        position: relative;
+        background: #fff;
+        border-radius: 22px;
+        padding: 14px 12px 12px;
+        text-align: center;
+        border: 2px solid var(--line);
+      }
+      .ch.sel {
+        border-color: var(--ink);
+        box-shadow: 0 4px 0 var(--ink);
+      }
+      .ch .rk {
+        position: absolute;
+        top: 10px;
+        left: 12px;
+        font: 800 13px 'Baloo 2';
+        color: var(--mute);
+      }
+      .ch.sel .rk::after {
+        content: 'TU ELECCIÓN';
+        margin-left: 6px;
+        font: 800 10px 'Nunito Sans';
+        letter-spacing: 0.6px;
+        color: #fff;
+        background: var(--ink);
+        padding: 2px 6px;
+        border-radius: 6px;
+        vertical-align: 1px;
+      }
+      .head {
+        width: 66px;
+        height: 62px;
+        margin: 6px auto 10px;
+        border-radius: 16px;
+        background: var(--c);
+        border: 4px solid #fff;
+        outline: 2px solid var(--c);
+        position: relative;
+      }
+      .head::before,
+      .head::after {
+        content: '';
+        position: absolute;
+        top: 21px;
+        width: 9px;
+        height: 11px;
+        background: var(--ink);
+        border-radius: 3px;
+      }
+      .head::before {
+        left: 15px;
+      }
+      .head::after {
+        right: 15px;
+      }
+      .head i {
+        position: absolute;
+        left: -4px;
+        right: -4px;
+        top: -4px;
+        height: 14px;
+        border-radius: 12px 12px 0 0;
+        background: rgba(27, 27, 47, 0.18);
+      }
+      .plate {
+        display: inline-block;
+        font: 800 17px/1 'Baloo 2';
+        padding: 6px 14px 4px;
+        border-radius: 999px;
+        background: var(--c);
+        color: var(--ink);
+      }
+      .plate.dk {
+        color: var(--ink);
+      }
+      .ch p {
+        margin: 8px 0 0;
+        font-size: 12.5px;
+        color: var(--mute);
+        line-height: 1.3;
+      }
+      /* halves */
+      main {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        margin-top: 22px;
+      }
+      section {
+        background: var(--card);
+        border: 2px solid var(--line);
+        border-radius: 24px;
+        padding: 20px 24px;
+        height: 536px;
+        display: flex;
+        flex-direction: column;
+      }
+      section h3 {
+        font: 800 24px/1 'Baloo 2';
+        margin: 0 0 14px;
+      }
+      .lbl {
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.7px;
+        color: var(--mute);
+        text-transform: uppercase;
+        margin: 0 0 8px;
+      }
+      .room {
+        display: grid;
+        grid-template-columns: 1fr auto auto;
+        align-items: center;
+        gap: 14px;
+        padding: 10px 14px;
+        border: 2px solid var(--line);
+        border-radius: 14px;
+        background: #fff;
+        margin-bottom: 8px;
+      }
+      .room.on {
+        border-color: var(--ink);
+      }
+      .room b {
+        font-size: 15px;
+      }
+      .room small {
+        display: block;
+        color: var(--mute);
+        font-size: 12.5px;
+      }
+      .st {
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.6px;
+        padding: 4px 9px;
+        border-radius: 8px;
+      }
+      .play {
+        background: var(--ink);
+        color: #fff;
+      }
+      .wait {
+        background: #efe4d4;
+        color: var(--ink);
+      }
+      .cnt {
+        font-weight: 700;
+        font-size: 13px;
+        width: 92px;
+        text-align: right;
+      }
+      .lock {
+        display: inline-block;
+        width: 11px;
+        height: 9px;
+        background: var(--ink);
+        border-radius: 2px;
+        position: relative;
+        margin-left: 6px;
+        vertical-align: 0;
+      }
+      .lock::before {
+        content: '';
+        position: absolute;
+        left: 2px;
+        top: -6px;
+        width: 4px;
+        height: 5px;
+        border: 2px solid var(--ink);
+        border-bottom: 0;
+        border-radius: 4px 4px 0 0;
+      }
+      .det {
+        margin-top: 6px;
+        border-top: 2px dashed var(--line);
+        padding-top: 12px;
+      }
+      .players {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px 14px;
+      }
+      .pl {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: #fff;
+        border-radius: 12px;
+        padding: 6px 10px;
+        border: 2px solid var(--line);
+      }
+      .mini {
+        width: 26px;
+        height: 24px;
+        border-radius: 7px;
+        background: var(--c);
+        border: 2px solid #fff;
+        outline: 2px solid var(--c);
+      }
+      .pl b {
+        flex: 1;
+        font-size: 14px;
+      }
+      .pl em {
+        font-style: normal;
+        font-size: 11px;
+        color: var(--mute);
+      }
+      .tm {
+        font-size: 10.5px;
+        font-weight: 800;
+        letter-spacing: 0.6px;
+        padding: 3px 7px;
+        border-radius: 6px;
+        color: #fff;
+      }
+      .r {
+        background: var(--rojo);
+      }
+      .a {
+        background: var(--azul);
+      }
+      .rd {
+        font-size: 12px;
+        font-weight: 800;
+        width: 62px;
+        text-align: right;
+      }
+      .rd.no {
+        color: var(--mute);
+        font-weight: 600;
+      }
+      .foot {
+        margin-top: auto;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .btn {
+        font: 800 16px 'Nunito Sans';
+        border: 0;
+        border-radius: 14px;
+        padding: 13px 26px;
+        background: var(--ink);
+        color: #fff;
+        cursor: pointer;
+        box-shadow: 0 4px 0 #000;
+      }
+      .btn.ghost {
+        background: #fff;
+        color: var(--ink);
+        border: 2px solid var(--ink);
+        box-shadow: none;
+        padding: 11px 22px;
+      }
+      .maps {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+      .map {
+        border: 2px solid var(--line);
+        border-radius: 14px;
+        background: #fff;
+        padding: 8px;
+        font-weight: 700;
+        font-size: 13px;
+      }
+      .map.on {
+        border-color: var(--ink);
+        box-shadow: 0 3px 0 var(--ink);
+      }
+      .plan {
+        height: 62px;
+        border-radius: 9px;
+        background: #e9dcc9;
+        position: relative;
+        margin-bottom: 6px;
+        overflow: hidden;
+      }
+      .plan div {
+        position: absolute;
+        background: #b8a58c;
+        border-radius: 3px;
+      }
+      .modes {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+      .mode {
+        font-weight: 700;
+        font-size: 13px;
+        padding: 7px 12px;
+        border-radius: 999px;
+        border: 2px solid var(--line);
+        background: #fff;
+      }
+      .mode.on {
+        background: var(--ink);
+        color: #fff;
+        border-color: var(--ink);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="logo"><span></span>BLOCKSHOT</div>
+      <label class="nick">Tu nombre <input value="Ricardo" /></label>
+      <nav><a href="#">Ranking</a><a href="#">Manual</a><a href="#">Ajustes</a></nav>
+    </header>
+
+    <div class="cast-h">
+      <h2>El reparto</h2>
+      <p>Ordenados por partidas jugadas esta semana · pulsa para elegir</p>
+    </div>
+    <div class="cast">
+      <div class="ch sel" style="--c: var(--sol)">
+        <span class="rk">#1</span>
+        <div class="head"><i></i></div>
+        <span class="plate">Soldado</span>
+        <p>Equilibrado, perdona los fallos</p>
+      </div>
+      <div class="ch" style="--c: var(--caz)">
+        <span class="rk">#2</span>
+        <div class="head"><i></i></div>
+        <span class="plate">Cazador</span>
+        <p>Un tiro, una baja</p>
+      </div>
+      <div class="ch" style="--c: var(--tan)">
+        <span class="rk">#3</span>
+        <div class="head"><i></i></div>
+        <span class="plate">Tanque</span>
+        <p>Aguanta lo que le echen</p>
+      </div>
+      <div class="ch" style="--c: var(--ray)">
+        <span class="rk">#4</span>
+        <div class="head"><i></i></div>
+        <span class="plate dk">Rayo</span>
+        <p>Entra, dispara y sale</p>
+      </div>
+      <div class="ch" style="--c: var(--bas)">
+        <span class="rk">#5</span>
+        <div class="head"><i></i></div>
+        <span class="plate">Bastión</span>
+        <p>Muro y ráfaga</p>
+      </div>
+      <div class="ch" style="--c: var(--exp)">
+        <span class="rk">#6</span>
+        <div class="head"><i></i></div>
+        <span class="plate">Explorador</span>
+        <p>Ve antes que nadie</p>
+      </div>
+      <div class="ch" style="--c: var(--art)">
+        <span class="rk">#7</span>
+        <div class="head"><i></i></div>
+        <span class="plate">Artillero</span>
+        <p>Todo explota</p>
+      </div>
+    </div>
+
+    <main>
+      <section>
+        <h3>Unirse a una sala</h3>
+        <p class="lbl">Salas en la red de clase · 3</p>
+        <div class="room">
+          <div><b>Sala de Ricardo</b><small>Patio · Todos contra todos</small></div>
+          <span class="st play">EN JUEGO</span><span class="cnt">5/12 jugadores</span>
+        </div>
+        <div class="room on">
+          <div><b>Clase 3B</b><small>Almacén · Por equipos · 4 de 6 listos</small></div>
+          <span class="st wait">EN ESPERA</span><span class="cnt">6/10 jugadores</span>
+        </div>
+        <div class="room">
+          <div>
+            <b>Torneo viernes<span class="lock" title="Con contraseña"></span></b
+            ><small>Desfiladero · Todos contra todos · con contraseña</small>
+          </div>
+          <span class="st wait">EN ESPERA</span><span class="cnt">3/8 jugadores</span>
+        </div>
+        <div class="det">
+          <p class="lbl">En Clase 3B</p>
+          <div class="players">
+            <div class="pl">
+              <span class="mini" style="--c: var(--caz)"></span><b>Ana <em>Cazador</em></b
+              ><span class="tm r">ROJO</span><span class="rd">Listo</span>
+            </div>
+            <div class="pl">
+              <span class="mini" style="--c: var(--sol)"></span><b>Bea <em>Soldado</em></b
+              ><span class="tm a">AZUL</span><span class="rd">Listo</span>
+            </div>
+            <div class="pl">
+              <span class="mini" style="--c: var(--tan)"></span><b>Cris <em>Tanque</em></b
+              ><span class="tm r">ROJO</span><span class="rd no">No listo</span>
+            </div>
+            <div class="pl">
+              <span class="mini" style="--c: var(--ray)"></span><b>Dani <em>Rayo</em></b
+              ><span class="tm a">AZUL</span><span class="rd">Listo</span>
+            </div>
+            <div class="pl">
+              <span class="mini" style="--c: var(--art)"></span><b>Eva <em>Artillero</em></b
+              ><span class="tm r">ROJO</span><span class="rd">Listo</span>
+            </div>
+            <div class="pl">
+              <span class="mini" style="--c: var(--exp)"></span><b>Fran <em>Explorador</em></b
+              ><span class="tm a">AZUL</span><span class="rd no">No listo</span>
+            </div>
+          </div>
+        </div>
+        <div class="foot"><button class="btn">Entrar</button><button class="btn ghost">Estoy listo</button></div>
+      </section>
+
+      <section>
+        <h3>Crear sala</h3>
+        <p class="lbl">Mapa</p>
+        <div class="maps">
+          <div class="map on">
+            <div class="plan">
+              <div style="left: 10%; top: 15%; width: 22%; height: 30%"></div>
+              <div style="right: 12%; bottom: 15%; width: 28%; height: 25%"></div>
+              <div style="left: 45%; top: 40%; width: 10%; height: 20%"></div>
+            </div>
+            Patio
+          </div>
+          <div class="map">
+            <div class="plan">
+              <div style="left: 8%; top: 12%; width: 18%; height: 76%"></div>
+              <div style="left: 40%; top: 12%; width: 18%; height: 76%"></div>
+              <div style="right: 8%; top: 12%; width: 18%; height: 76%"></div>
+            </div>
+            Almacén
+          </div>
+          <div class="map">
+            <div class="plan">
+              <div style="left: 0; top: 0; width: 100%; height: 30%"></div>
+              <div style="left: 0; bottom: 0; width: 100%; height: 30%"></div>
+              <div style="left: 45%; top: 42%; width: 8%; height: 16%"></div>
+            </div>
+            Desfiladero
+          </div>
+          <div class="map">
+            <div class="plan">
+              <div style="left: 12%; top: 20%; width: 30%; height: 14%"></div>
+              <div style="right: 10%; top: 55%; width: 36%; height: 14%"></div>
+              <div style="left: 30%; bottom: 8%; width: 12%; height: 24%"></div>
+            </div>
+            Polvo
+          </div>
+          <div class="map">
+            <div class="plan">
+              <div style="left: 6%; top: 10%; width: 24%; height: 34%"></div>
+              <div style="left: 38%; top: 10%; width: 24%; height: 34%"></div>
+              <div style="right: 6%; top: 10%; width: 24%; height: 34%"></div>
+              <div style="left: 6%; bottom: 10%; width: 40%; height: 30%"></div>
+              <div style="right: 6%; bottom: 10%; width: 40%; height: 30%"></div>
+            </div>
+            Ciudad
+          </div>
+          <div class="map">
+            <div class="plan">
+              <div style="left: 15%; top: 20%; width: 50%; height: 12%"></div>
+              <div style="left: 15%; top: 20%; width: 10%; height: 60%"></div>
+              <div style="right: 15%; bottom: 15%; width: 20%; height: 20%"></div>
+            </div>
+            Obra
+          </div>
+        </div>
+        <p class="lbl">Modo de juego</p>
+        <div class="modes">
+          <span class="mode on">Todos contra todos</span><span class="mode">Por equipos</span
+          ><span class="mode">Captura la bandera</span><span class="mode">Escalada de armas</span
+          ><span class="mode">Confirmar bajas</span><span class="mode">Infectados</span><span class="mode">Dominio</span
+          ><span class="mode">Rondas</span>
+        </div>
+        <p class="lbl">Contraseña (opcional)</p>
+        <input placeholder="Déjala vacía para sala abierta" style="width: 100%" />
+        <div class="foot">
+          <button class="btn">Crear sala</button
+          ><span style="font-size: 13px; color: var(--mute)">Tu PC será el servidor · blockshot.local:3000</span>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

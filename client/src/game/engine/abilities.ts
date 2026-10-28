@@ -1,11 +1,17 @@
-// Ability objects in the world, from the snapshot: smoke clouds (a heap of grey blocks that grows, drifts and
-// fades), mines (a dark puck with a blinking light) and cover walls (which rise from the floor and also go into
-// the client's colliders, so its movement prediction bumps into them like the server does).
+// Ability objects in the world, from the snapshot: smoke clouds (Kenney's smoke puffs round the canister that
+// throws them; they grow, drift and fade), mines (Quaternius's landmine with a blinking light) and cover walls
+// (two rows of Quaternius's sandbags that rise from the floor). Walls also go into the client's colliders, so its
+// movement prediction bumps into them like the server does; the collider is the same box as before.
 import * as THREE from 'three';
 import { SMOKE, WALL, type Collider, type DeployableSnapshot } from '@blockshot/shared';
+import { FX, fxFrame } from '../render/fxAtlas';
+import { preloadProps, prop } from '../render/props';
 
-/** Blocks per cloud and how long it takes to grow / to fade out (ms). */
-const SMOKE_PUFFS = 44;
+/** Puffs per cloud and how long it takes to grow / to fade out (ms). */
+const SMOKE_PUFFS = 34;
+const SMOKE_SHADE = 0xd6d8dc;
+const CANISTER_SIZE = 0.3;
+const MINE_SIZE = 0.62;
 const SMOKE_GROW_MS = 700;
 const SMOKE_FADE_MS = 1400;
 const SMOKE_OPACITY = 0.97;
@@ -18,19 +24,15 @@ interface Obj {
   group: THREE.Group;
   born: number;
   collider: Collider | null;
-  /** smoke: its blocks with their drift speed */
-  puffs?: { mesh: THREE.Mesh; spin: number }[];
+  /** smoke: its puffs with their spin */
+  puffs?: { sprite: THREE.Sprite; spin: number }[];
   light?: THREE.Mesh;
 }
 
-const box = new THREE.BoxGeometry(1, 1, 1);
-const mineGeo = new THREE.CylinderGeometry(0.28, 0.32, 0.12, 12);
-const lightGeo = new THREE.SphereGeometry(0.06, 8, 6);
-const mineMat = new THREE.MeshLambertMaterial({ color: '#2b2f36' });
+const lightGeo = new THREE.SphereGeometry(0.045, 8, 6);
 const lightOn = new THREE.MeshBasicMaterial({ color: '#ff3b3b' });
 const lightOff = new THREE.MeshBasicMaterial({ color: '#4a1414' });
-const wallMat = new THREE.MeshLambertMaterial({ color: '#9aa1a8' });
-const wallEdge = new THREE.MeshLambertMaterial({ color: '#6f767d' });
+preloadProps('smokegren', 'mine', 'sacks');
 
 export class AbilityObjects {
   private readonly objs = new Map<number, Obj>();
@@ -52,7 +54,7 @@ export class AbilityObjects {
     for (const [id, o] of this.objs) {
       if (seen.has(id)) continue;
       this.scene.remove(o.group);
-      for (const p of o.puffs ?? []) (p.mesh.material as THREE.Material).dispose();
+      for (const p of o.puffs ?? []) p.sprite.material.dispose();
       if (o.collider) wallsChanged = true;
       this.objs.delete(id);
     }
@@ -81,49 +83,46 @@ export class AbilityObjects {
     const group = new THREE.Group();
     group.position.set(x, y, z);
     if (kind === 'smoke') {
-      // Random blocks inside the cloud's sphere, bigger towards the middle
+      // Puffs inside the cloud's sphere, bigger towards the middle, round the canister on the floor
       const puffs = Array.from({ length: SMOKE_PUFFS }, (_, i) => {
         const a = Math.random() * Math.PI * 2;
         const r = Math.sqrt(Math.random()) * SMOKE.radius * 0.8;
-        const s = 2.2 + Math.random() * 2 * (1 - r / SMOKE.radius);
-        const shade = 0.78 + Math.random() * 0.14;
-        const mesh = new THREE.Mesh(
-          box,
-          new THREE.MeshLambertMaterial({
-            color: new THREE.Color(shade, shade, shade * 1.02),
-            transparent: true,
-            opacity: SMOKE_OPACITY,
-            depthWrite: false,
-            side: THREE.DoubleSide, // seen from inside too: no clear view out of the cloud
-          }),
-        );
-        mesh.position.set(Math.cos(a) * r, 0.4 + Math.random() * SMOKE.radius * 0.6 + (i % 3) * 0.3, Math.sin(a) * r);
-        mesh.scale.setScalar(s);
-        mesh.rotation.set(Math.random(), Math.random() * 3, Math.random());
-        group.add(mesh);
-        return { mesh, spin: (Math.random() - 0.5) * SMOKE_DRIFT };
+        const mat = new THREE.SpriteMaterial({
+          map: fxFrame(FX.puff[i % FX.puff.length]!),
+          color: SMOKE_SHADE,
+          transparent: true,
+          opacity: SMOKE_OPACITY,
+          depthWrite: false,
+          rotation: Math.random() * Math.PI * 2,
+        });
+        const sprite = new THREE.Sprite(mat);
+        sprite.position.set(Math.cos(a) * r, 0.5 + Math.random() * SMOKE.radius * 0.7, Math.sin(a) * r);
+        sprite.scale.setScalar(3.2 + Math.random() * 2.4 * (1 - r / SMOKE.radius));
+        group.add(sprite);
+        return { sprite, spin: (Math.random() - 0.5) * SMOKE_DRIFT };
       });
-      group.scale.setScalar(0.2);
+      const canister = prop('smokegren', CANISTER_SIZE);
+      canister.rotation.z = Math.PI / 2; // lying on its side
+      canister.position.y = 0.05;
+      group.add(canister);
       return { kind, group, born: now, collider: null, puffs };
     }
     if (kind === 'mine') {
-      const puck = new THREE.Mesh(mineGeo, mineMat);
-      puck.position.y = 0.06;
       const light = new THREE.Mesh(lightGeo, lightOn);
-      light.position.y = 0.14;
-      group.add(puck, light);
+      light.position.y = 0.17;
+      group.add(prop('mine', MINE_SIZE), light);
       return { kind, group, born: now, collider: null, light };
     }
-    // Cover wall: a concrete slab with a darker cap, rising from the floor
+    // Cover wall: two rows of sandbags filling the collider's box, rising from the floor
     const [w, d] = along === 0 ? [WALL.w, WALL.t] : [WALL.t, WALL.w];
-    const slab = new THREE.Mesh(box, wallMat);
-    slab.scale.set(w, WALL.h, d);
-    slab.position.y = WALL.h / 2;
-    slab.castShadow = slab.receiveShadow = true;
-    const cap = new THREE.Mesh(box, wallEdge);
-    cap.scale.set(w + 0.06, 0.1, d + 0.06);
-    cap.position.y = WALL.h;
-    group.add(slab, cap);
+    for (let row = 0; row < 2; row++) {
+      const bags = prop('sacks', [WALL.w, WALL.h / 2, WALL.t]);
+      bags.position.y = (row * WALL.h) / 2;
+      if (along !== 0) bags.rotation.y = Math.PI / 2;
+      // the top row is shifted half a bag, like real stacked sandbags
+      bags.position[along === 0 ? 'x' : 'z'] = row ? 0.12 : 0;
+      group.add(bags);
+    }
     group.scale.y = 0.05;
     return {
       kind,
@@ -141,8 +140,8 @@ export class AbilityObjects {
         const left = SMOKE.durationMs - age;
         const alpha = SMOKE_OPACITY * Math.max(0, Math.min(1, left / SMOKE_FADE_MS));
         for (const p of o.puffs ?? []) {
-          p.mesh.rotation.y += p.spin * dt;
-          (p.mesh.material as THREE.MeshLambertMaterial).opacity = alpha;
+          p.sprite.material.rotation += p.spin * dt;
+          p.sprite.material.opacity = alpha;
         }
       } else if (o.kind === 'mine' && o.light) {
         o.light.material = Math.floor(age / MINE_BLINK_MS) % 2 ? lightOff : lightOn;
@@ -155,7 +154,7 @@ export class AbilityObjects {
   dispose(): void {
     for (const o of this.objs.values()) {
       this.scene.remove(o.group);
-      for (const p of o.puffs ?? []) (p.mesh.material as THREE.Material).dispose();
+      for (const p of o.puffs ?? []) p.sprite.material.dispose();
     }
     this.objs.clear();
   }

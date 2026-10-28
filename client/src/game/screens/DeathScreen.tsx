@@ -45,7 +45,8 @@ export default function DeathScreen({ lastDeath, current, feed, you, mode, info,
           Repetición · así te vio <b>{lastDeath.name}</b>
         </div>
       )}
-      <div className="death">
+      {/* During the replay the card steps aside to the bottom-left corner: the killer's view stays clear */}
+      <div className={`death ${h.replay ? 'replaying' : ''}`}>
         <h2>
           {lastDeath ? (
             <>

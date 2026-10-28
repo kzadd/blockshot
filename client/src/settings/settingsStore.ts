@@ -3,6 +3,8 @@ import { useSyncExternalStore } from 'react';
 // Player settings: saved in this browser and applied immediately
 export type CrosshairStyle = 'cross' | 'crossdot' | 'dot' | 'circle' | 't' | 'x';
 export type ColorblindMode = 'off' | 'rg' | 'by';
+/** Graphics quality: baja for integrated graphics (default), alta adds antialias, soft shadows and full resolution. */
+export type Quality = 'baja' | 'alta';
 
 export const CROSSHAIRS: { id: CrosshairStyle; name: string }[] = [
   { id: 'cross', name: 'Cruz' },
@@ -35,6 +37,7 @@ export interface Settings {
   /** soft HUD and camera shake when taking damage */
   shake: boolean;
   colorblind: ColorblindMode;
+  quality: Quality;
   crosshair: CrosshairConfig;
 }
 
@@ -47,7 +50,8 @@ export const DEFAULTS: Settings = {
   volume: 0.8,
   shake: true,
   colorblind: 'off',
-  crosshair: { style: 'cross', color: '#ffffff', size: 8, thickness: 2, gap: 5, outline: true, dynamic: true },
+  quality: 'baja',
+  crosshair: { style: 'cross', color: '#ffffff', size: 6, thickness: 2, gap: 4, outline: true, dynamic: true },
 };
 
 const KEY = 'blockshot:settings';

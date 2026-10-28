@@ -58,7 +58,6 @@ const base = (): HudState => ({
   teamScore: null,
   flags: null,
   ping: 10,
-  chatOpen: false,
   grenades: 1,
   zones: null,
   round: null,

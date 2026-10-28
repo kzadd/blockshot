@@ -1,29 +1,12 @@
 import { canSwitchTeam, teamName, type ModeId, type SideTeam } from '@blockshot/shared';
 import { Icon } from '../../ui/icons';
-import { Keys } from '../../ui/ui';
 import { useHud } from '../hud/hudStore';
-
-const PAUSE_KEYS: [string[], string][] = [
-  [['W', 'A', 'S', 'D'], 'Moverse'],
-  [['Espacio'], 'Saltar · mantén para encadenar'],
-  [['Shift'], 'Esprintar'],
-  [['C'], 'Agacharse · deslizarse'],
-  [['Clic izq.'], 'Disparar'],
-  [['Clic der.'], 'Apuntar'],
-  [['R'], 'Recargar'],
-  [['G'], 'Granada: mantén para ver dónde cae, suelta para lanzar'],
-  [['E'], 'Habilidad del personaje'],
-  [['1', '2', '3', 'Q'], 'Cambiar de arma (3: cuchillo)'],
-  [['Tab'], 'Marcador'],
-  [['V'], 'Chat rápido'],
-  [['Esc'], 'Pausa'],
-];
 
 interface Props {
   mode: ModeId;
   onResume: () => void;
   onSettings: () => void;
-  onManual: () => void;
+  onControls: () => void;
   onSwitchTeam: (team: SideTeam) => void;
   onLeave: () => void;
   /** server PC only: the admin panel (bots, players, room) */
@@ -37,7 +20,7 @@ export default function PauseMenu({
   mode,
   onResume,
   onSettings,
-  onManual,
+  onControls,
   onSwitchTeam,
   onLeave,
   admin,
@@ -47,60 +30,62 @@ export default function PauseMenu({
 }: Props) {
   const myTeam = useHud((s) => s.myTeam) ?? 0;
   const other: SideTeam = myTeam === 1 ? 2 : 1;
+  // A proposal window over the game: clicking outside it goes back to the game
   return (
-    <div className="pause-bg" onClick={onResume}>
-      <div className="stage">
-        <div className="pause-panel">
-          <h2>Pausa</h2>
-          <p className="sub">
-            <b>Haz clic o pulsa Esc para volver</b> · los demás siguen jugando
-          </p>
-          <div className="key-grid">
-            {PAUSE_KEYS.map(([keys, what]) => (
-              <div className="key-row" key={what}>
-                <Keys keys={keys} />
-                <span>{what}</span>
-              </div>
-            ))}
-          </div>
-          <div className="actions" onClick={(e) => e.stopPropagation()}>
-            <button className="btn has-key" onClick={onSettings}>
-              <span className="key">O</span>Ajustes
+    <div className="pz pz-layer dim wins" onClick={onResume}>
+      <div
+        className="win pause-win"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pause-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h1 className="title" id="pause-title">
+          Pausa
+        </h1>
+        <p className="meta">Los demás siguen jugando</p>
+        <button className="btn primary wide" onClick={onResume}>
+          Continuar <kbd className="k">Esc</kbd>
+        </button>
+        <nav className="pw-menu" aria-label="Opciones">
+          <button onClick={onSettings}>
+            <Icon name="sliders" />
+            Ajustes <kbd className="k">O</kbd>
+          </button>
+          <button onClick={onControls}>
+            <Icon name="book" />
+            Controles <kbd className="k">H</kbd>
+          </button>
+          <button onClick={onRanking}>
+            <Icon name="award" />
+            Ranking
+          </button>
+          <button onClick={onTour}>
+            <Icon name="swords" />
+            Torneo
+          </button>
+          {canSwitchTeam(mode) && myTeam !== 0 && (
+            <button onClick={() => onSwitchTeam(other)}>
+              <Icon name="users" />
+              Pasar a {teamName(mode, other)} <kbd className="k">T</kbd>
             </button>
-            <button className="btn has-key" onClick={onManual}>
-              <span className="key">H</span>Manual
-            </button>
-            <button className="btn" onClick={onRanking}>
-              <Icon name="award" />
-              Ranking
-            </button>
-            <button className="btn" onClick={onTour}>
-              <Icon name="award" />
-              Torneo
-            </button>
-            {canSwitchTeam(mode) && myTeam !== 0 && (
-              <button className="btn has-key" onClick={() => onSwitchTeam(other)}>
-                <span className="key">T</span>Pasar a {teamName(mode, other)}
-              </button>
-            )}
-            <button className="btn ghost danger" onClick={onLeave}>
-              <Icon name="logout" />
-              Salir de la sala
-            </button>
-          </div>
-          {admin && (
-            <div className="admin-row" onClick={(e) => e.stopPropagation()}>
-              <span className="kicker">
-                <Icon name="lock" />
-                Solo servidor
-              </span>
-              <button className="btn sm" onClick={onAdmin}>
-                <Icon name="shield" />
-                Panel de admin <span className="key">P</span>
-              </button>
-            </div>
           )}
-        </div>
+          <button className="danger" onClick={onLeave}>
+            <Icon name="logout" />
+            Salir de la sala
+          </button>
+        </nav>
+        {admin && (
+          <div className="pw-admin">
+            <span className="lbl">
+              <Icon name="lock" />
+              Solo en este PC
+            </span>
+            <button className="btn sm" onClick={onAdmin}>
+              Panel de admin <kbd className="k">P</kbd>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

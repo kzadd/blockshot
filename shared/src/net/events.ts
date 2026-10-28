@@ -1,6 +1,7 @@
 // Typed Socket.IO protocol. Short keys in high-frequency payloads keep snapshots small.
 import type { Vec3 } from '../core/math';
 import type { CharacterId, SkinId } from '../characters/characters';
+import type { CamoId, FinishId } from '../characters/looks';
 import type { TournamentResult } from '../modes/tournament';
 import type { MapId, SizeId } from '../maps/types';
 import type { BotLevel } from '../modes/bots';
@@ -70,6 +71,10 @@ export interface PlayerSnapshot {
   sk: SkinId;
   /** outfit colour picked by the player (OUTFIT_COLORS) */
   co: string;
+  /** uniform camouflage */
+  cm: CamoId;
+  /** guns' finish */
+  fn: FinishId;
   x: number;
   y: number;
   z: number;
@@ -196,6 +201,8 @@ export interface SpawnedMessage {
   skin: SkinId;
   /** outfit colour (OUTFIT_COLORS) */
   color: string;
+  camo: CamoId;
+  finish: FinishId;
   hp: number;
   level: number;
   team: Team;
@@ -259,6 +266,10 @@ export interface RankingRow {
   medals: number;
   /** flag captures or confirmed tags */
   caps: number;
+  /** most-picked character (null before the first pick was recorded) */
+  fav: CharacterId | null;
+  /** outfit colour last worn with `fav` ('' if unknown) */
+  favColor: string;
 }
 
 /** Session statistics of one player (server PC only). */
@@ -309,7 +320,7 @@ export interface ClientToServerEvents {
   'room:join': (data: JoinRoomRequest, cb: (res: JoinResult) => void) => void;
   'room:leave': () => void;
   'net:ping': (d: { rtt: number }, cb: () => void) => void;
-  'player:spawn': (d: { characterId: string; skin?: string; color?: string }) => void;
+  'player:spawn': (d: { characterId: string; skin?: string; color?: string; camo?: string; finish?: string }) => void;
   'team:set': (d: { team: number }) => void;
   'player:input': (d: InputMessage) => void;
   'player:switch': (d: { slot: number }) => void;

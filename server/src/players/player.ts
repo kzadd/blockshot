@@ -1,6 +1,8 @@
 import {
   createMoveState,
+  type CamoId,
   type CharacterId,
+  type FinishId,
   type MoveInput,
   type MoveState,
   type SkinId,
@@ -30,6 +32,9 @@ export interface Player {
   skin: SkinId;
   /** outfit colour (one of OUTFIT_COLORS) */
   color: string;
+  /** cosmetic: uniform camouflage and guns' finish */
+  camo: CamoId;
+  finish: FinishId;
   team: Team;
   alive: boolean;
   hp: number;
@@ -111,6 +116,8 @@ export function createPlayer(id: string, name: string, team: Team): Player {
     characterId: null,
     skin: 'base',
     color: '',
+    camo: 'liso',
+    finish: 'estandar',
     team,
     alive: false,
     hp: 0,

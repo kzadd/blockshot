@@ -17,23 +17,20 @@ export function TournamentPanel({ room, you, admin, onStart }: PanelProps) {
   const [rounds, setRounds] = useState<number>(TOUR_ROUNDS[1]);
   const tour = room.tour;
   return (
-    <div className="admin-room">
-      <span className="kicker">
-        <Icon name="award" />
-        Torneo
-      </span>
+    <section>
+      <h2 className="lbl">Torneo</h2>
       {tour ? (
         <>
-          <span className="admin-tour">
+          <p className="aw-tour">
             Ronda <b>{tour.round}</b> de {tour.rounds}
-          </span>
+          </p>
           {admin || tour.by === you ? (
-            <button className="btn sm ghost danger" onClick={() => socket.emit('tournament:set', { rounds: 0 })}>
+            <button className="btn sm danger" onClick={() => socket.emit('tournament:set', { rounds: 0 })}>
               <Icon name="x" />
               Terminar torneo
             </button>
           ) : (
-            <small className="admin-hint">Solo quien lo creó o el admin puede terminarlo</small>
+            <small className="meta">Solo quien lo creó o el admin puede terminarlo</small>
           )}
         </>
       ) : (
@@ -61,10 +58,10 @@ export function TournamentPanel({ room, you, admin, onStart }: PanelProps) {
             <Icon name="award" />
             Empezar torneo
           </button>
-          <small className="admin-hint">Todos contra todos · cada puesto suma puntos (10, 8, 6…)</small>
+          <small className="meta">Todos contra todos · cada puesto suma puntos (10, 8, 6…)</small>
         </>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -75,15 +72,25 @@ export default function TournamentDialog({ onClose, ...p }: Omit<PanelProps, 'on
     return () => window.removeEventListener('keydown', esc);
   }, [onClose]);
   return (
-    <div className="modal-bg" onClick={onClose}>
-      <div className="modal admin-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <h2>Torneo</h2>
-          <span className="esc">Empezarlo reinicia la partida para todos</span>
-          <button className="btn icon" onClick={onClose} aria-label="Cerrar">
-            <Icon name="x" size={18} />
+    <div className="pz pz-layer dim wins" onClick={onClose}>
+      <div
+        className="win tour-win"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="tour-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="aw-head">
+          <div>
+            <h1 className="title" id="tour-title">
+              Torneo
+            </h1>
+            <p className="meta">Empezarlo reinicia la partida para todos</p>
+          </div>
+          <button className="btn sm" onClick={onClose}>
+            Cerrar <kbd className="k">Esc</kbd>
           </button>
-        </div>
+        </header>
         <TournamentPanel {...p} onStart={onClose} />
       </div>
     </div>

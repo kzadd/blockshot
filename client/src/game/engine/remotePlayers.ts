@@ -8,7 +8,9 @@ import {
   isOutfitColor,
   isTeamMode,
   loadoutOf,
+  type CamoId,
   type CharacterId,
+  type FinishId,
   type HitTarget,
   type ModeId,
   type PlayerSnapshot,
@@ -16,6 +18,7 @@ import {
   type Team,
   type WeaponId,
 } from '@blockshot/shared';
+import { prop } from '../render/props';
 import { palette, teamColor } from '../../settings/palette';
 import {
   buildCharacter,
@@ -25,6 +28,7 @@ import {
   type GunModel,
   type NameTag,
 } from '../render/models';
+import { loadGun } from '../render/gunAssets';
 import { damp, dampAngle } from './util';
 
 const INFECTED_COLOR = '#6fcf3a';
@@ -69,11 +73,10 @@ function glintMat(): THREE.SpriteMaterial {
   return glintMaterial;
 }
 
-/** Tanque's shield: a glassy blue panel in front of the chest (the model faces -z). */
-const SHIELD_Y = 1.05;
-const SHIELD_Z = -0.62;
-const shieldGeo = new THREE.BoxGeometry(1.25, 1.7, 0.06);
-const shieldMat = new THREE.MeshBasicMaterial({ color: 0x5aaaff, transparent: true, opacity: 0.38, depthWrite: false });
+/** Tanque's shield: the pack's riot shield held in front of the body (the model faces -z), feet to chest. */
+const SHIELD_Y = 0.25;
+const SHIELD_Z = -0.6;
+const SHIELD_SIZE: [number, number, number] = [0.95, 0.08, 1.55];
 const BUBBLE_OPACITY = 0.14;
 const BUBBLE_PULSE = 0.08;
 const BUBBLE_PULSE_SPEED = 0.008;
@@ -108,6 +111,7 @@ export interface Sample {
 export interface Outfit {
   color: string;
   skin: string;
+  camo: CamoId;
 }
 
 export interface Remote {
@@ -117,17 +121,21 @@ export interface Remote {
   tag: NameTag | null;
   bubble: THREE.Mesh | null;
   /** Tanque's shield in front of the body */
-  shield: THREE.Mesh | null;
+  shield: THREE.Object3D | null;
   /** lens glint of a sniper who is scoped in */
   glint: THREE.Sprite | null;
   charId: CharacterId | null;
   skin: SkinId | null;
   /** outfit colour picked by the player */
   co: string;
+  cm: CamoId;
+  fn: FinishId;
   team: Team | -1;
   color: string;
   weaponId: WeaponId | null;
   gun: GunModel | null;
+  /** bumps on every gun change, so a late pack model doesn't replace a newer gun */
+  gunToken: number;
   buffer: Sample[];
   rx: number;
   sl: number;
@@ -141,13 +149,42 @@ export interface Remote {
   lastShot: number;
 }
 
-/** In team modes everybody wears its team colour; in free for all, the colour the player picked and its skin. */
-export function outfitFor(mode: ModeId, charId: CharacterId, skin: string, team: Team, color?: string): Outfit {
+/**
+ * Walking swings the legs (`walk`: the cycle's phase); sliding stretches them; crouching puts a knee down.
+ * `k` eases knees and height towards their pose. Also used for our own body in the death replay.
+ */
+export function animateLegs(m: CharacterModel, walk: number, speed: number, sl: number, cr: number, k: number): void {
+  const swing = sl ? 0 : Math.sin(walk) * Math.min(speed / WALK_FULL_SPEED, 1) * (cr ? LEG_SWING_CROUCHED : LEG_SWING);
+  const low = sl || cr;
+  m.legL.rotation.x = sl ? 1.2 : cr ? 1.1 + swing : swing;
+  m.legR.rotation.x = sl ? 1.2 : cr ? -0.35 - swing : -swing;
+  const kneeL = sl ? 0 : cr ? KNEE_CROUCH_FRONT : -Math.max(0, -swing) * KNEE_BEND;
+  const kneeR = sl ? 0 : cr ? KNEE_CROUCH_BACK : -Math.max(0, swing) * KNEE_BEND;
+  m.kneeL.rotation.x += (kneeL - m.kneeL.rotation.x) * k;
+  m.kneeR.rotation.x += (kneeR - m.kneeR.rotation.x) * k;
+  m.legL.position.y = m.legR.position.y += ((low ? 0.5 : 0.8) - m.legR.position.y) * k;
+  m.upper.position.y += ((low ? -0.5 : 0) - m.upper.position.y) * k;
+}
+
+/** How fast the walk cycle turns per metre walked (shared with the replay ghost). */
+export const WALK_PHASE_PER_M = WALK_CYCLE;
+
+/**
+ * In team modes everybody wears its team colour on a plain uniform (a camouflage would hide who is who);
+ * in free for all, the colour and camouflage the player picked. The skin (who you are) is always yours.
+ */
+export function outfitFor(
+  mode: ModeId,
+  charId: CharacterId,
+  skin: string,
+  team: Team,
+  color?: string,
+  camo: CamoId = 'liso',
+): Outfit {
   const ch = CHAR_BY_ID[charId];
-  // Team modes paint the uniform in the team colour; the skin (who you are) is always yours
-  if (mode === 'infect' && team === 2) return { color: INFECTED_COLOR, skin: 'zombi' };
-  if (isTeamMode(mode) && team) return { color: teamColor(team, ch.color), skin };
-  return { color: isOutfitColor(color) ? color : ch.color, skin };
+  if (mode === 'infect' && team === 2) return { color: INFECTED_COLOR, skin: 'zombi', camo: 'liso' };
+  if (isTeamMode(mode) && team) return { color: teamColor(team, ch.color), skin, camo: 'liso' };
+  return { color: isOutfitColor(color) ? color : ch.color, skin, camo };
 }
 
 export class RemotePlayers {
@@ -198,11 +235,16 @@ export class RemotePlayers {
           prot: false,
           walk: 0,
           stepAcc: 0,
+          gunToken: 0,
+          cm: 'liso',
+          fn: 'estandar',
           lastShot: 0,
         };
         this.all.set(p.id, r);
       }
-      if (p.c && (r.charId !== p.c || r.skin !== p.sk || r.co !== p.co || r.team !== p.tm)) this.build(r, p);
+      const changed =
+        r.charId !== p.c || r.skin !== p.sk || r.co !== p.co || r.cm !== p.cm || r.fn !== p.fn || r.team !== p.tm;
+      if (p.c && changed) this.build(r, p);
       r.name = p.n;
       r.rx = p.rx;
       r.sl = p.sl;
@@ -233,8 +275,8 @@ export class RemotePlayers {
   private build(r: Remote, p: PlayerSnapshot): void {
     if (!p.c) return;
     if (r.model) this.scene.remove(r.model.group);
-    const { color, skin } = outfitFor(this.mode, p.c, p.sk, p.tm, p.co);
-    r.model = buildCharacter(p.c, skin, color);
+    const { color, skin, camo } = outfitFor(this.mode, p.c, p.sk, p.tm, p.co, p.cm);
+    r.model = buildCharacter(p.c, skin, color, camo);
     r.color = color;
     // Team modes: name in the team colour (teammates are seen through walls); otherwise the enemy colour
     const teams = isTeamMode(this.mode);
@@ -248,7 +290,10 @@ export class RemotePlayers {
     r.bubble.position.y = BUBBLE_Y;
     r.bubble.visible = false;
     r.model.group.add(r.bubble);
-    r.shield = new THREE.Mesh(shieldGeo, shieldMat);
+    // The model lies flat (long side along z): stood up on its bottom edge
+    r.shield = new THREE.Group().add(prop('shield', SHIELD_SIZE));
+    r.shield.children[0]!.rotation.x = -Math.PI / 2;
+    r.shield.children[0]!.position.y = SHIELD_SIZE[2] / 2;
     r.shield.position.set(0, SHIELD_Y, SHIELD_Z);
     r.shield.visible = false;
     r.model.group.add(r.shield);
@@ -262,6 +307,8 @@ export class RemotePlayers {
     r.charId = p.c;
     r.skin = p.sk;
     r.co = p.co;
+    r.cm = p.cm;
+    r.fn = p.fn;
     r.team = p.tm;
     r.weaponId = null;
     r.gun = null;
@@ -270,11 +317,19 @@ export class RemotePlayers {
 
   private setGun(r: Remote, wid: WeaponId): void {
     if (!r.model) return;
-    const g = buildGun(wid, true, r.color);
-    g.scale.setScalar(REMOTE_GUN_SCALE);
-    r.model.holdGun(g);
+    const hold = (g: GunModel) => {
+      g.scale.setScalar(REMOTE_GUN_SCALE);
+      r.model?.holdGun(g);
+      r.gun = g;
+    };
+    // The procedural gun shows at once; the pack's model (with the player's finish) replaces it when loaded
+    hold(buildGun(wid, true, r.color));
     r.weaponId = wid;
-    r.gun = g;
+    const token = ++r.gunToken;
+    const model = r.model;
+    void loadGun(wid, { finish: r.fn, color: r.color, camo: r.cm, withFlash: true }).then((g) => {
+      if (r.gunToken === token && r.model === model) hold(g);
+    });
   }
 
   private remove(id: string): void {
@@ -361,20 +416,7 @@ export class RemotePlayers {
           footstep(g.position.x, g.position.z);
         }
       }
-      // Walking swings the legs; sliding stretches them; crouching puts a knee down
-      const { sl, cr } = s;
-      const swing = sl
-        ? 0
-        : Math.sin(r.walk) * Math.min(speed / WALK_FULL_SPEED, 1) * (cr ? LEG_SWING_CROUCHED : LEG_SWING);
-      const low = sl || cr;
-      r.model.legL.rotation.x = sl ? 1.2 : cr ? 1.1 + swing : swing;
-      r.model.legR.rotation.x = sl ? 1.2 : cr ? -0.35 - swing : -swing;
-      const kneeL = sl ? 0 : cr ? KNEE_CROUCH_FRONT : -Math.max(0, -swing) * KNEE_BEND;
-      const kneeR = sl ? 0 : cr ? KNEE_CROUCH_BACK : -Math.max(0, swing) * KNEE_BEND;
-      r.model.kneeL.rotation.x += (kneeL - r.model.kneeL.rotation.x) * k;
-      r.model.kneeR.rotation.x += (kneeR - r.model.kneeR.rotation.x) * k;
-      r.model.legL.position.y = r.model.legR.position.y += ((low ? 0.5 : 0.8) - r.model.legR.position.y) * k;
-      r.model.upper.position.y += ((low ? -0.5 : 0) - r.model.upper.position.y) * k;
+      animateLegs(r.model, r.walk, speed, s.sl, s.cr, k);
     }
   }
 
@@ -388,11 +430,6 @@ export class RemotePlayers {
       }
     }
     return out;
-  }
-
-  /** Outfit colour a remote is drawn in (for the blocks it breaks into). */
-  colorOf(id: string): string {
-    return this.all.get(id)?.color || '#888888';
   }
 
   /** World position of a remote's model, if it is drawn. */

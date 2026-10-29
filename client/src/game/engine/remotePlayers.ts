@@ -35,7 +35,7 @@ const INFECTED_COLOR = '#6fcf3a';
 /** Snapshots kept per player: 4.5 s at 20 Hz, enough to replay how you died. */
 const BUFFER_SIZE = 90;
 const NAME_TAG_Y = 2.3;
-const REMOTE_GUN_SCALE = 1.3;
+const REMOTE_GUN_SCALE = 1.05;
 /** Muzzle flash of remote guns (ms) and the shot origin when the gun is not drawn yet. */
 const REMOTE_FLASH_MS = 60;
 const MUZZLE_Y_STANDING = 1.35;

@@ -54,6 +54,9 @@ function source(file: string): Promise<THREE.Group | null> {
 const RECOLOR: Record<string, string> = {
   leafsGreen: '#4f8a3c',
   woodBark: '#6b4a2b',
+  // Pines: dark needles and bark (the kit's are teal and pink)
+  leafsDark: '#2f5a3a',
+  woodBarkDark: '#4f3622',
   dirt: '#ffffff',
   grass: '#efe2c8',
 };

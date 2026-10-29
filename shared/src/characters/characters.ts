@@ -59,7 +59,7 @@ export const CHARACTERS: Character[] = [
     name: 'Rayo',
     color: '#e8b923',
     hp: 90,
-    speed: 8.6,
+    speed: 8.2,
     primary: 'smg',
     secondary: 'pistol',
     ability: 'dash',
@@ -100,7 +100,7 @@ export const CHARACTERS: Character[] = [
     secondary: 'sawedoff',
     ability: 'medkit',
     role: 'Área',
-    desc: 'Lanzagranadas que estalla al tocar: saca a la gente de las esquinas. Lento y sin tiros a la cabeza.',
+    desc: 'Bazuca: un cohete recto que estalla al tocar y daña a todos alrededor. Lento y un tiro por carga.',
   },
 ];
 

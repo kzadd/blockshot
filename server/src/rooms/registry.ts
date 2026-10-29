@@ -19,6 +19,7 @@ import {
   type RoomSummary,
 } from '@blockshot/shared';
 import { createMode } from '../modes';
+import { resetWorld } from '../combat/worldObjects';
 import { BOT_PREFIX } from '../players/bot';
 import { createPlayer } from '../players/player';
 import { foldPlayer } from '../stats/sessionStats';
@@ -108,12 +109,15 @@ export class RoomRegistry {
       vote: null,
       grenades: [],
       deployables: [],
+      // Filled right below (resetWorld also builds the colliders)
+      world: undefined as never,
       closed: false,
       banned: new Set(),
       tournament: null,
       lobbyChanged: () => this.events.changed(),
     };
     room.mode = createMode(modeId, room);
+    resetWorld(room);
     this.rooms.set(id, room);
     return room;
   }

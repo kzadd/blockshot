@@ -1,5 +1,5 @@
 import { BARREL, PALLET, pad, sandbags } from '../props';
-import { RAIL_H, RAIL_T, STAIR_W, STEP_RUN, STORY, flight, railing, slab, type Rect } from '../structures';
+import { RAIL_H, RAIL_T, STAIR_W, STEP_RUN, STORY, flight, house, railing, slab, type Rect } from '../structures';
 import type { BoxFn, MapBuildContext } from '../types';
 
 /** Floors of the concrete skeleton in the middle; the last one is its open roof (m = LEVELS × STORY). */
@@ -27,11 +27,13 @@ const MEDIUM_SITE = 45;
 /** Tower crane by the north wall: the mast collides, the jib and the hanging load are decoration. */
 const CRANE_MAST = 1.6;
 const CRANE_H = 22;
+/** Landing on the crane's mast, reached by a ladder: the zipline down to the skeleton starts there. */
+const CRANE_LANDING = 14;
 
 // Obra: an open concrete skeleton of three floors in the middle, scaffolds, site huts and a tower crane.
 // Mirror-symmetric on x so Red (west) and Blue (east) start the same.
 export function buildObra(ctx: MapBuildContext): void {
-  const { B, D, S, P, H, rand } = ctx;
+  const { B, D, S, P, H, BR, BK, PK, LD, ZL, rand } = ctx;
   const t = Math.round(Math.min(12, Math.max(7, 0.24 * H))); // half side of the skeleton
 
   skeleton(B, t);
@@ -93,6 +95,41 @@ export function buildObra(ctx: MapBuildContext): void {
   }
 
   crane(B, D, H);
+  // A landing on the crane's mast (a ladder up from the ground) and a zipline from it down onto the top floor
+  const cz = -(H - 4);
+  B(2.3, CRANE_LANDING, cz, 3, 0.3, 3, 'metal');
+  LD(2.3, cz + 1.5, CRANE_LANDING + 0.3, 0);
+  D(2.3, 0, cz + 1.75, 0.2, CRANE_LANDING, 0.2, 'metal');
+  ZL([2.3, CRANE_LANDING + 0.3 + 2.3, cz + 1.6], [0, LEVELS * STORY + 2.3, -t + 2]);
+  PK('armor', 0, 2, LEVELS * STORY);
+
+  // Site huts with health, steel beams and pipes stacked on the open ground, fuel barrels, crates that break
+  for (const s of [1, -1]) {
+    const hx = s * 0.62 * H;
+    const hz = s * 0.42 * H;
+    // (the small site has no room for the huts: its scaffold stairs run there; the health lies in the open)
+    if (H <= SMALL_SITE) PK('hp', s * 0.62 * H, -s * 0.6 * H);
+    else
+      house(ctx, {
+        x: hx,
+        z: hz,
+        w: 7,
+        d: 5,
+        wall: 'metal',
+        roof: 'roof',
+        ground: 'tile',
+        doors: [{ side: s > 0 ? 'w' : 'e' }, { side: s > 0 ? 'n' : 's' }],
+        windows: [{ side: s > 0 ? 'e' : 'w' }],
+      });
+    if (H > SMALL_SITE) PK('hp', hx, hz);
+    BR(hx + s * 2, hz + s * 4);
+    const bx = -s * 0.35 * H;
+    const bz = s * 0.75 * H;
+    B(bx, 0, bz, 6, 0.5, 1.4, 'metal');
+    B(bx, 0.5, bz, 6, 0.5, 1.4, 'metal');
+    B(bx, 0, bz + 2.2, 5, 0.8, 0.8, 'concrete');
+    BK(s * 0.4 * H, -s * 0.15 * H, 1.3);
+  }
 
   // Pallets, barrels and sandbags scattered round the site (never under the skeleton nor the scaffolds)
   const busy = (x: number, z: number) =>

@@ -3,6 +3,9 @@ import { house, mirrorHouse, type HouseSpec } from '../structures';
 import type { MapBuildContext } from '../types';
 
 const MESA_H = 4;
+/** Gallery under each mesa's edge: depth into the mesa and its height (m). */
+const GALLERY = 3;
+const GALLERY_H = 2.7;
 /** Outposts along each mesa, as fractions of H (mirrored on the other mesa). */
 const OUTPOSTS = [-0.45, 0.1, 0.6];
 /** Narrow firing slits. */
@@ -32,7 +35,7 @@ const TOWER: HouseSpec = {
 
 // Desfiladero: a canyon between two high mesas joined by bridges
 export function buildDesfiladero(ctx: MapBuildContext): void {
-  const { B, S, P: Prop, H, rand } = ctx;
+  const { B, S, P: Prop, H, BR, BK, PK, ZL, rand } = ctx;
   const P = Math.max(10, Math.round(0.32 * H)); // the canyon spans -P..P
   const outpost: HouseSpec = {
     x: 0,
@@ -55,7 +58,16 @@ export function buildDesfiladero(ctx: MapBuildContext): void {
   };
   const bridges = [0, 0.5 * H, -0.5 * H];
   for (const s of [1, -1]) {
-    B((s * (P + H)) / 2, 0, 0, H - P, MESA_H, 2 * H, 'platform');
+    // The mesa, with a gallery cut under its edge (a covered way along the canyon, roofed and on pillars)
+    const g0 = s > 0 ? -0.45 * H : 0.05 * H;
+    const g1 = s > 0 ? -0.05 * H : 0.45 * H;
+    const inner = s * (P + GALLERY / 2);
+    B(s * (P + GALLERY + (H - P - GALLERY) / 2), 0, 0, H - P - GALLERY, MESA_H, 2 * H, 'platform');
+    B(inner, 0, (-H + g0) / 2, GALLERY, MESA_H, g0 + H, 'platform');
+    B(inner, 0, (g1 + H) / 2, GALLERY, MESA_H, H - g1, 'platform');
+    B(inner, GALLERY_H, (g0 + g1) / 2, GALLERY, MESA_H - GALLERY_H, g1 - g0, 'platform');
+    for (let z = g0 + 5; z < g1 - 2; z += 7) B(s * (P + 0.4), 0, z, 0.7, GALLERY_H, 0.7, 'wall2');
+    PK('hp', s * (P + GALLERY - 0.9), (g0 + g1) / 2);
     const ups = [s * 0.25 * H, -s * 0.7 * H];
     for (const z of ups) stairs(B, s * P, z, 'x', s, 8, 3);
 
@@ -99,6 +111,19 @@ export function buildDesfiladero(ctx: MapBuildContext): void {
     const sx = rand() < 0.5 ? 1 : -1;
     const w = 1.8 + rand() * 1.4;
     B(sx * (0.25 + rand() * 0.25) * P, 0, z, w, 1.2 + rand() * 0.9, w, 'rock');
+  }
+
+  // The canyon floor: an overturned truck and sandbag lines to cross it in hops, barrels and a crate that breaks,
+  // the armour right under the middle bridge; a zipline from each mesa down into the canyon
+  PK('armor', 0, 0);
+  for (const s of [1, -1]) {
+    B(-s * 0.3 * P, 0, s * 0.38 * H, 2.4, 2.2, 5.5, 'metal');
+    B(-s * 0.3 * P, 0, s * (0.38 * H + 3.6), 2.4, 1.6, 1.8, 'metal');
+    Prop(s * 0.2 * P, s * 0.66 * H, sandbags(4, 1));
+    Prop(-s * 0.45 * P, -s * 0.12 * H, sandbags(1, 3));
+    BR(s * 0.6 * P, s * 0.12 * H);
+    BK(s * 0.4 * P, -s * 0.18 * H, 1.4);
+    ZL([s * (P + 0.3), MESA_H + 2.3 + 0.4, s * 0.6 * H], [s * 0.15 * P, 2.3, s * 0.8 * H]);
   }
 
   for (const s of [1, -1]) {

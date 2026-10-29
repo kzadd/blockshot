@@ -54,13 +54,13 @@ describe('input queue', () => {
 
   it('moves the player forwards (yaw 0 looks towards -z) and records it for lag compensation', () => {
     const { room, join } = makeRoom('ffa');
-    const p = join('A', 0, 20);
+    const p = join('A', 5, 30); // open ground (the fountain stands at (0, 21.5))
     queueInputs(
       p,
       Array.from({ length: 30 }, (_, i) => cmd(i)),
     );
     for (let i = 0; i < 30; i++) simulateRoom(room, FIXED_DT, Date.now() + i);
-    expect(p.z).toBeLessThan(20);
+    expect(p.z).toBeLessThan(30);
     expect(p.hist.length).toBeGreaterThan(0);
   });
 

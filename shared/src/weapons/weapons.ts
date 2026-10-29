@@ -126,12 +126,12 @@ export const WEAPONS: Record<WeaponId, Weapon> = {
   },
   // Grenade launcher: slow rounds that blow up on contact (area damage), no headshots
   launcher: {
-    name: 'Lanzagranadas',
-    damage: 95,
+    name: 'Bazuca',
+    damage: 110,
     headMult: 1,
     fireRate: 950,
-    mag: 4,
-    reload: 2900,
+    mag: 1,
+    reload: 2300,
     auto: false,
     spread: 0.012,
     adsSpread: 0.004,
@@ -183,9 +183,9 @@ export const WEAPONS: Record<WeaponId, Weapon> = {
     weight: 1,
     adsSpeed: 20,
     adsMove: 0.75,
-    falloff: [20, 55, 0.6],
+    falloff: [12, 35, 0.55],
     bloom: 0.0016,
-    bloomMax: 0.018,
+    bloomMax: 0.028,
   },
   lmg: {
     name: 'Ametralladora',

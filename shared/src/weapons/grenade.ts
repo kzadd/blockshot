@@ -23,8 +23,8 @@ export const GRENADE = {
   size: 0.12,
 };
 
-/** Grenade launcher rounds: fast and flat, they blow up on contact (or after the fuse), smaller blast. */
-export const LAUNCHER = { speed: 34, lift: 1, gravity: 9, fuseMs: 3000, radius: 3.8, maxDamage: 95, minDamage: 25 };
+/** Bazooka rocket: flies straight and fast, blows up on whatever it touches with a wide blast. */
+export const LAUNCHER = { speed: 42, lift: 0, gravity: 0, fuseMs: 3000, radius: 5.5, maxDamage: 110, minDamage: 35 };
 
 /** Starting velocity of a throw from the look direction `d` (unit) by a player moving at (vx, vz). */
 export const throwVelocity = (d: Vec3, vx: number, vz: number): Vec3 => [

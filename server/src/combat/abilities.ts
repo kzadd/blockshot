@@ -13,9 +13,9 @@ import {
   SMOKE,
   WALL,
   castShot,
+  raySphere,
   clamp,
   floorBelow,
-  getColliders,
   round2,
   type Collider,
   type DeployableKind,
@@ -28,6 +28,7 @@ import { sameTeam } from '../players/teams';
 import type { Room } from '../rooms/room';
 import { applyDamage } from './damage';
 import { throwSmoke } from './grenades';
+import { rebuildColliders, resetWorld } from './worldObjects';
 
 export interface Deployable {
   id: number;
@@ -48,6 +49,8 @@ const WALL_MAX_STEP = 1.2;
 const BODY_LOW = 0.2;
 const BODY_HIGH = 1.6;
 const CHEST = 1.1;
+/** A shot this close to a mine (m, round its centre) hits it. */
+const MINE_HIT_R = 0.45;
 /** A mine only notices bodies this close vertically. */
 const MINE_REACH_Y = 1.5;
 
@@ -58,10 +61,8 @@ export function wallBox(d: Pick<Deployable, 'pos' | 'along'>): Collider {
   return { c: 'concrete', min: [x - hx, y, z - hz], max: [x + hx, y + WALL.h, z + hz] };
 }
 
-/** Map boxes plus the cover walls standing now (movement, bullets and grenades all use this list). */
-function refreshColliders(room: Room): void {
-  room.colliders = [...getColliders(room.map), ...room.deployables.filter((d) => d.kind === 'wall').map(wallBox)];
-}
+/** Map boxes, standing barrels and crates, plus the cover walls standing now (worldObjects.ts). */
+const refreshColliders = rebuildColliders;
 
 const add = (room: Room, d: Omit<Deployable, 'id'>): Deployable => {
   const full = { ...d, id: ++seq };
@@ -187,6 +188,17 @@ export function shieldBlocks(victim: Player, from: Vec3, now: number): boolean {
   return (-Math.sin(victim.ry) * dx - Math.cos(victim.ry) * dz) / len > SHIELD.arcCos;
 }
 
+/** A shot from `o` along `d` that flies `t` m: a rival's mine it crosses is shot away (disarmed, no blast). */
+export function shootMines(room: Room, p: Player, o: Vec3, d: Vec3, t: number): void {
+  const hit = room.deployables.find((m) => {
+    if (m.kind !== 'mine' || m.owner === p.id) return false;
+    const owner = room.players.get(m.owner);
+    if (owner && sameTeam(room, owner, p)) return false;
+    return raySphere(o, d, [m.pos[0], m.pos[1] + 0.1, m.pos[2]], MINE_HIT_R) < t;
+  });
+  if (hit) room.deployables = room.deployables.filter((m) => m !== hit);
+}
+
 function blowMine(room: Room, m: Deployable): void {
   const [x, y, z] = m.pos;
   room.channel.broadcast('boom', [{ x: round2(x), y: round2(y), z: round2(z) }]);
@@ -235,10 +247,10 @@ export function tickAbilities(room: Room, now: number): void {
   if (wall) refreshColliders(room);
 }
 
-/** Everything goes when the room changes map or a new match starts. */
+/** Everything goes when the room changes map or a new match starts (barrels, crates and pickups come back too). */
 export function clearAbilities(room: Room): void {
   room.deployables = [];
-  room.colliders = getColliders(room.map);
+  resetWorld(room);
 }
 
 export const deployableSnapshot = (room: Room): DeployableSnapshot[] =>

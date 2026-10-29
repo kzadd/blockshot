@@ -2,6 +2,8 @@
 // runs the very same code to predict its own player, so both agree step by step.
 import type { Vec3 } from '../core/math';
 import { DASH } from '../abilities/abilities';
+import { LADDER, ZIPLINE } from '../maps/objects';
+import type { MapZipline } from '../maps/types';
 import { PAD, PLAYER } from '../player/player';
 import type { Collider } from '../physics/raycast';
 
@@ -74,6 +76,13 @@ export interface MoveState {
   dashT: number;
   dashX: number;
   dashZ: number;
+  /** on a ladder this step */
+  climbing: boolean;
+  /** zipline being ridden (-1 = none), how far along it (0 at its first point, 1 at the second) */
+  zip: number;
+  zipT: number;
+  /** s before a zipline can be grabbed again after letting go */
+  zipCd: number;
 }
 
 /** What the environment and the player's loadout impose on a step. */
@@ -87,6 +96,9 @@ export interface MoveContext {
   fallback: Vec3;
   /** the character's ability is the dash */
   dash?: boolean;
+  /** climbing volumes in front of the map's ladders (ladderVolume) */
+  ladders?: readonly Collider[];
+  ziplines?: readonly MapZipline[];
 }
 
 /** Things that happened during a step (sounds and camera effects for the client). */
@@ -99,6 +111,8 @@ export interface MoveEvents {
   /** landing fall speed (m/s, negative) when it was hard enough to be felt; 0 otherwise */
   land: number;
   dash: boolean;
+  /** grabbed a zipline */
+  zip: boolean;
 }
 
 /** Ground acceleration (exponential approach to the wanted speed). */
@@ -153,6 +167,10 @@ export function createMoveState(x: number, y: number, z: number): MoveState {
     dashT: 0,
     dashX: 0,
     dashZ: 0,
+    climbing: false,
+    zip: -1,
+    zipT: 0,
+    zipCd: 0,
   };
 }
 
@@ -230,9 +248,68 @@ function updateStamina(st: MoveState, dt: number, speed: number): void {
   }
 }
 
+/** Looking further down than this (rad), "forward" on a ladder climbs down. */
+const LADDER_LOOK_DOWN = -0.6;
+
+const touching = (st: MoveState, b: Collider) => {
+  const r = PLAYER.radius;
+  return (
+    st.x - r < b.max[0] &&
+    st.x + r > b.min[0] &&
+    st.y < b.max[1] &&
+    st.y + st.height > b.min[1] &&
+    st.z - r < b.max[2] &&
+    st.z + r > b.min[2]
+  );
+};
+
+/** Grabs the zipline within reach of the hands, if any: its index and where along it. */
+function grabZipline(st: MoveState, lines: readonly MapZipline[]): [number, number] | null {
+  const hx = st.x;
+  const hy = st.y + st.height + 0.1;
+  const hz = st.z;
+  for (let i = 0; i < lines.length; i++) {
+    const [a, b] = lines[i]!;
+    const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    const len2 = ab[0]! ** 2 + ab[1]! ** 2 + ab[2]! ** 2 || 1;
+    const t = Math.min(1, Math.max(0, ((hx - a[0]) * ab[0]! + (hy - a[1]) * ab[1]! + (hz - a[2]) * ab[2]!) / len2));
+    const d = Math.hypot(a[0] + ab[0]! * t - hx, a[1] + ab[1]! * t - hy, a[2] + ab[2]! * t - hz);
+    if (d < ZIPLINE.grab && t > 0 && t < 1) return [i, t];
+  }
+  return null;
+}
+
+/** One step hanging from a zipline: slides towards its lower end; jump or crouch lets go, as does the end. */
+function rideZipline(st: MoveState, lines: readonly MapZipline[], letGo: boolean, dt: number): void {
+  const [a, b] = lines[st.zip]!;
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const dz = b[2] - a[2];
+  const len = Math.hypot(dx, dy, dz) || 1;
+  const sign = dy <= 0 ? 1 : -1; // towards the lower end
+  st.zipT += (sign * ZIPLINE.speed * dt) / len;
+  const end = st.zipT <= 0 || st.zipT >= 1;
+  st.zipT = Math.min(1, Math.max(0, st.zipT));
+  st.x = a[0] + dx * st.zipT;
+  st.y = a[1] + dy * st.zipT - ZIPLINE.hang;
+  st.z = a[2] + dz * st.zipT;
+  const v = (sign * ZIPLINE.speed) / len;
+  st.vx = dx * v;
+  st.vy = dy * v;
+  st.vz = dz * v;
+  st.grounded = false;
+  st.sliding = false;
+  st.sprinting = false;
+  if (end || letGo) {
+    st.zip = -1;
+    st.zipCd = ZIPLINE.letGoS;
+    if (letGo && !end) st.vy = Math.max(st.vy, PLAYER.jump * 0.5);
+  }
+}
+
 /** Advances the player by one step of `dt` seconds. Mutates `st` and returns what happened. */
 export function stepMovement(st: MoveState, input: MoveInput, dt: number, ctx: MoveContext): MoveEvents {
-  const ev: MoveEvents = { jump: false, slide: false, pad: false, step: 0, land: 0, dash: false };
+  const ev: MoveEvents = { jump: false, slide: false, pad: false, step: 0, land: 0, dash: false, zip: false };
   const cols = ctx.colliders;
   const held = (bit: number) => (input.b & bit) !== 0;
   const f = Math.sign(input.f);
@@ -251,6 +328,33 @@ export function stepMovement(st: MoveState, input: MoveInput, dt: number, ctx: M
   const hs = Math.hypot(st.vx, st.vz);
   const crouchKey = held(BTN_CROUCH);
   const wantJump = held(BTN_JUMP) || st.jumpBuffer > 0;
+
+  // Ziplines: jump at a cable (hands within reach) to grab it; jump or crouch again to let go
+  const lines = ctx.ziplines;
+  if (lines?.length) {
+    let grabbed = false;
+    if (st.zip < 0 && st.zipCd <= 0 && held(BTN_JUMP) && !st.grounded) {
+      const g = grabZipline(st, lines);
+      if (g) {
+        [st.zip, st.zipT] = g;
+        st.dashT = 0;
+        grabbed = true;
+        ev.zip = true;
+      }
+    }
+    if (st.zip >= 0 && st.zip < lines.length) {
+      rideZipline(st, lines, !grabbed && (held(BTN_JUMP_PRESSED) || crouchKey), dt);
+      st.climbing = false;
+      st.jumpBuffer = 0;
+      st.dashCd = Math.max(0, st.dashCd - dt);
+      st.sprintBlock = Math.max(0, st.sprintBlock - dt);
+      st.slideSince = Math.min(LONG_AGO_S, st.slideSince + dt);
+      st.staminaIdle = Math.min(LONG_AGO_S, st.staminaIdle + dt);
+      updateStamina(st, dt, 0);
+      return ev;
+    }
+    st.zip = -1;
+  }
 
   // Crouch (C). Standing up needs room above the head
   if (crouchKey) st.crouching = true;
@@ -369,7 +473,12 @@ export function stepMovement(st: MoveState, input: MoveInput, dt: number, ctx: M
   st.crouchHeld = crouchKey;
   st.height = st.crouching || st.sliding ? PLAYER.crouchHeight : PLAYER.height;
 
-  st.vy = Math.max(-MAX_FALL_SPEED, st.vy - PLAYER.gravity * dt);
+  // Ladders: forward climbs (down when looking down), back climbs down; no gravity while on one
+  st.climbing = !ev.jump && f !== 0 && !!ctx.ladders?.some((l) => touching(st, l));
+  if (st.climbing) {
+    st.vy = (f > 0 && input.pitch > LADDER_LOOK_DOWN ? 1 : -1) * LADDER.speed;
+    st.sliding = false;
+  } else st.vy = Math.max(-MAX_FALL_SPEED, st.vy - PLAYER.gravity * dt);
   const fall = st.vy;
   const wasGrounded = st.grounded;
   st.grounded = false;
@@ -398,5 +507,6 @@ export function stepMovement(st: MoveState, input: MoveInput, dt: number, ctx: M
   st.sprintBlock = Math.max(0, st.sprintBlock - dt);
   st.slideSince = Math.min(LONG_AGO_S, st.slideSince + dt);
   st.staminaIdle = Math.min(LONG_AGO_S, st.staminaIdle + dt);
+  st.zipCd = Math.max(0, st.zipCd - dt);
   return ev;
 }

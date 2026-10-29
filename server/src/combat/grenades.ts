@@ -18,6 +18,7 @@ import { sameTeam } from '../players/teams';
 import type { Room } from '../rooms/room';
 import { popSmoke } from './abilities';
 import { applyDamage } from './damage';
+import { blastObjects } from './worldObjects';
 
 /** Body height range a blast measures to, from the feet (the lowest point stays above the floor). */
 const BODY_LOW = 0.2;
@@ -105,6 +106,8 @@ function explode(room: Room, g: Grenade, now: number): void {
       continue;
     applyDamage(room, owner, v, dmg, false, g.round ? WEAPONS.launcher : GRENADE_WEAPON, [v.x, v.y + CHEST, v.z]);
   }
+  const b = g.round ? LAUNCHER : GRENADE;
+  blastObjects(room, owner, g.pos, b.radius, b.maxDamage, now);
 }
 
 export function tickGrenades(room: Room, dt: number, now: number): void {

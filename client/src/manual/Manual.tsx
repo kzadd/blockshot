@@ -90,6 +90,15 @@ export const TRICKS: [string, string][] = [
   ],
   ['Disparos justos', 'El servidor compensa el retraso de la red: si en tu pantalla le diste, cuenta.'],
   ['Granadas', 'Sácalos de una esquina: la explosión no atraviesa paredes y no daña a tu equipo ni a ti.'],
+  ['Botiquín y chaleco', 'Están en el suelo y en el minimapa: +40 de vida o +50 de blindaje. Vuelven a los 30 s.'],
+  [
+    'Barriles rojos',
+    'Dispárales y explotan: daño de granada alrededor, y la baja es tuya. Las cajas de madera se rompen.',
+  ],
+  [
+    'Escaleras y tirolinas',
+    'Camina hacia una escalera para subir (mira abajo para bajar). Salta al cable de una tirolina para deslizarte; salta otra vez para soltarte.',
+  ],
   [
     'Medallas',
     'Primera sangre, doble baja, venganza, desde el aire, por la espalda o tiro lejano: suman en el marcador.',

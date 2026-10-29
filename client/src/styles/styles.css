@@ -1772,6 +1772,28 @@ kbd.down,
   position: absolute;
   border-radius: 50%;
 }
+/* Holographic sight (Valorant-like): a thin glowing hexagon and a small marker, the gun just below */
+.ads-sight.holo .hex {
+  position: absolute;
+  width: 230px;
+  height: 160px;
+  margin: -80px 0 0 -115px;
+  overflow: visible;
+}
+.ads-sight.holo polyline {
+  fill: none;
+  stroke: #ffd23a;
+  stroke-width: 3.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 4px rgba(255, 196, 40, 0.8));
+}
+.ads-sight.holo .cross {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 2;
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.9));
+}
 /* Marksman scope: a big clear lens with thin cross hairs, the edges only shaded */
 .ads-sight.scope {
   background: radial-gradient(

@@ -29,31 +29,30 @@ Modelos sueltos de Poly Pizza (https://poly.pizza), cada página marcada «Publi
 2026-10-28. Quaternius cambió en 2026 la licencia de su web; estas copias se obtuvieron como CC0 en Poly Pizza.
 Convertidos a GLB con meshopt.
 
-| Asset              | Autor      | Página                                                                                              | Dónde se usa                                                                                      |
-| ------------------ | ---------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Knife              | Quaternius | https://poly.pizza/m/N9bfPFP1hr                                                                     | `client/public/models/guns/knife.glb` (cuchillo)                                                  |
-| Glove              | Quaternius | https://poly.pizza/m/l1zv4LaA4I                                                                     | `client/public/models/hands/glove.glb` (manos en primera persona; los dedos se doblan por código) |
-| Grenade            | Quaternius | https://poly.pizza/m/xnuUzBTsUg                                                                     | `client/public/models/props/grenade.glb`                                                          |
-| Landmine           | Quaternius | https://poly.pizza/m/PtqkseZo9O                                                                     | `client/public/models/props/mine.glb` (habilidad Mina)                                            |
-| Sack Trench        | Quaternius | https://poly.pizza/m/LW3jwpPfiN                                                                     | `client/public/models/props/sacks.glb` (habilidad Muro y sacos terreros de los mapas)             |
-| Smoke Grenade West | Pichuliru  | https://poly.pizza/m/GbhfKcTiF9                                                                     | `client/public/models/props/smokegren.glb` (habilidad Humo)                                       |
-| Crate (×2)         | Quaternius | https://poly.pizza/m/NlXe0ZJGUd · https://poly.pizza/m/SfJtdV8GDr                                   | `client/public/models/world/q-crate*.glb`                                                         |
-| Pallet             | Quaternius | https://poly.pizza/m/cUAsYHDqfD                                                                     | `client/public/models/world/q-pallet.glb`                                                         |
-| Car, Car, SUV      | Quaternius | https://poly.pizza/m/Cz6yDaUcM9 · https://poly.pizza/m/unqqkULtRU · https://poly.pizza/m/xsMtZhBkxL | `client/public/models/world/q-car-*.glb`                                                          |
-| Street Light       | Quaternius | https://poly.pizza/m/nFwrlcLvM5                                                                     | `client/public/models/world/q-lamp.glb`                                                           |
+| Asset              | Autor      | Página                                                                                              | Dónde se usa                                                                          |
+| ------------------ | ---------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Knife              | Quaternius | https://poly.pizza/m/N9bfPFP1hr                                                                     | `client/public/models/guns/knife.glb` (cuchillo)                                      |
+| Grenade            | Quaternius | https://poly.pizza/m/xnuUzBTsUg                                                                     | `client/public/models/props/grenade.glb`                                              |
+| Landmine           | Quaternius | https://poly.pizza/m/PtqkseZo9O                                                                     | `client/public/models/props/mine.glb` (habilidad Mina)                                |
+| Sack Trench        | Quaternius | https://poly.pizza/m/LW3jwpPfiN                                                                     | `client/public/models/props/sacks.glb` (habilidad Muro y sacos terreros de los mapas) |
+| Smoke Grenade West | Pichuliru  | https://poly.pizza/m/GbhfKcTiF9                                                                     | `client/public/models/props/smokegren.glb` (habilidad Humo)                           |
+| Crate (×2)         | Quaternius | https://poly.pizza/m/NlXe0ZJGUd · https://poly.pizza/m/SfJtdV8GDr                                   | `client/public/models/world/q-crate*.glb`                                             |
+| Pallet             | Quaternius | https://poly.pizza/m/cUAsYHDqfD                                                                     | `client/public/models/world/q-pallet.glb`                                             |
+| Car, Car, SUV      | Quaternius | https://poly.pizza/m/Cz6yDaUcM9 · https://poly.pizza/m/unqqkULtRU · https://poly.pizza/m/xsMtZhBkxL | `client/public/models/world/q-car-*.glb`                                              |
+| Street Light       | Quaternius | https://poly.pizza/m/nFwrlcLvM5                                                                     | `client/public/models/world/q-lamp.glb`                                               |
 
 Kits de Kenney (https://kenney.nl), CC0 1.0, descargados de las páginas que el propio Kenney publica en OpenGameArt.
 Los GLB llevan su textura (`colormap.png`) incrustada, reducida a 256 px, y comprimidos con meshopt
 (`client/public/models/world/`, prefijo según el kit):
 
-| Kit                       | Página                                              | Modelos                                                               |
-| ------------------------- | --------------------------------------------------- | --------------------------------------------------------------------- |
-| City Kit (Industrial) 2.0 | https://opengameart.org/content/city-kit-industrial | `i-*`: contenedores, fábricas, chimenea, depósito                     |
-| City Kit (Commercial) 2.1 | https://opengameart.org/content/city-kit-commercial | `c-*`: rascacielos y bloques del fondo                                |
-| City Kit (Suburban) 2.0   | https://opengameart.org/content/city-kit-suburban   | `u-*`: casas alrededor del Patio                                      |
-| City Kit (Roads) 2.2      | https://opengameart.org/content/city-kit-roads      | `r-*`: farola, contenedor de basura, señalización de obra             |
-| Survival Kit              | https://opengameart.org/content/survival-kit        | `s-*`: barril, rocas de arena, árboles, valla                         |
-| Nature Kit 2.1            | https://opengameart.org/content/nature-kit          | `n-*`: árboles, cactus, rocas (colores retocados en `worldModels.ts`) |
+| Kit                       | Página                                              | Modelos                                                                                                            |
+| ------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| City Kit (Industrial) 2.0 | https://opengameart.org/content/city-kit-industrial | `i-*`: contenedores, fábricas, chimenea, depósito                                                                  |
+| City Kit (Commercial) 2.1 | https://opengameart.org/content/city-kit-commercial | `c-*`: rascacielos y bloques del fondo                                                                             |
+| City Kit (Suburban) 2.0   | https://opengameart.org/content/city-kit-suburban   | `u-*`: casas alrededor del Patio                                                                                   |
+| City Kit (Roads) 2.2      | https://opengameart.org/content/city-kit-roads      | `r-*`: farola, contenedor de basura, señalización de obra                                                          |
+| Survival Kit              | https://opengameart.org/content/survival-kit        | `s-*`: barril, rocas de arena, árboles, valla                                                                      |
+| Nature Kit 2.1            | https://opengameart.org/content/nature-kit          | `n-*`: árboles, pinos, cactus, rocas, troncos apilados y tienda de campaña (colores retocados en `worldModels.ts`) |
 
 ## Efectos y texturas
 

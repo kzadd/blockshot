@@ -7,35 +7,45 @@ import * as shared from '../index';
 const hash = (v: unknown) => createHash('sha256').update(JSON.stringify(v)).digest('hex').slice(0, 16);
 
 const MAP_HASHES: Record<string, string> = {
-  'patio:s': '69f51e56e83bdd0e',
-  'patio:m': '7e8f34b1271a8e73',
-  'patio:l': 'e404ace138a30db6',
-  'almacen:s': '28fc2af0d788c2f9',
-  'almacen:m': '30a0f9d0d3cf174d',
-  'almacen:l': 'e6f1a58cb6a1ab41',
-  'desfiladero:s': '91960fda921437fb',
-  'desfiladero:m': 'f6df51e5247c3d2d',
-  'desfiladero:l': '0e69c206610df50c',
-  'polvo:s': '3f75fc0f02b2c0ef',
-  'polvo:m': '87dfc8c8c46119fc',
-  'polvo:l': 'b061e1e7882b849d',
-  'ciudad:s': 'b105cc877be14b0a',
-  'ciudad:m': 'd00601f6b555f63f',
-  'ciudad:l': 'f26e27d6dc034b52',
-  // sixth map (construction site) added on purpose
-  'obra:s': '4fbae09d2b1e274d',
-  'obra:m': '45479f810f4d6784',
-  'obra:l': '8c39ea14b4f07024',
+  // 2026-10-29: map objects (barrels, crates, health and armour, ladders, ziplines) on every map, the six maps
+  // reworked (more cover, high routes) and three new ones: Puerto, Estación and Nevada
+  'patio:s': '54d0184caa6f8a09',
+  'patio:m': '13779e4158dc2289',
+  'patio:l': '7ba73db62f26a807',
+  'almacen:s': 'f2b89977355a6278',
+  'almacen:m': '9d42c71850adfb1b',
+  'almacen:l': 'a680cc9eb3657221',
+  'desfiladero:s': '1a980f443e916df3',
+  'desfiladero:m': '174cc2b5378e238c',
+  'desfiladero:l': 'd123fb843b5529e5',
+  'polvo:s': '111fd2f5b38ab1d4',
+  'polvo:m': 'bc3cb0368ae8fb57',
+  'polvo:l': '2bf49d795c61d331',
+  'ciudad:s': '0ef7d092751b45be',
+  'ciudad:m': '878b1c4f2047bd02',
+  'ciudad:l': '0a817ba086d067cf',
+  'obra:s': '8ef3d67c85ca6f2d',
+  'obra:m': 'd23a66941cf57f7e',
+  'obra:l': '2ee1a2d841f44a39',
+  'puerto:s': 'd1b1c32179a51cce',
+  'puerto:m': 'e1ddd5bb6003f049',
+  'puerto:l': '39897a3df5014d5f',
+  'estacion:s': '71cf93979eb3cceb',
+  'estacion:m': '7838a33f21bba3db',
+  'estacion:l': '30cf7ee934493569',
+  'nevada:s': '35274bf55230f84a',
+  'nevada:m': '87c83507b07966fa',
+  'nevada:l': '15a2299f9172f385',
 };
 
 const TABLE_HASHES = {
   // Balance pass (2026-10-24, checked with server/src/combat/duel.sim.test.ts): Rayo 8.6 m/s and 90 hp, Tanque 140 hp,
   // slower sniper aim, rifle 105 ms, more falloff on rifle and LMG, longer SMG range
-  WEAPONS: '3da8cc1d13ee65f6', // + marksman rifle and grenade launcher; sniper scopes in slower, rifle blooms more
-  CHARACTERS: 'c8d0180a23c4abaf', // abilities (key E) + Explorador and Artillero
+  WEAPONS: '64ecc48c8062006e', // + marksman rifle; SMG nerf (Rayo); the launcher is now a bazooka (one rocket per load)
+  CHARACTERS: 'b305eae771b62448', // abilities (key E) + Explorador and Artillero; Rayo 8.2 m/s; Artillero's bazooka
   MODES: '7b0e3729e18e0ee7', // two new modes: Dominio and Rondas
-  PLAYER: 'd72f2e246c7216f2', // stamina back on (sprint and slides spend it)
-  MAPS: '64018304e6c9b34c', // sixth map: Obra
+  PLAYER: '131216ce937cbbb8', // stamina back on; drains faster, slides cost more, lower speed cap
+  MAPS: '0db50ccaebbe4b7b', // nine maps: + Puerto, Estación, Nevada
   MAP_SIZES: '0cd287561039dcb2',
   SKINS: '336d515d0bade54b', // creatures: the first ten plus Ninja, Pirata, Caballero, Vikingo, Esqueleto, Panda, Pingüino, Perro, Dinosaurio, Búho
   GUN_LADDERS: '8f9323383a0b8d4b',

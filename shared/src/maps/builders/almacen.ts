@@ -21,7 +21,7 @@ const POST = 0.15;
 
 // Almacén: rows of containers, narrow aisles, offices under the mezzanines and two-story side offices
 export function buildAlmacen(ctx: MapBuildContext): void {
-  const { B, S, P, H, rand } = ctx;
+  const { B, S, P, H, BR, BK, PK, LD, rand } = ctx;
   const mL = Math.round(0.55 * H);
   const offices: HouseSpec[] = [];
   for (const s of [1, -1]) {
@@ -96,6 +96,13 @@ export function buildAlmacen(ctx: MapBuildContext): void {
   const inOffice = (x: number, z: number, margin: number) =>
     offices.some((o) => Math.abs(x - o.x) < o.w / 2 + margin && Math.abs(z - o.z) < o.d / 2 + margin);
 
+  /** A shelving rack 2 m deep and 6 long (along z): four posts and shelves at 1.2 and 2.6 m, boxes on them. */
+  const rack = (x: number, z: number) => {
+    for (const px of [-0.9, 0.9]) for (const pz of [-2.9, 2.9]) B(x + px, 0, z + pz, 0.15, 3.8, 0.15, 'metal');
+    for (const y of [1.2, 2.6]) B(x, y, z, 2, 0.12, 6, 'metal');
+    B(x, 1.32, z - 1.5, 1.6, 0.9, 1.4, 'crate');
+    B(x, 2.72, z + 1.4, 1.6, 0.9, 1.6, 'crate2');
+  };
   // Containers in columns; the centre stays free
   const zMax = H - 9;
   const rows = Math.floor((2 * zMax + 4) / 10);
@@ -108,12 +115,22 @@ export function buildAlmacen(ctx: MapBuildContext): void {
         if (x < 8 && Math.abs(z) < 7) continue;
         const roll = rand();
         if (roll < 0.12) continue; // gap to cross
+        // The third column is tall shelving instead: posts and shelves, gaps to see and shoot through
+        if (x === 22) {
+          if (!inOffice(sx * x, z, 1)) rack(sx * x, z);
+          continue;
+        }
         B(sx * x, 0, z, 2.6, 2.6, 6, color());
-        if (roll < 0.35) B(sx * x, 2.6, z, 2.6, 2.6, 6, color());
-        // Crate next to it to climb up (not in front of the side offices)
+        if (roll < 0.35) {
+          B(sx * x, 2.6, z, 2.6, 2.6, 6, color());
+          LD(sx * x, z + sx * 3, 5.2, sx > 0 ? 0 : 2);
+        }
+        // Crate next to it to climb up (not in front of the side offices); some of them break
         if (rand() < 0.4) {
           const cz = z + (rand() < 0.5 ? 2 : -2);
-          if (!inOffice(sx * (x + 2.2), cz, 1.8)) B(sx * (x + 2.2), 0, cz, 1.8, 1.2, 1.8, 'crate');
+          if (inOffice(sx * (x + 2.2), cz, 1.8)) continue;
+          if (rand() < 0.5) BK(sx * (x + 2.2), cz, 1.4);
+          else B(sx * (x + 2.2), 0, cz, 1.8, 1.2, 1.8, 'crate');
         }
       }
     }
@@ -145,6 +162,11 @@ export function buildAlmacen(ctx: MapBuildContext): void {
   }
   P(-1.4, 4.4, PALLET);
   P(-0.2, -4.2, BARREL);
+  // Explosive barrels round the centre, armour in the middle of the catwalk, health in the side offices
+  BR(7, -2);
+  BR(-8, 2.5);
+  PK('armor', cx, 0, STORY);
+  for (const o of offices) PK('hp', o.x - Math.sign(o.x) * 1.2, o.z - 2.5);
 
   for (const z of [-0.6, 0, 0.6]) {
     S(H - 1.8, z * H);

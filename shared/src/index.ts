@@ -12,6 +12,7 @@ export * from './modes/bots';
 export * from './modes/tournament';
 export * from './maps/types';
 export * from './maps/maps';
+export * from './maps/objects';
 export { INDOOR_FLOOR_KINDS, ROOF_KINDS } from './maps/structures';
 export * from './net/constants';
 export * from './net/events';

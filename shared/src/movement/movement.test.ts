@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ladderVolume, ZIPLINE } from '../maps/objects';
 import { PAD, PLAYER } from '../player/player';
 import type { Collider } from '../physics/raycast';
 import {
@@ -183,5 +184,55 @@ describe('movement simulation', () => {
     run(st, ctx, 30, () => input());
     expect(st.x).toBe(3);
     expect(st.z).toBe(4);
+  });
+
+  it('climbs a ladder onto the roof holding forward, and down holding back', () => {
+    // A block from z -5 to -1, 4 m high; the ladder on its +z face, the climber facing -z
+    const block: Collider = { c: 'wall', min: [-3, 0, -5], max: [3, 4, -1] };
+    const ladder = ladderVolume({ x: 0, z: -1, y0: 0, y1: 4, dir: 0 });
+    const ctx = { ...ctxWith(block), ladders: [ladder] };
+    const st = grounded(ctx);
+    run(st, ctx, 85, () => input({ f: 1 }));
+    expect(st.y).toBeCloseTo(4, 1);
+    expect(st.z).toBeLessThan(-1.2);
+    // Back down: walk back to the edge and keep going back
+    const down = createMoveState(0, 3, -0.7);
+    run(down, ctx, 120, () => input({ f: -1 }));
+    expect(down.y).toBe(0);
+  });
+
+  it('rides a zipline down to its lower end and lets go there', () => {
+    const line: [[number, number, number], [number, number, number]] = [
+      [0, 8, 0],
+      [0, 4, -20],
+    ];
+    const ctx = { ...ctxWith(), ziplines: [line] };
+    // In the air with the hands at the cable, jump held: grabs it
+    const st = createMoveState(0, 8 - PLAYER.height - 0.1 - 0.2, -1);
+    const ev = run(st, ctx, 1, () => input({ b: BTN_JUMP }));
+    expect(ev[0]!.zip).toBe(true);
+    expect(st.zip).toBe(0);
+    run(st, ctx, 120, () => input());
+    expect(st.zip).toBe(-1);
+    expect(st.z).toBeLessThan(-19);
+    expect(st.y).toBeLessThan(4 - ZIPLINE.hang + 0.5);
+  });
+
+  it('lets go of a zipline when jump is pressed again', () => {
+    const ctx = {
+      ...ctxWith(),
+      ziplines: [
+        [
+          [0, 8, 0],
+          [0, 4, -20],
+        ],
+      ] as [[number, number, number], [number, number, number]][],
+    };
+    const st = createMoveState(0, 8 - PLAYER.height - 0.3, -1);
+    run(st, ctx, 1, () => input({ b: BTN_JUMP }));
+    run(st, ctx, 10, () => input());
+    run(st, ctx, 1, () => input({ b: BTN_JUMP | BTN_JUMP_PRESSED }));
+    expect(st.zip).toBe(-1);
+    expect(st.z).toBeGreaterThan(-10);
   });
 });

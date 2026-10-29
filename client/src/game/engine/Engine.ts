@@ -18,7 +18,8 @@ import {
   stepGrenade,
   throwVelocity,
   castShot,
-  getColliders,
+  climbables,
+  liveColliders,
   grenadesFor,
   gunLadder,
   isTeamMode,
@@ -53,6 +54,7 @@ import { buildCharacter, buildGun, type CharacterModel } from '../render/models'
 import { preloadProps, prop } from '../render/props';
 import { buildWorld } from '../render/world';
 import { AbilityObjects } from './abilities';
+import { MapObjects } from './mapObjects';
 import { CameraRig } from './cameraRig';
 import { createDevStats, type FrameStats } from './devStats';
 import { Effects } from './effects';
@@ -92,8 +94,6 @@ const ADS_SIGHT = 0.85;
 /** Abilities whose object shows in the first-person left hand, and for how long (ms) when it has no duration. */
 const GADGET_OF: Partial<Record<string, Gadget>> = { shield: 'shield', medkit: 'medkit', radar: 'radio' };
 const GADGET_MS = 900;
-/** Guns whose aimed sight is drawn by the HUD (a scope); the sniper's scope is the full-screen one. */
-const HUD_SIGHT = new Set<string>(['dmr']);
 /** How long the shield flashes after stopping a bullet (ms). */
 const SHIELD_FLASH_MS = 220;
 /** Speed lines: from walking speed up to this much faster (× walk) they grow to full; sprinting and sliding
@@ -194,9 +194,9 @@ export class Engine implements MinimapSource {
   private readonly vm: ViewModel;
   /** The killer's gun and hands in the death replay, seen from their eyes. */
   private readonly killVm: ViewModel;
-  /** map boxes first (mapColliders of them), then the cover walls standing now */
+  /** map boxes, the barrels and crates standing and the cover walls (rebuilt when any of them changes) */
   private readonly colliders: Collider[];
-  private readonly mapColliders: number;
+  private readonly mapObjs: MapObjects;
   private readonly abilityObjs: AbilityObjects;
   /** G is held: the arc and landing ring show, release throws */
   private grenadeAim = false;
@@ -278,8 +278,7 @@ export class Engine implements MinimapSource {
     private readonly mode: ModeId = 'ffa',
     private readonly limit = 0,
   ) {
-    this.colliders = getColliders(map);
-    this.mapColliders = this.colliders.length;
+    this.colliders = liveColliders(map);
     const aspect = container.clientWidth / container.clientHeight;
 
     // Calidad gráfica (read when entering a room): baja = no antialias, 1 pixel per CSS pixel, hard shadows
@@ -312,6 +311,7 @@ export class Engine implements MinimapSource {
       return normal ? { point, normal } : null;
     });
     this.abilityObjs = new AbilityObjects(this.scene);
+    this.mapObjs = new MapObjects(this.scene, map);
     // Grenade aim: a dotted arc and a ring where it will land (hidden until G is held)
     this.arc = new THREE.Line(
       new THREE.BufferGeometry().setAttribute(
@@ -449,6 +449,7 @@ export class Engine implements MinimapSource {
       adsMove: w.adsMove,
       fallback: spawn ? [spawn[0], spawn[1], spawn[2]] : [0, 0, 0],
       dash: this.character?.ability === 'dash',
+      ...climbables(this.map),
     };
   }
 
@@ -469,7 +470,10 @@ export class Engine implements MinimapSource {
       } else this.effects.bullet(new THREE.Vector3(...d.at), new THREE.Vector3(...d.at), 'wall', null);
     });
     net.on('damaged', (d) => {
+      // Healed (medkit, health on the floor): no hurt effects
+      const healed = d.hp >= this.hp;
       this.hp = d.hp;
+      if (healed) return;
       this.damageTime = performance.now();
       this.damageDirs.push({ x: d.from[0], z: d.from[1], t: this.damageTime });
       this.bus.emit('hurt');
@@ -500,6 +504,15 @@ export class Engine implements MinimapSource {
       if (up) this.bus.emit('streak');
     });
     net.on('boom', (d) => this.onBoom(d.x, d.y, d.z));
+    net.on('crate', (d) => {
+      const at = new THREE.Vector3(d.x, d.y, d.z);
+      this.effects.splinters(at);
+      sfx.thud(140, 0.25, Math.max(0.1, 0.6 - at.distanceTo(this.rig.camera.position) / 60));
+    });
+    net.on('pickup', () => {
+      sfx.blip(660, 0.07, 'triangle', 0.18);
+      sfx.blip(990, 0.09, 'triangle', 0.16, 0.06);
+    });
     net.on('tag', (d) => this.bus.emit('tag', { confirm: d.type === 'confirm' }));
     net.on('flag', (d) => this.bus.emit('flag', { type: d.type }));
     net.on('match:end', () => {
@@ -670,13 +683,13 @@ export class Engine implements MinimapSource {
     if (gadget) this.vm.showGadget(gadget, performance.now() + (gadget === 'shield' ? SHIELD.durationMs : GADGET_MS));
   }
 
-  /** Fully aimed with the marksman rifle: the HUD draws its telescopic sight instead of the 3D gun (the other
-   * guns are aimed over their own iron sights, with the gun in view). */
+  /** Fully aimed: the HUD draws the sight, a holographic hexagon floating over the gun like Valorant's (the marksman
+   * rifle's telescopic sight replaces the gun; the sniper has its own full-screen scope). */
   private adsSight(now: number): boolean {
     const w = this.weapons.weapon();
     return (
       !!w &&
-      HUD_SIGHT.has(this.weapons.weaponId()) &&
+      !w.melee &&
       this.weapons.aimLerp > ADS_SIGHT &&
       !this.weapons.current().reloadEnd &&
       now >= this.weapons.swapUntil
@@ -689,7 +702,7 @@ export class Engine implements MinimapSource {
     return this.players.find((p) => p.id === this.myId)?.ac ?? 0;
   }
 
-  private onState({ players, ts, fl, tg, inf, gr, dp, dz, rd }: StateSnapshot): void {
+  private onState({ players, ts, fl, tg, inf, gr, dp, wo, dz, rd }: StateSnapshot): void {
     const shielded = !!players.find((p) => p.id === this.myId)?.sh;
     const now = performance.now();
     if (!shielded) this.shieldUntil = 0;
@@ -698,10 +711,11 @@ export class Engine implements MinimapSource {
     this.objectives.zones = dz ?? null;
     this.round = rd ?? null;
     this.syncGrenades(gr ?? []);
-    // Cover walls changed: the prediction must bump into the same walls as the server
-    if (this.abilityObjs.sync(dp ?? [], performance.now())) {
-      this.colliders.length = this.mapColliders;
-      this.colliders.push(...this.abilityObjs.walls());
+    // Cover walls, barrels or crates changed: the prediction must bump into the same things as the server
+    const objs = this.mapObjs.sync(wo);
+    if (this.abilityObjs.sync(dp ?? [], performance.now()) || objs) {
+      this.colliders.length = 0;
+      this.colliders.push(...liveColliders(this.map, this.mapObjs.objectsDown()), ...this.abilityObjs.walls());
     }
     this.teamScore = ts;
     this.objectives.flags = fl;
@@ -1018,7 +1032,8 @@ export class Engine implements MinimapSource {
     this.vm.update(
       dt,
       now,
-      this.alive && !this.weapons.scoped() && !this.adsSight(now),
+      // Aimed, the gun stays in view under the holographic sight; only the marksman rifle's scope replaces it
+      this.alive && !this.weapons.scoped() && !(this.adsSight(now) && this.weapons.weaponId() === 'dmr'),
       this.alive
         ? {
             weapon: this.weapons.weapon(),
@@ -1052,6 +1067,7 @@ export class Engine implements MinimapSource {
       g.mesh.rotation.x += dt * GRENADE_TUMBLE;
     }
     this.abilityObjs.update(dt, performance.now());
+    this.mapObjs.update(performance.now());
     this.objectives.update(dt, now, this.objectiveSources());
 
     this.sendAcc += frameDt * MS_PER_S;
@@ -1104,6 +1120,7 @@ export class Engine implements MinimapSource {
       tags,
       flags,
       zones,
+      pickups: this.mapObjs.available(),
     };
   }
 
@@ -1226,6 +1243,7 @@ export class Engine implements MinimapSource {
     this.objectives.dispose();
     this.effects.dispose();
     this.abilityObjs.dispose();
+    this.mapObjs.dispose();
     this.vm.dispose();
     this.killVm.dispose();
     this.renderer.dispose();

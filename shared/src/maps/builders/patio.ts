@@ -1,10 +1,10 @@
 import { BARREL, LAMP, TREE, pad, sandbags, stairs } from '../props';
-import { STORY, house, mirrorHouse } from '../structures';
+import { PARAPET_H, ROOF_T, STORY, house, mirrorHouse } from '../structures';
 import type { MapBuildContext } from '../types';
 
 // Patio: central tower, middle walls and rooms in the corners
 export function buildPatio(ctx: MapBuildContext): void {
-  const { B, S, P, H } = ctx;
+  const { B, D, S, P, H, BR, BK, PK, LD, ZL } = ctx;
   const k = H / 40;
   B(0, 0, 0, 12, 3, 12, 'platform');
   for (const s of [1, -1]) {
@@ -91,12 +91,16 @@ export function buildPatio(ctx: MapBuildContext): void {
     [28, -10],
     [-12, -12],
     [12, 12],
+  ] as const;
+  for (const [x, z] of crates) B(x * k, 0, z * k, 2.4, 1.2, 2.4, 'crate');
+  // The four crates on the cross axes break
+  for (const [x, z] of [
     [0, -26],
     [0, 26],
     [-26, 0],
     [26, 0],
-  ] as const;
-  for (const [x, z] of crates) B(x * k, 0, z * k, 2.4, 1.2, 2.4, 'crate');
+  ] as const)
+    BK(x * k, z * k, 1.6);
   // Crate stacks (climbable by jumping)
   B(-12 * k, 0, 12 * k, 2.4, 2.4, 2.4, 'crate2');
   B(-12 * k - 2.4, 0, 12 * k, 2.4, 1.2, 2.4, 'crate');
@@ -131,6 +135,37 @@ export function buildPatio(ctx: MapBuildContext): void {
     }
     P(s * (d0 + 3), 0, sandbags(1, 3));
     P(0, s * (d0 + 3), sandbags(3, 1));
+  }
+
+  // Market stalls in the square (counter, posts and a striped awning: cover to advance from) and two fountains
+  // behind the gaps of the middle walls, so the square is no longer crossed in one run
+  const stall = (x: number, z: number, alongX: boolean) => {
+    const [w, d] = alongX ? [3.2, 2.2] : [2.2, 3.2];
+    B(x, 0, z, alongX ? 3 : 0.8, 1.1, alongX ? 0.8 : 3, 'wood');
+    for (const px of [-1, 1])
+      for (const pz of [-1, 1]) B(x + (px * w) / 2, 0, z + (pz * d) / 2, 0.15, 2.6, 0.15, 'wood');
+    D(x, 2.6, z, w + 0.4, 0.15, d + 0.4, 'awning');
+  };
+  for (const s of [1, -1]) {
+    stall(-s * 7 * k, -s * 23 * k, true);
+    stall(s * 23 * k, -s * 7 * k, false);
+    B(0, 0, s * 21.5 * k, 4, 0.8, 4, 'concrete');
+    B(0, 0.8, s * 21.5 * k, 0.8, 1.6, 0.8, 'concrete');
+    D(0, 0.8, s * 21.5 * k, 3.4, 0.02, 3.4, 'water');
+    // Barrels inside the middle walls
+    BR(s * (d0 - 1.5), s * 4);
+  }
+
+  // Up high: armour on the tower; ziplines from two of the house roofs down to it; ladders up the other two
+  // (to above the parapet, so the climber steps over it)
+  PK('armor', 0, 0);
+  const roofTop = 2 * STORY + ROOF_T;
+  for (const s of [1, -1]) {
+    // From the roof corner nearest the tower, high enough to clear the parapet (jump to grab it)
+    ZL([s * (c + 0.5), roofTop + PARAPET_H + 2.3, s * (c + 0.5)], [s * 4.5, 3 + 2.3, s * 1]);
+    LD(-s * (hc + hw / 2), s * (hc - 1.5), roofTop + PARAPET_H, s > 0 ? 1 : 3);
+    // Health in the back alleys
+    PK('hp', s * 36 * k, -s * 8 * k);
   }
 
   // Corner spawns in the back alleys (no further west than the west spawn, which holds the CTF base)

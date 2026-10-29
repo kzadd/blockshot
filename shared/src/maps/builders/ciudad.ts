@@ -11,7 +11,7 @@ const SHOP_MIN_H = 6.5;
 
 // Ciudad: city blocks with streets, alleys and squares; walk-up houses with roof terraces and shops under the towers
 export function buildCiudad(ctx: MapBuildContext): void {
-  const { B, S, P, H, rand } = ctx;
+  const { B, D, S, P, H, BR, BK, PK, LD, ZL, rand } = ctx;
   const n = H < 34 ? 3 : H < 50 ? 4 : 5; // blocks per side
   const sw = 7; // street width
   const bs = (2 * H - (n + 1) * sw) / n; // block side
@@ -20,6 +20,8 @@ export function buildCiudad(ctx: MapBuildContext): void {
   const cols: StructureKind[] = ['bld1', 'bld2', 'bld3', 'bld4'];
   const pickColor = () => cols[Math.floor(rand() * cols.length)]!;
   const plaza = Math.floor((n - 1) / 2);
+  /** Roofs of the solid blocks with a fire escape: (x, z, height), for the ziplines down to the square. */
+  const roofs: [number, number, number, number, number][] = [];
   // Walk-up house: shop downstairs, a flat upstairs (two stories) and outside stairs to the roof
   const walkUp = (cx: number, cz: number, stories: number, brick: boolean) => {
     const w = bs - 1.4;
@@ -63,7 +65,10 @@ export function buildCiudad(ctx: MapBuildContext): void {
       const roll = rand();
       if ((i === plaza && j === plaza) || roll < 0.1) {
         // Square: fountain, trees and benches
-        B(cx, 0, cz, 3, 0.8, 3, 'platform');
+        // A fountain in the middle (the square, and the odd empty block)
+        B(cx, 0, cz, 4, 0.8, 4, 'concrete');
+        B(cx, 0.8, cz, 0.8, 1.6, 0.8, 'concrete');
+        D(cx, 0.8, cz, 3.4, 0.02, 3.4, 'water');
         for (const [dx, dz] of [
           [1, 1],
           [1, -1],
@@ -84,6 +89,10 @@ export function buildCiudad(ctx: MapBuildContext): void {
         if (rand() < 0.5) {
           B(cx - (w + 2.6) / 2, 0, cz, w, h, bs, c);
           B(cx + (w + 2.6) / 2, 0, cz, w, h2, bs, pickColor());
+          // Fire escape up the west face of the west block
+          const fx = cx - (w + 2.6) / 2 - w / 2;
+          LD(fx, cz - bs * 0.25, h, 1);
+          roofs.push([fx + w / 2, cz, w, bs, h]);
         } else {
           B(cx, 0, cz - (w + 2.6) / 2, bs, h, w, c);
           B(cx, 0, cz + (w + 2.6) / 2, bs, h2, w, pickColor());
@@ -129,11 +138,33 @@ export function buildCiudad(ctx: MapBuildContext): void {
       const side = rand() < 0.5 ? 1 : -1;
       if (rand() < 0.55) P(at(j) + (rand() - 0.5) * bs * 0.5, street(i) + side * 2.2, car(true));
       if (rand() < 0.55) P(street(i) + side * 2.2, at(j) + (rand() - 0.5) * bs * 0.5, car(false));
-      if (rand() < 0.3) P(at(j) + bs / 2 - 0.6, street(i) - side * 2.8, BARREL);
+      if (rand() < 0.3) {
+        // Half the street barrels are fuel drums that blow up
+        if (rand() < 0.5) BR(at(j) + bs / 2 - 0.6, street(i) - side * 2.8);
+        else P(at(j) + bs / 2 - 0.6, street(i) - side * 2.8, BARREL);
+      }
     }
     for (let j = 0; j <= n; j++) {
       if (rand() < 0.5) P(street(i) + sw / 2 - 0.4, street(j) + sw / 2 - 0.4, LAMP);
       S(street(i), street(j));
     }
   }
+
+  // The square: armour by the fountain, crates that break round it; ziplines from the two highest fire-escape roofs
+  const pc = at(plaza);
+  PK('armor', pc + 3, pc);
+  BK(pc - 3.5, pc + 2.5, 1.3);
+  BK(pc + 2.5, pc - 3.5, 1.3);
+  for (const [x, z, w, d, h] of [...roofs].sort((a, b) => b[4] - a[4]).slice(0, 2)) {
+    // From the roof edge nearest the square
+    const sx = Math.min(x + w / 2 - 0.3, Math.max(x - w / 2 + 0.3, pc));
+    const sz = Math.min(z + d / 2 - 0.3, Math.max(z - d / 2 + 0.3, pc));
+    const dx = pc - sx;
+    const dz = pc - sz;
+    const len = Math.hypot(dx, dz) || 1;
+    if (h > 4.5) ZL([sx, h + 2.3, sz], [pc - (dx / len) * 4, 2.3, pc - (dz / len) * 4]);
+  }
+  // Health in two opposite streets
+  PK('hp', street(1), at(n - 1));
+  PK('hp', street(n - 1), at(0));
 }

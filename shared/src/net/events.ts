@@ -3,7 +3,7 @@ import type { Vec3 } from '../core/math';
 import type { CharacterId, SkinId } from '../characters/characters';
 import type { CamoId, FinishId } from '../characters/looks';
 import type { TournamentResult } from '../modes/tournament';
-import type { MapId, SizeId } from '../maps/types';
+import type { MapId, PickupKind, SizeId } from '../maps/types';
 import type { BotLevel } from '../modes/bots';
 import type { MedalId } from '../modes/medals';
 import type { ModeId, SideTeam, Team } from '../modes/modes';
@@ -160,6 +160,9 @@ export type GrenadeSnapshot = [number, number, number, number];
 export type DeployableKind = 'smoke' | 'mine' | 'wall';
 export type DeployableSnapshot = [number, DeployableKind, number, number, number, number, Team, string];
 
+/** Map objects not there right now (indices): [fallen barrels, broken crates, taken pickups]. */
+export type ObjectsSnapshot = [number[], number[], number[]];
+
 export interface StateSnapshot {
   players: PlayerSnapshot[];
   ts: Record<SideTeam, number> | null;
@@ -169,6 +172,8 @@ export interface StateSnapshot {
   gr: GrenadeSnapshot[];
   /** smoke clouds, mines and cover walls */
   dp: DeployableSnapshot[];
+  /** barrels, crates and pickups that are gone for now */
+  wo: ObjectsSnapshot;
   dz: DomSnapshot[] | null;
   rd: RoundSnapshot | null;
 }
@@ -310,6 +315,10 @@ export interface ServerToClientEvents {
   'room:changed': (room: RoomInfo) => void;
   /** a grenade exploded */
   boom: (d: { x: number; y: number; z: number }) => void;
+  /** a wooden crate broke (index into map.crates and its centre, for the splinters) */
+  crate: (d: { i: number; x: number; y: number; z: number }) => void;
+  /** you picked up health or armour */
+  pickup: (k: PickupKind) => void;
   /** the admin removed you from the room (you are back in the lobby) */
   kicked: (reason: string) => void;
 }

@@ -12,6 +12,8 @@ export interface MinimapView {
   flags: { x: number; z: number; team: SideTeam }[];
   /** Domination zones: letter in the owner's colour */
   zones: { x: number; z: number; owner: number; letter: string }[];
+  /** health and armour lying on the floor now */
+  pickups: { x: number; z: number; k: 'hp' | 'armor' }[];
 }
 export interface MinimapSource {
   minimap(now: number): MinimapView;
@@ -116,6 +118,19 @@ export default function Minimap({
         g.lineWidth = 1.5;
         g.strokeStyle = INK;
         g.stroke();
+      }
+
+      // Health (green cross) and armour (blue square) on the floor
+      for (const pk of view.pickups) {
+        const x = toPx(pk.x);
+        const y = toPx(pk.z);
+        g.fillStyle = INK;
+        g.fillRect(x - 5, y - 5, 10, 10);
+        g.fillStyle = pk.k === 'hp' ? '#46d37f' : '#4c9dff';
+        if (pk.k === 'hp') {
+          g.fillRect(x - 1.5, y - 4, 3, 8);
+          g.fillRect(x - 4, y - 1.5, 8, 3);
+        } else g.fillRect(x - 3.5, y - 3.5, 7, 7);
       }
 
       // Domination: zone letters in their owner's colour

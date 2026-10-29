@@ -4,7 +4,9 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 
 // Small props for grenades and abilities, from Quaternius and Pichuliru on Poly Pizza (CC0, see ASSETS_CREDITS.md),
 // as meshopt GLBs in public/models/props. Clones share geometry and materials, so many of them cost little.
-export type PropName = 'grenade' | 'smokegren' | 'mine' | 'sacks' | 'shield' | 'medkit' | 'radio';
+export type PropName = 'grenade' | 'smokegren' | 'mine' | 'sacks' | 'shield' | 'medkit' | 'radio' | 'barrel' | 'crate';
+/** Props that are one of the world kits' models (public/models/world, Kenney; see ASSETS_CREDITS.md). */
+const FILE: Partial<Record<PropName, string>> = { barrel: '../world/s-barrel', crate: '../world/q-crate' };
 
 const BASE = `${import.meta.env.BASE_URL}models/props/`;
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
@@ -13,7 +15,7 @@ const source = (name: PropName): Promise<THREE.Group | null> => {
   let p = sources.get(name);
   if (!p) {
     p = loader
-      .loadAsync(`${BASE}${name}.glb`)
+      .loadAsync(`${BASE}${FILE[name] ?? name}.glb`)
       .then((g) => {
         g.scene.traverse((o) => {
           if (o instanceof THREE.Mesh) o.castShadow = o.receiveShadow = true;

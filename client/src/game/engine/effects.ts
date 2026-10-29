@@ -392,6 +392,40 @@ export class Effects {
     this.liveSplats.splice(i, 1);
   }
 
+  /** A wooden crate breaking: a burst of splinters and dust from its centre. */
+  splinters(at: THREE.Vector3): void {
+    for (let i = 0; i < 26; i++)
+      this.particle(
+        at,
+        i % 3 ? 0x9a6b3f : 0x6e4a2a,
+        0.09,
+        0,
+        SPARK_LIFE * 3,
+        SPARK_SPEED * 1.6,
+        SPARK_GRAVITY,
+        1,
+        UP,
+        1,
+        false,
+        FX.debris,
+      );
+    for (let i = 0; i < 4; i++)
+      this.particle(
+        at,
+        0xb9a487,
+        PUFF_SIZE * 6,
+        PUFF_GROW * 3,
+        PUFF_LIFE * 2.5,
+        0.8,
+        -PUFF_RISE,
+        0.7,
+        UP,
+        1,
+        false,
+        FX.dust,
+      );
+  }
+
   /** A killed player: a burst of blood mist and drops, a pool under them and splats round about; `at` = the feet. */
   shatter(at: THREE.Vector3): void {
     const centre = at.clone().setY(at.y + 1.1);

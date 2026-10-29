@@ -9,9 +9,25 @@ import { buildDesfiladero } from './builders/desfiladero';
 import { buildObra } from './builders/obra';
 import { buildPatio } from './builders/patio';
 import { buildPolvo } from './builders/polvo';
+import { buildPuerto } from './builders/puerto';
+import { buildEstacion } from './builders/estacion';
+import { buildNevada } from './builders/nevada';
 import { PROP_COLORS } from './props';
 import { ROOF_KINDS, STRUCTURE_COLORS } from './structures';
-import type { BoxKind, GameMap, MapBox, MapDef, MapId, PropPart, SizeId, Spawn } from './types';
+import { BARREL, LADDER_DIRS, ZIPLINE } from './objects';
+import type {
+  BoxKind,
+  GameMap,
+  MapBox,
+  MapDef,
+  MapId,
+  MapLadder,
+  MapPickup,
+  MapZipline,
+  PropPart,
+  SizeId,
+  Spawn,
+} from './types';
 
 export const MAP_SIZES: Record<SizeId, { id: SizeId; name: string; half: number; players: number }> = {
   s: { id: 's', name: 'Pequeño', half: 26, players: 6 },
@@ -151,6 +167,81 @@ const MAP_DEFS: Record<MapId, MapDef> = {
       cont2: '#4a7fb0',
     },
   },
+  puerto: {
+    name: 'Puerto',
+    tag: 'Altura y agua',
+    desc: 'Contenedores, un canal con grúa pórtico y un carguero en su dique. Tirolinas desde la grúa.',
+    build: buildPuerto,
+    wallH: 7,
+    sky: '#9cc2dd',
+    colors: {
+      floor: '#4f5a5e',
+      wall: '#7f8a90',
+      quay: '#8f8c86',
+      hull: '#b4432f',
+      deck: '#8a6a4a',
+      water: '#2b5b74',
+      metal: '#d9a531',
+      bridge: '#7a6a55',
+      platform: '#9aa3ab',
+      railing: '#e0b23a',
+      roof: '#5a646c',
+      tile: '#a8a39a',
+      cont1: '#d9772e',
+      cont2: '#4a7fb0',
+      cont3: '#5f8f4e',
+    },
+  },
+  estacion: {
+    name: 'Estación',
+    tag: 'Dos niveles',
+    desc: 'Calles arriba y un andén hundido con un tren parado que se puede atravesar.',
+    build: buildEstacion,
+    wallH: 9,
+    sky: '#b4cde3',
+    colors: {
+      floor: '#5d5a55',
+      wall: '#9a6a52',
+      quay: '#a29d93',
+      platform: '#c9c3b6',
+      step: '#bdb6aa',
+      stair: '#b8b2a6',
+      concrete: '#b3afa6',
+      roof: '#59616b',
+      train: '#c9662f',
+      tile: '#d8d2c4',
+      bridge: '#6e7680',
+      railing: '#3a4048',
+      wood: '#8a6a4a',
+      brick: '#a8603f',
+      plaster: '#d8c8b0',
+      ballast: '#75706a',
+      track: '#8d9399',
+      sleeper: '#5a4632',
+      tunnel: '#121417',
+      awning: '#c0503e',
+    },
+  },
+  nevada: {
+    name: 'Nevada',
+    tag: 'Bosque y nieve',
+    desc: 'Puesto de montaña: lago helado al centro, bosques de pinos, torres de vigilancia con tirolina.',
+    build: buildNevada,
+    wallH: 5,
+    sky: '#c9d7e4',
+    colors: {
+      floor: '#eef2f5',
+      wall: '#8d8f8c',
+      ice: '#b9dcef',
+      rock: '#9aa0a6',
+      wood: '#7a5a3c',
+      roof: '#4d5560',
+      railing: '#6b4e33',
+      pine: '#3f6e4a',
+      logs: '#8a6440',
+      sandbag: '#a89a78',
+    },
+  },
 };
 
 export const MAPS = (Object.entries(MAP_DEFS) as [MapId, MapDef][]).map(([id, m]) => ({
@@ -200,6 +291,14 @@ export function groundAt(boxes: readonly MapBox[], x: number, z: number): number
     if (Math.abs(x - b.x) <= b.w / 2 && Math.abs(z - b.z) <= b.d / 2) y = Math.max(y, b.y + b.h);
   }
   return round2(y);
+}
+
+/** Where something stands at (x, z): the lowest box top with room for a body above it (under roofs, not on them). */
+export function standAt(boxes: readonly MapBox[], x: number, z: number, room = PLAYER.height): number {
+  const here = boxes.filter((b) => Math.abs(x - b.x) <= b.w / 2 && Math.abs(z - b.z) <= b.d / 2);
+  const tops = [0, ...here.map((b) => b.y + b.h)].sort((a, b) => a - b);
+  for (const t of tops) if (!here.some((b) => b.y < t + room && b.y + b.h > t + 0.01)) return round2(t);
+  return round2(tops[tops.length - 1]!);
 }
 
 /** Height of the highest box top at (x, z) that is not above `y` (the floor under a point, not the roof over it). */
@@ -292,15 +391,59 @@ export function getMap(mapId: string, sizeId: string): GameMap {
   B(-H - 0.5, 0, 0, 1, def.wallH, 2 * H);
   B(H + 0.5, 0, 0, 1, def.wallH, 2 * H);
   const props: PendingProp[] = [];
+  const barrels: [number, number][] = [];
+  const crates: [number, number, number, number | undefined][] = [];
+  const pickups: [MapPickup['k'], number, number, number | undefined][] = [];
+  const ladders: MapLadder[] = [];
+  const ziplines: MapZipline[] = [];
   def.build({
     B,
     D,
     S: (x, z) => points.push([round2(x), round2(z)]),
     P: (x, z, parts) => props.push({ x, z, parts }),
+    BR: (x, z) => barrels.push([x, z]),
+    BK: (x, z, s = 1.2, y) => crates.push([x, z, s, y]),
+    PK: (k, x, z, y) => pickups.push([k, x, z, y]),
+    LD: (x, z, y1, dir) => ladders.push({ x: round2(x), z: round2(z), y0: 0, y1: round2(y1), dir }),
+    ZL: (a, b) => ziplines.push([a.map(round2) as Vec3, b.map(round2) as Vec3]),
     H,
     rand: rng(seedOf(key)),
   });
   placeProps(boxes, points, props);
+  // Objects stand on the ground there (decided once every box is in)
+  const objBox = (x: number, z: number, w: number, h: number, c: MapBox['c'], y?: number): MapBox => ({
+    x: round2(x),
+    y: y ?? standAt(boxes, x, z),
+    z: round2(z),
+    w,
+    h,
+    d: w,
+    c,
+  });
+  const barrelBoxes = barrels.map(([x, z]) => objBox(x, z, BARREL.w, BARREL.h, 'xbarrel'));
+  const crateBoxes = crates.map(([x, z, s, y]) => objBox(x, z, s, s, 'xcrate', y));
+  // A zipline whose rider would go through something on the way is dropped (cables are checked once, here)
+  const riderHits = (x: number, y: number, z: number) =>
+    boxes.some(
+      (b) =>
+        Math.abs(x - b.x) < b.w / 2 + 0.3 &&
+        Math.abs(z - b.z) < b.d / 2 + 0.3 &&
+        y - ZIPLINE.hang < b.y + b.h &&
+        y - 0.3 > b.y,
+    );
+  const clearLines = ziplines.filter(([a, b]) => {
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+    for (let d = 1; d < len - 1.5; d += 0.5) {
+      const t = d / len;
+      if (riderHits(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t)) return false;
+    }
+    return true;
+  });
+  // A ladder's foot: the floor just in front of its wall
+  for (const l of ladders) {
+    const [dx, dz] = LADDER_DIRS[l.dir]!;
+    l.y0 = floorBelow(boxes, l.x - dx * 0.3, l.y1 - 0.5, l.z - dz * 0.3);
+  }
 
   const cols = getColliders({ boxes });
   // Capture the flag bases: the westernmost spawn point (Red) and the easternmost (Blue)
@@ -324,6 +467,11 @@ export function getMap(mapId: string, sizeId: string): GameMap {
     decor,
     spawns,
     bases: { 1: base(side(1)), 2: base(side(-1)) },
+    barrels: barrelBoxes,
+    crates: crateBoxes,
+    pickups: pickups.map(([k, x, z, y]) => ({ k, x: round2(x), y: y ?? standAt(boxes, x, z), z: round2(z) })),
+    ladders,
+    ziplines: clearLines,
   };
   mapCache.set(key, map);
   return map;

@@ -14,7 +14,7 @@ const ADOBE = {
 // Polvo: desert town with three routes (tunnel, mid and long hall) and two bomb sites in the north.
 // Coordinates are designed for the medium size (80 m) and scaled for the others.
 export function buildPolvo(ctx: MapBuildContext): void {
-  const { B, S, P, H } = ctx;
+  const { B, D, S, P, H, BR, BK, PK, LD } = ctx;
   const k = H / 40;
   // Rectangle [x1,x2] × [z1,z2] of height h, resting on y
   const R = (x1: number, x2: number, z1: number, z2: number, h: number, c: BoxKind = 'wall2', y = 0) =>
@@ -155,6 +155,26 @@ export function buildPolvo(ctx: MapBuildContext): void {
   // Jump pads in mid: to peek over the houses
   pad(B, 0, 20 * k);
   pad(B, 0, -20 * k);
+
+  // Market street between the two yards: stalls with striped awnings (cover with a roof), armour in the middle
+  for (const x of [-18, -8, 8, 18]) {
+    B(x * k, 0, -21 * k, 3, 1.1, 0.8, 'wood');
+    for (const px of [-1.6, 1.6]) for (const pz of [-1.1, 1.1]) B(x * k + px, 0, -21 * k + pz, 0.15, 2.6, 0.15, 'wood');
+    D(x * k, 2.6, -21 * k, 3.6, 0.15, 2.6, 'awning');
+  }
+  PK('armor', 0, -22.5 * k);
+  // A well and two carts in the middle cut the long line north
+  B(0, 0, 26 * k, 2.4, 1, 2.4, 'concrete');
+  for (const s of [1, -1]) B(s * 12 * k, 0, 22 * k, 2.6, 1.3, 1.6, 'wood');
+  // Planks from roof to roof over the middle (resting on the parapets) and ladders up the two north houses
+  B(0, 7.1, -3 * k, 12 * k + 0.6, 0.2, 1.6, 'bridge');
+  for (const s of [1, -1]) LD(s * 12 * k, 18 * k, 7.3, 2);
+  // Health in the tunnel, explosive barrels at both sites, crates that break in the middle
+  PK('hp', -26 * k, 12 * k);
+  BR(34 * k, -21 * k);
+  BR(-30 * k, -23 * k);
+  BK(4 * k, 3 * k, 1.3);
+  BK(-5 * k, -2 * k, 1.3);
   P(27 * k, -15 * k, sandbags(1, 3));
 
   const spawns = [

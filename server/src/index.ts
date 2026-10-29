@@ -7,6 +7,7 @@ import { FIXED_DT, SIM_STEPS_PER_TICK } from '@blockshot/shared';
 import { serverConfig } from './config';
 import { tickAbilities } from './combat/abilities';
 import { tickGrenades } from './combat/grenades';
+import { tickWorld } from './combat/worldObjects';
 import { startFixedLoop } from './game/loop';
 import { snapshotRoom } from './game/tick';
 import { createApp } from './http/app';
@@ -61,6 +62,7 @@ startFixedLoop(FIXED_DT * MS_PER_S, (now) => {
       simulateRoom(room, FIXED_DT, now);
       tickGrenades(room, FIXED_DT, now);
       tickAbilities(room, now);
+      tickWorld(room, now);
       if (snapshot) snapshotRoom(room, now);
     } catch (err) {
       logger.error({ err, room: room.id }, 'room tick failed');

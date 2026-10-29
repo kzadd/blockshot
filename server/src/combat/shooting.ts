@@ -21,8 +21,9 @@ import { weaponIdOf, weaponOf } from '../players/loadout';
 import type { Player } from '../players/player';
 import { sameTeam } from '../players/teams';
 import type { Room } from '../rooms/room';
-import { shieldBlocks } from './abilities';
+import { shieldBlocks, shootMines } from './abilities';
 import { launchRound } from './grenades';
+import { hitObjectAt } from './worldObjects';
 import { applyDamage } from './damage';
 import { behaviorOf } from './weaponBehavior';
 
@@ -107,6 +108,10 @@ export function handleShoot(room: Room, p: Player, msg: ShootInput): void {
   for (const d of dirs) {
     const { t, hit } = behavior.trace(w, { origin: o, dir: d, colliders: room.colliders, targets, shooterId: p.id });
     ends.push([round2(o[0] + d[0] * t), round2(o[1] + d[1] * t), round2(o[2] + d[2] * t)]);
+    // A rival's mine on the way is shot away; a barrel or crate in the way takes the bullet
+    shootMines(room, p, o, d, t);
+    if (hit?.type === 'wall')
+      hitObjectAt(room, p, [o[0] + d[0] * t, o[1] + d[1] * t, o[2] + d[2] * t], damageAt(w, t), now);
     if (hit?.type !== 'player') continue;
     const e = damage.get(hit.id) ?? { dmg: 0, head: false, at: [o[0] + d[0] * t, o[1] + d[1] * t, o[2] + d[2] * t] };
     e.dmg += damageAt(w, t) * (hit.head ? w.headMult : 1);

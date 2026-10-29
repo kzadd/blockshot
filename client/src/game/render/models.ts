@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { FX, fxFrame } from './fxAtlas';
-import { handAt, type Grip } from './hands';
 import type { CamoId, CharacterId, SkinId, WeaponId } from '@blockshot/shared';
 
 /** Guns whose muzzle is further than this (m) are held with the left hand on the handguard. */
@@ -1361,9 +1360,14 @@ export function buildCharacter(
   return { group, legL: legs[0]!, legR: legs[1]!, kneeL: knees[0]!, kneeR: knees[1]!, upper, aim, hand, holdGun };
 }
 
-// First-person arms: added to the gun so it looks held. The hands are the pack's glove (hands.ts), bent round the
-// grip (right) and under the handguard (left, long guns) or cupping the right hand (handguns); the knife is held
-// alone in a fist, thumb towards the blade. Sleeves follow the outfit; the gloves take the skin's glove colour.
+// First-person arms: block forearms in the characters' style (same Kit and cloth as the body), one per hand. A
+// pose says, in gun space, where the fist is (`at`), where the back of the hand faces (`back`) and where the
+// forearm runs to (`fore`, towards the elbow, off-screen).
+export interface HandPose {
+  at: V3;
+  back: V3;
+  fore: V3;
+}
 const GRIP = v3(0, -0.105, 0.1);
 const KNIFE_GRIP = v3(0, -0.1, 0.105);
 /**
@@ -1375,111 +1379,88 @@ export const KNIFE_YAW = 0.3;
 export const KNIFE_ROLL = 0.5;
 /** The knife's forearm, in view space: back towards the camera, down and to the right. */
 const KNIFE_FOREARM = v3(0.2, -0.3, 0.5);
-/** First-person left arm closed round a grenade held at the origin, palm up, forearm down and back. */
-export function buildOffhandArm(skin: string, color: string, camo: CamoId): THREE.Group {
-  const mats = { ...skinMaterials(color, skin, camo), ...characterMaterials('soldado', skin) };
+/** Long enough to leave the screen from any pose. */
+const FP_ARM_LEN = 0.8;
+
+/** The knife hand: the forearm is set in view space and taken back through the knife's pitch, yaw and roll. */
+function knifePose(): HandPose {
+  const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(KNIFE_PITCH, KNIFE_YAW, KNIFE_ROLL)).invert();
+  const fore = KNIFE_FOREARM.clone().normalize().applyQuaternion(q);
+  const fingers = v3(-fore.x, -fore.y, 0).normalize();
+  return { at: KNIFE_GRIP, back: fingers.clone().cross(v3(0, 0, -1)), fore };
+}
+
+/** Right hand round the pistol grip, its back to the right, the forearm out to the bottom-right corner. */
+const RIGHT_POSE: HandPose = { at: GRIP, back: v3(1, 0.3, 0), fore: v3(1, -0.35, 0.3) };
+
+const LEFT_FORE = v3(-1, -0.4, 0.55);
+
+/** How the first-person arms hold `gun`: the right hand, and the left one (null: held in the right hand alone). */
+export function armPoses(gun: GunModel): { right: HandPose; left: HandPose | null } {
+  if (gun.userData.id === 'knife') return { right: knifePose(), left: null };
+  // The left forearm crosses to the bottom-left corner, as on every gun: under the handguard, palm up, on long
+  // guns; on handguns cupping the right fist from the left
+  const left: HandPose =
+    gun.userData.muzzleZ < LONG_GUN_MUZZLE_Z
+      ? {
+          at: v3(-0.01, -0.07, Math.round(gun.userData.muzzleZ * 0.42 * 100) / 100),
+          back: v3(-0.5, -1, 0),
+          fore: LEFT_FORE,
+        }
+      : {
+          at: v3(-0.01, -0.08, Math.round(gun.userData.muzzleZ * 0.5 * 100) / 100),
+          back: v3(-0.5, -1, 0),
+          fore: LEFT_FORE,
+        };
+  return { right: RIGHT_POSE, left };
+}
+
+/**
+ * A first-person forearm (side 1 right, -1 left): the fist at the origin, knuckles to -Z, back of the hand to +Y,
+ * the forearm back along +Z. Tactical look: knuckle pad, watch, grey glove cuff and an arm band in the accent colour.
+ */
+function buildFpArm(color: string, skin: string, camo: CamoId, side: number): THREE.Group {
   const g = new THREE.Group();
-  const h = handAt('fist', true, v3(0, 0, 0), v3(0.3, 1, -0.2), v3(-1, 0, 0.3), mats.glove);
-  const wrist = h ? h.wrist : v3(0, -0.08, 0.04);
-  if (h) g.add(h.mesh);
-  const elbow = wrist.clone().add(v3(-0.08, -0.42, 0.22));
+  const len = FP_ARM_LEN;
   addKit(
     g,
-    `fp-off:${wrist
-      .toArray()
-      .map((n) => n.toFixed(3))
-      .join(',')}`,
-    mats,
+    `fparm:${side}`,
+    skinMaterials(color, skin, camo) as BodyMaterials,
     (k) => {
-      k.beam(wrist, elbow, 0.062, 0.066, 'main', 0.02);
-      k.beam(wrist, wrist.clone().lerp(elbow, 0.12), 0.068, 0.072, 'gear');
+      // Fist: back of the hand, four fingers curled under, the thumb across
+      k.box(0.085, 0.07, 0.1, 0, 0.01, 0, 'glove');
+      for (let i = 0; i < 4; i++) k.box(0.02, 0.05, 0.035, -0.03 + i * 0.02, -0.03, -0.035, 'glove');
+      k.box(0.03, 0.03, 0.07, -side * 0.045, -0.015, -0.01, 'glove', 0, side * 0.3, 0);
+      k.box(0.075, 0.015, 0.035, 0, 0.05, -0.025, 'metal'); // knuckle pad
+      k.box(0.095, 0.085, 0.05, 0, 0, 0.07, 'gear'); // glove cuff
+      // Sleeve widening towards the elbow: drawn upright and laid back along +Z
+      k.transform = new THREE.Matrix4()
+        .makeTranslation(0, 0, 0.09)
+        .multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2));
+      k.taper(0.1, len - 0.09, 0.095, 0, (len - 0.09) / 2, 0, 'main', 1.15, 1);
+      k.transform = null;
+      k.box(0.022, 0.02, 0.022, 0, 0.055, 0.12, 'metal'); // watch
+      k.box(0.112, 0.104, 0.035, 0, 0, 0.3, 'accent'); // arm band
     },
     false,
   );
   return g;
 }
 
-/** The knife hand: the forearm is set in view space and taken back through the knife's pitch, yaw and roll. */
-function knifePose(): { fingers: V3; back: V3; elbow: V3 } {
-  const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(KNIFE_PITCH, KNIFE_YAW, KNIFE_ROLL)).invert();
-  const fore = KNIFE_FOREARM.clone().applyQuaternion(q);
-  // Knuckles away from the forearm, square to the blade (gun space -Z): the wrist sits on the forearm's side
-  const fingers = v3(-fore.x, -fore.y, 0).normalize();
-  return { fingers, back: fingers.clone().cross(v3(0, 0, -1)), elbow: KNIFE_GRIP.clone().add(fore) };
-}
-export function buildArms(gun: GunModel, skin: string = 'base', color = '#3f7fe0', camo: CamoId = 'liso'): THREE.Group {
-  const mats = { ...skinMaterials(color, skin, camo), ...characterMaterials('soldado', skin) };
-  // Built again when the gloves arrive: the old arms go
-  gun.getObjectByName('fp-arms')?.removeFromParent();
-  const g = new THREE.Group();
-  g.name = 'fp-arms';
-  const id = gun.userData.id;
-  const long = gun.userData.muzzleZ < LONG_GUN_MUZZLE_Z;
-  const glove = mats.glove;
-  // Each hand: what it holds, where its fingers point (before closing) and where the back of the hand faces
-  type Pose = { grip: Grip; left: boolean; at: V3; fingers: V3; back: V3; elbow: V3 };
-  const poses: Pose[] =
-    id === 'knife'
-      ? [{ grip: 'fist', left: false, at: KNIFE_GRIP, ...knifePose() }]
-      : [
-          // Right hand round the pistol grip: thumb up, knuckles forward, back of the hand to the right
-          {
-            grip: 'fist',
-            left: false,
-            at: GRIP,
-            fingers: v3(0, -0.3, -1),
-            back: v3(1, 0, 0),
-            elbow: long ? v3(0.24, -0.4, 0.46) : v3(0.13, -0.62, 0.14),
-          },
-          long
-            ? {
-                // Left hand under the handguard, fingers wrapping up its right side, thumb along it
-                grip: 'cup',
-                left: true,
-                at: v3(0, -0.02, Math.round(gun.userData.muzzleZ * 0.42 * 100) / 100),
-                fingers: v3(1, 0.25, 0),
-                back: v3(0, -1, 0.2),
-                elbow: v3(-0.36, -0.36, Math.round(gun.userData.muzzleZ * 0.42 * 100) / 100 + 0.42),
-              }
-            : {
-                // Handguns: the left hand cups the right one from the left side
-                grip: 'cup',
-                left: true,
-                at: v3(-0.03, -0.13, 0.095),
-                fingers: v3(0.15, -0.35, -1),
-                back: v3(-1, -0.2, 0),
-                elbow: v3(-0.17, -0.62, 0.12),
-              },
-        ];
-  const wrists: [V3, V3][] = [];
-  for (const p of poses) {
-    const h = handAt(p.grip, p.left, p.at, p.fingers, p.back, glove);
-    // Without the glove (still loading) the sleeve ends at the grip
-    const wrist = h ? h.wrist : p.at.clone();
-    if (h) {
-      h.mesh.castShadow = false;
-      g.add(h.mesh);
-    }
-    wrists.push([wrist, p.elbow]);
+const _basis = new THREE.Matrix4();
+export class FpArm {
+  readonly root: THREE.Group;
+  constructor(side: 1 | -1, color: string, skin: string, camo: CamoId) {
+    this.root = buildFpArm(color, skin, camo, side);
   }
-  const key = `fp:${wrists.map(([a, b]) => [...a.toArray(), ...b.toArray()].map((n) => n.toFixed(3)).join(',')).join('|')}`;
-  addKit(
-    g,
-    key,
-    mats,
-    (k) => {
-      for (const [wrist, elbow] of wrists) {
-        // Sleeve from the glove's cuff, with a cuff and a band
-        const cuffIn = wrist.clone().lerp(elbow, 0.02);
-        k.beam(cuffIn, elbow, 0.062, 0.066, 'main', 0.02);
-        k.beam(cuffIn, cuffIn.clone().lerp(elbow, 0.12), 0.068, 0.072, 'gear');
-        k.beam(cuffIn.clone().lerp(elbow, 0.34), cuffIn.clone().lerp(elbow, 0.4), 0.074, 0.078, 'accent');
-      }
-    },
-    false,
-  );
-  gun.add(g);
-  return g;
+
+  /** Puts the fist and forearm in `p` (the parent's space). */
+  pose(p: HandPose): void {
+    const z = p.fore.clone().normalize();
+    const y = p.back.clone().addScaledVector(z, -p.back.dot(z)).normalize();
+    this.root.quaternion.setFromRotationMatrix(_basis.makeBasis(y.clone().cross(z), y, z));
+    this.root.position.copy(p.at);
+  }
 }
 
 // ------------------------------------------------------------ Weapons

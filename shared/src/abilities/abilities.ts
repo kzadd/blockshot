@@ -29,13 +29,13 @@ export const ABILITIES: Record<AbilityId, Ability> = {
     id: 'shield',
     name: 'Escudo',
     desc: 'Un escudo frontal para las balas que te llegan de delante durante unos segundos.',
-    cooldownMs: 22000,
+    cooldownMs: 26000,
   },
   dash: {
     id: 'dash',
     name: 'Impulso',
     desc: 'Sales disparado unos 7 metros hacia donde te mueves, sin caer. Entra, dispara y sal.',
-    cooldownMs: 7000,
+    cooldownMs: 10000,
   },
   radar: {
     id: 'radar',
@@ -63,12 +63,12 @@ export const SMOKE = { fuseMs: 1100, radius: 4.5, durationMs: 9000 };
 export const MINE = { armMs: 1000, trigger: 1.8, radius: 4, maxDamage: 85, minDamage: 30, lifeMs: 90000 };
 export const MINE_WEAPON: Weapon = { ...WEAPONS.pistol, name: 'Mina', damage: MINE.maxDamage, headMult: 1 };
 /** Shield: blocks shots coming from the front half (within `arcCos` of the facing) for `durationMs`. */
-export const SHIELD = { durationMs: 3500, arcCos: 0.2 };
+export const SHIELD = { durationMs: 2500, arcCos: 0.2 };
 /** Dash: `timeS` seconds at `speed` m/s along the move direction without falling (~7 m), then it leaves you
  * at `exit` m/s. Cooldown in s (it is part of the shared movement simulation, so the client predicts it). */
 export const DASH = { speed: 30, timeS: 0.22, exit: 11, cooldownS: ABILITIES.dash.cooldownMs / 1000 };
 /** Radar: how long the rivals show on the minimap. Medkit: health it gives back. */
-export const RADAR_MS = 5000;
-export const MEDKIT_HP = 50;
+export const RADAR_MS = 7000;
+export const MEDKIT_HP = 40;
 /** Cover wall: size (along, height, thickness), distance in front of the player and how long it stands. */
 export const WALL = { w: 2.6, h: 1.9, t: 0.4, dist: 1.7, durationMs: 10000 };

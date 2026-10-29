@@ -535,16 +535,30 @@ function SmokeFog() {
 }
 
 /**
- * The marksman rifle's telescopic sight while fully aimed (its 3D scope would fill the view). Every other gun is
- * aimed over the pack model's own iron sights, with the 3D gun in view.
+ * The sight while fully aimed: a holographic hexagon with a marker in the middle, floating over the gun (which sits
+ * just below it, Valorant-style); the telescopic sight on the marksman rifle.
  */
-function ScopeSight() {
+function AdsSight({ weapon }: { weapon: string }) {
   const shotKey = useHud((s) => s.shotKey);
   return (
-    <div className="ads-sight scope">
+    <div className={`ads-sight ${weapon === 'dmr' ? 'scope' : 'holo'}`}>
       <div key={shotKey} className="ads-reticle">
-        <i className="dot" />
-        <i className="frame" />
+        {weapon === 'dmr' ? (
+          <>
+            <i className="dot" />
+            <i className="frame" />
+          </>
+        ) : (
+          <svg className="hex" viewBox="-115 -80 230 160" aria-hidden="true">
+            {/* Four corner pieces: the frame is broken at the middle of every side */}
+            <polyline points="-20,-75 -70,-75 -110,-35 -110,-14" />
+            <polyline points="20,-75 70,-75 110,-35 110,-14" />
+            <polyline points="-20,75 -70,75 -110,35 -110,14" />
+            <polyline points="20,75 70,75 110,35 110,14" />
+            {/* The cross inside */}
+            <path className="cross" d="M-15 0H-6M6 0H15M0 -15V-6M0 6V15" />
+          </svg>
+        )}
       </div>
     </div>
   );
@@ -738,7 +752,7 @@ export default function HUD({ engine, map, mode, scoreLimit, you, feed, banner }
             <Scope />
           ) : (
             <>
-              {h.sight ? <ScopeSight /> : <AimCrosshair />}
+              {h.sight ? <AdsSight weapon={h.sight} /> : <AimCrosshair />}
               <CenterMarks />
               <Banner banner={banner} />
             </>

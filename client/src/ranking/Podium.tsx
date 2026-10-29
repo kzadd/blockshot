@@ -19,7 +19,7 @@ const FOV = 28;
 const CAM_Z = 9.6;
 /** Half the width the three steps need on screen (m) */
 const HALF_WIDTH = 2.3;
-const GUN_SCALE = 1.3;
+const GUN_SCALE = 1.05;
 
 export default function Podium({ top }: { top: RankingRow[] }) {
   const ref = useRef<HTMLDivElement>(null);

@@ -294,6 +294,48 @@ const THEMES: Record<MapId, Theme> = {
     sky: '#6f9ccc',
     scenery: construction,
   },
+  puerto: {
+    floor: ['concrete', 4],
+    wall: ['corrugated', 3],
+    platform: ['diamond', 2],
+    step: ['concrete', 2],
+    quay: ['paving', 3],
+    hull: ['metalPanel', 3],
+    deck: ['planks', 2],
+    metal: ['metalPanel', 2],
+    water: [null],
+    ground: ['asphalt', 5, '#6f706c'],
+    sun: 0xfff3e0,
+    sky: '#8db8d8',
+    scenery: harbour,
+  },
+  estacion: {
+    floor: ['concrete', 4],
+    wall: ['brick', 2.4],
+    platform: ['tiles', 2],
+    step: ['concrete', 2],
+    quay: ['paving', 3],
+    train: ['metalPanel', 2],
+    ballast: ['gravel', 1.5],
+    track: [null],
+    sleeper: ['planks', 1],
+    tunnel: [null],
+    ground: ['asphalt', 5, '#6a6b6e'],
+    sun: 0xfff1d6,
+    sky: '#a8c6e2',
+    scenery: city,
+  },
+  nevada: {
+    floor: ['sand', 4],
+    wall: ['rock', 6],
+    wood: ['planks', 2],
+    roof: ['planks', 2],
+    ice: [null],
+    ground: ['sand', 5, '#e6ecf0'],
+    sun: 0xf2f6ff,
+    sky: '#c3d3e2',
+    scenery: snowfield,
+  },
 };
 const CAR_COLORS = ['#c0503e', '#3d6e9e', '#e8e4dc', '#2b2f36', '#c9a13a', '#4f7a45'];
 const HOUSES = ['a', 'c', 'e', 'h', 'k', 'o'].map((k) => `world/u-building-type-${k}`);
@@ -459,6 +501,7 @@ const BLOB = new THREE.IcosahedronGeometry(0.5, 1);
 // ------------------------------------------------------------ Props: pack models (worldModels.ts)
 const TREES = ['world/n-tree_oak', 'world/n-tree_detailed', 'world/n-tree_default'];
 const CARS = ['world/q-car-sedan', 'world/q-car-hatch', 'world/q-car-suv'];
+const PINES = ['world/n-tree_pineTallA', 'world/n-tree_pineRoundA', 'world/n-tree_pineDefaultA'];
 const BARRELS = ['#3d6e9e', '#b04a3a', '#c9a13a', '#4f7a45'];
 /** Spot of a tree: its height (m) in the arena; outside they are bigger. */
 const TREE_H = 5.2;
@@ -485,6 +528,12 @@ function addProp(models: WorldModels, b: PropBox, rand: Rand, i: number): boolea
       return true;
     case 'carTop':
       return true; // the car model already has its roof
+    case 'pine':
+      models.add(pick(PINES, i), { ...at, w: 3, d: 3, h: b.h * (0.9 + rand() * 0.35), fit: 'height', ry: rand() * 6 });
+      return true;
+    case 'logs':
+      models.add('world/n-log_stackLarge', { ...at, ...along, ry: turn });
+      return true;
     case 'cactus':
       models.add('world/n-cactus_tall', { ...at, h: b.h, fit: 'height', ry: rand() * 6 });
       return true;
@@ -686,6 +735,54 @@ function town(batch: Batch, map: GameMap, rand: Rand, models: WorldModels): void
   hills(batch, map, rand, '#5f8f45');
 }
 
+/** Port: the canal runs on out to sea east and west, container stacks and factories on the far quays. */
+function harbour(batch: Batch, map: GameMap, rand: Rand, models: WorldModels): void {
+  const H = map.half;
+  const sea = mat(map.colors.water ?? '#2b5b74', null);
+  for (const s of [1, -1]) batch.add(BOX, sea, s * (H + 40), 0.01, 0, 0, 80, 0.02, 10);
+  for (let i = 0; i < 14; i++) {
+    const [x, z] = outside(rand, H, 6, 30);
+    if (Math.abs(z) < 8) continue;
+    const n = 1 + Math.floor(rand() * 3);
+    const along = rand() < 0.5;
+    for (let j = 0; j < n; j++)
+      models.add(`world/i-shipping-container-${'abc'[Math.floor(rand() * 3)]}`, {
+        x,
+        y: j * 2.6,
+        z,
+        w: 2.6,
+        h: 2.6,
+        d: 6,
+        ry: along ? Math.PI / 2 : 0,
+      });
+  }
+  factories(map, rand, models);
+}
+
+/** Snow: pine forest and rocks all round, and the hills white. */
+function snowfield(batch: Batch, map: GameMap, rand: Rand, models: WorldModels): void {
+  const H = map.half;
+  for (let i = 0; i < 90; i++) {
+    const [x, z] = outside(rand, H, 2, 50);
+    models.add(pick(PINES, i), { x, y: 0, z, w: 1, h: 7 + rand() * 6, d: 1, fit: 'height', ry: rand() * 6 });
+  }
+  for (let i = 0; i < 10; i++) {
+    const [x, z] = outside(rand, H, 8, 45);
+    models.add(rand() < 0.5 ? 'world/n-rock_tallA' : 'world/n-rock_largeA', {
+      x,
+      y: 0,
+      z,
+      w: 1,
+      h: 3 + rand() * 4,
+      d: 1,
+      fit: 'height',
+      ry: rand() * 6,
+    });
+  }
+  models.add('world/n-tent_detailedClosed', { x: H + 9, y: 0, z: -6, w: 1, h: 2.2, d: 1, fit: 'height', ry: 0.6 });
+  hills(batch, map, rand, '#e9eef2');
+}
+
 function industrial(batch: Batch, map: GameMap, rand: Rand, models: WorldModels): void {
   const H = map.half;
   // Warehouse roof structure: trusses and hanging lights
@@ -700,7 +797,12 @@ function industrial(batch: Batch, map: GameMap, rand: Rand, models: WorldModels)
     }
   }
   for (const z of [-H / 2, 0, H / 2]) batch.add(BOX, steel, 0, y + 0.5, z, 0, 2 * H + 1, 0.35, 0.35);
-  // Kenney's factories, tanks and chimneys around
+  factories(map, rand, models);
+}
+
+/** Kenney's factories, tanks and chimneys around the arena. */
+function factories(map: GameMap, rand: Rand, models: WorldModels): void {
+  const H = map.half;
   for (let i = 0; i < 16; i++) {
     const h = 10 + rand() * 8;
     const [x, z] = outside(rand, H, 8, 60, h * 1.2);

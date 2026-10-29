@@ -23,29 +23,29 @@ export const PLAYER = {
   // in the air speed is kept. maxSpeed is the absolute cap with slide + bunny hop
   softCap: 1.7,
   overFriction: 2.2,
-  maxSpeed: 2.6,
+  maxSpeed: 2.2,
   /** sprint multiplier (Shift) */
   sprint: 1.3,
   /** stamina (false = like Krunker: unlimited sprint and slide) */
   useStamina: true,
   stamina: 100,
-  /** per second while sprinting (about 6.5 s in a row) */
-  staminaDrain: 15,
+  /** per second while sprinting (about 4.5 s in a row) */
+  staminaDrain: 22,
   /** per second while resting */
-  staminaRegen: 25,
+  staminaRegen: 16,
   /** ms without sprinting before it recovers */
-  staminaDelay: 700,
+  staminaDelay: 1200,
   /** when exhausted, this much is needed to sprint again */
   staminaMin: 25,
   /** stamina cost per slide (with useStamina) */
-  slideCost: 20,
+  slideCost: 30,
   // Slide: duration, friction, minimum boost (× speed) and the gain of each chained slide
   slideTime: 1.05,
   slideFriction: 0.9,
   slideBoost: 1.55,
-  slideGain: 1.12,
+  slideGain: 1.06,
   /** s between slides (so it cannot be spammed in place) */
-  slideCooldown: 0.25,
+  slideCooldown: 0.6,
   respawnDelay: 3000,
   /** ms without taking damage before regenerating */
   regenDelay: 5000,

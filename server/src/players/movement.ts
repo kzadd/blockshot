@@ -3,6 +3,7 @@
 import {
   BTN_AIM,
   CHAR_BY_ID,
+  climbables,
   FIXED_DT,
   MAX_QUEUED_INPUTS,
   MAX_SIM_BUDGET_S,
@@ -41,6 +42,7 @@ function stepPlayer(room: Room, p: Player, input: MoveInput): void {
     adsMove: w?.adsMove ?? 1,
     fallback: spawn ? [spawn[0], spawn[1], spawn[2]] : [0, 0, 0],
     dash: CHAR_BY_ID[p.characterId].ability === 'dash',
+    ...climbables(room.map),
   });
   const m = p.move;
   p.x = m.x;

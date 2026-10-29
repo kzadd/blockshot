@@ -9,6 +9,7 @@ import type {
 } from '@blockshot/shared';
 import type { Deployable } from '../combat/abilities';
 import type { Grenade } from '../combat/grenades';
+import type { WorldObjects } from '../combat/worldObjects';
 import type { Tournament } from '../match/tournament';
 import type { GameMode } from '../modes/gameMode';
 import type { Player } from '../players/player';
@@ -53,6 +54,8 @@ export interface Room {
   grenades: Grenade[];
   /** smoke clouds, mines and cover walls (abilities) */
   deployables: Deployable[];
+  /** barrels, crates and pickups of the map (worldObjects.ts) */
+  world: WorldObjects;
   /** the admin closed the room: nobody new can join */
   closed: boolean;
   /** names the admin kicked: they cannot come back to this room */

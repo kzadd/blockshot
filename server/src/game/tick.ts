@@ -9,6 +9,7 @@ import {
 } from '@blockshot/shared';
 import { deployableSnapshot } from '../combat/abilities';
 import { grenadeSnapshot } from '../combat/grenades';
+import { objectsSnapshot } from '../combat/worldObjects';
 import { sendAcks } from '../players/movement';
 import type { Player } from '../players/player';
 import { autoBalance, isTeamRoom } from '../players/teams';
@@ -77,6 +78,7 @@ export function buildSnapshot(room: Room, now: number): StateSnapshot {
     inf: mode.inf ?? null,
     gr: grenadeSnapshot(room),
     dp: deployableSnapshot(room),
+    wo: objectsSnapshot(room),
     dz: mode.dz ?? null,
     rd: mode.rd ?? null,
   };

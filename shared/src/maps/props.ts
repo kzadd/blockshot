@@ -9,6 +9,9 @@ export const TREE: PropPart[] = [
 ];
 export const LAMP: PropPart[] = [[0, 0, 0, 0.25, 4.2, 0.25, 'lamp']];
 export const CACTUS: PropPart[] = [[0, 0, 0, 0.45, 2.3, 0.45, 'cactus']];
+/** A pine: only its trunk blocks (the branches are decoration). */
+export const PINE: PropPart[] = [[0, 0, 0, 0.6, 6, 0.6, 'pine']];
+export const LOGS: PropPart[] = [[0, 0, 0, 3, 1.4, 1.6, 'logs']];
 export const sandbags = (w: number, d: number): PropPart[] => [[0, 0, 0, w, 0.95, d, 'sandbag']];
 export const PALLET: PropPart[] = [
   [0, 0, 0, 1.2, 0.15, 1.2, 'pallet'],

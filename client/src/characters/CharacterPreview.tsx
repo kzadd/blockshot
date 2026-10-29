@@ -14,7 +14,7 @@ const MAX_PIXEL_RATIO = 1.5;
 const TURN_SECONDS = 8;
 const DRAG_SPEED = 0.012;
 const MAX_DT = 0.05;
-const GUN_SCALE = 1.3;
+const GUN_SCALE = 1.05;
 const AIM_TILT = 0.12;
 /** Arma tab: both guns up close, one above the other. */
 const SHOWCASE_SCALE = 2.2;

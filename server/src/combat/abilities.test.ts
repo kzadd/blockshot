@@ -10,12 +10,13 @@ import {
   WALL,
   createMoveState,
   getColliders,
+  liveColliders,
   getMap,
   stepMovement,
   type Collider,
 } from '@blockshot/shared';
 import { makeRoom } from '../testing/fakeRoom';
-import { shieldBlocks, smokeBlocks, tickAbilities, useAbility } from './abilities';
+import { shieldBlocks, shootMines, smokeBlocks, tickAbilities, useAbility } from './abilities';
 import { launchRound, tickGrenades } from './grenades';
 
 const LOOK_NORTH: [number, number, number] = [0, 0, -1];
@@ -31,11 +32,11 @@ describe('abilities', () => {
     expect(useAbility(r.room, a, [0, 1.6, 30], LOOK_NORTH, now)).toBe(true);
     const wall = r.room.deployables.find((d) => d.kind === 'wall')!;
     expect(wall.pos[2]).toBeCloseTo(30 - WALL.dist);
-    expect(r.room.colliders.length).toBe(getColliders(r.room.map).length + 1);
+    expect(r.room.colliders.length).toBe(liveColliders(r.room.map).length + 1);
     expect(useAbility(r.room, a, [0, 1.6, 30], LOOK_NORTH, now + 1000)).toBe(false); // cooldown
     tickAbilities(r.room, now + WALL.durationMs + 1);
     expect(r.room.deployables).toHaveLength(0);
-    expect(r.room.colliders.length).toBe(getColliders(r.room.map).length);
+    expect(r.room.colliders.length).toBe(liveColliders(r.room.map).length);
   });
 
   it('wall: never on top of a player (no sitio), and the cooldown is not spent', () => {
@@ -70,6 +71,23 @@ describe('abilities', () => {
     expect(rival.alive).toBe(true);
     expect(rival.hp).toBeLessThan(rival.maxHp);
     expect(rival.hp).toBeGreaterThan(0);
+  });
+
+  it('mine: a rival shoots it away; a shot from a teammate does not', () => {
+    const r = makeRoom('teams');
+    const hunter = r.join('Caza', 0, 30, 'cazador');
+    const mate = r.join('Mate', 20, 30);
+    const rival = r.join('Riva', 20, 20);
+    if (mate.team !== hunter.team) [mate.team, rival.team] = [hunter.team, mate.team];
+    useAbility(r.room, hunter, [0, 1.6, 30], LOOK_NORTH, Date.now());
+    // Shooting down at it from 5 m away
+    const d: [number, number, number] = [0, -1.5 / Math.hypot(1.5, 5), -5 / Math.hypot(1.5, 5)];
+    shootMines(r.room, mate, [0, 1.6, 35], d, 50);
+    expect(r.room.deployables).toHaveLength(1);
+    shootMines(r.room, rival, [0, 1.6, 35], d, 2); // the shot stops before reaching it
+    expect(r.room.deployables).toHaveLength(1);
+    shootMines(r.room, rival, [0, 1.6, 35], d, 50);
+    expect(r.room.deployables).toHaveLength(0);
   });
 
   it('shield: blocks shots from the front only, for a few seconds', () => {

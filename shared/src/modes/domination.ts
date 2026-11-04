@@ -27,6 +27,52 @@ const SIDE_ZONE_X = 0.5;
 const SEARCH_STEP = 1;
 const SEARCH_RADIUS = 0.4;
 
+/**
+ * Helpers to place mode objects (zones, bomb sites) on open ground of a map: the ground height under a zone
+ * square, whether that square is clear, and points in rings of growing radius around a centre (nearest first).
+ */
+export function openGround(map: GameMap) {
+  const colliders = getColliders(map);
+  const h = map.half;
+  // The ground a zone stands on: the highest box under the whole zone square (the map floor, a raised quay…)
+  const ground = (x: number, z: number) =>
+    Math.max(
+      0,
+      ...colliders
+        .filter(
+          (c) =>
+            c.max[1] < CLEAR_HEIGHT &&
+            c.min[0] <= x - CLEAR_HALF &&
+            c.max[0] >= x + CLEAR_HALF &&
+            c.min[2] <= z - CLEAR_HALF &&
+            c.max[2] >= z + CLEAR_HALF,
+        )
+        .map((c) => c.max[1]),
+    );
+  const clear = (x: number, z: number) => {
+    if (Math.abs(x) >= h - WALL_MARGIN || Math.abs(z) >= h - WALL_MARGIN) return false;
+    const g = ground(x, z);
+    return !colliders.some(
+      (c) =>
+        c.max[1] > g + 0.05 &&
+        c.min[1] < g + CLEAR_HEIGHT &&
+        c.max[0] > x - CLEAR_HALF &&
+        c.min[0] < x + CLEAR_HALF &&
+        c.max[2] > z - CLEAR_HALF &&
+        c.min[2] < z + CLEAR_HALF,
+    );
+  };
+  const around = function* (cx: number, cz: number) {
+    yield [cx, cz] as const;
+    for (let r = SEARCH_STEP; r <= h * SEARCH_RADIUS; r += SEARCH_STEP) {
+      const n = Math.ceil((2 * Math.PI * r) / SEARCH_STEP);
+      for (let i = 0; i < n; i++)
+        yield [cx + r * Math.cos((i / n) * 2 * Math.PI), cz + r * Math.sin((i / n) * 2 * Math.PI)] as const;
+    }
+  };
+  return { ground, clear, around };
+}
+
 const cache = new WeakMap<GameMap, Vec3[]>();
 
 /**
@@ -37,33 +83,12 @@ const cache = new WeakMap<GameMap, Vec3[]>();
 export function dominationZones(map: GameMap): Vec3[] {
   const known = cache.get(map);
   if (known) return known;
-  const colliders = getColliders(map);
+  const { ground, clear, around } = openGround(map);
   const h = map.half;
-  const clear = (x: number, z: number) =>
-    Math.abs(x) < h - WALL_MARGIN &&
-    Math.abs(z) < h - WALL_MARGIN &&
-    !colliders.some(
-      (c) =>
-        c.max[1] > 0.05 &&
-        c.min[1] < CLEAR_HEIGHT &&
-        c.max[0] > x - CLEAR_HALF &&
-        c.min[0] < x + CLEAR_HALF &&
-        c.max[2] > z - CLEAR_HALF &&
-        c.min[2] < z + CLEAR_HALF,
-    );
-  // Rings of growing radius around a point, nearest first
-  const around = function* (cx: number, cz: number) {
-    yield [cx, cz] as const;
-    for (let r = SEARCH_STEP; r <= h * SEARCH_RADIUS; r += SEARCH_STEP) {
-      const n = Math.ceil((2 * Math.PI * r) / SEARCH_STEP);
-      for (let i = 0; i < n; i++)
-        yield [cx + r * Math.cos((i / n) * 2 * Math.PI), cz + r * Math.sin((i / n) * 2 * Math.PI)] as const;
-    }
-  };
   let a: Vec3 = [-SIDE_ZONE_X * h, 0, 0];
   for (const [x, z] of around(-SIDE_ZONE_X * h, 0)) {
     if (x < -CLEAR_HALF && clear(x, z) && clear(-x, z)) {
-      a = [x, 0, z];
+      a = [x, ground(x, z), z];
       break;
     }
   }
@@ -71,11 +96,39 @@ export function dominationZones(map: GameMap): Vec3[] {
   for (let k = 0; k <= h * SEARCH_RADIUS * 2; k += SEARCH_STEP) {
     const z = [k, -k].find((zz) => clear(0, zz));
     if (z !== undefined) {
-      b = [0, 0, z];
+      b = [0, ground(0, z), z];
       break;
     }
   }
-  const zones: Vec3[] = [a, b, [-a[0], 0, a[2]]];
+  // C mirrors A's spot but stands on its own ground (a map that is not quite symmetric there)
+  const zones: Vec3[] = [a, b, [-a[0], ground(-a[0], a[2]), a[2]]];
   cache.set(map, zones);
   return zones;
+}
+
+export const SITE_NAMES = ['A', 'B'] as const;
+/** Bomb sites are looked for this fraction of the half side north and south of the centre of Blue's half. */
+const SITE_Z = 0.5;
+const siteCache = new WeakMap<GameMap, [Vec3, Vec3]>();
+
+/**
+ * Bomb sites A (north, z < 0) and B (south) on Blue's half (x > 0), on open ground. Deterministic, like the
+ * domination zones.
+ */
+export function bombSites(map: GameMap): [Vec3, Vec3] {
+  const known = siteCache.get(map);
+  if (known) return known;
+  const { ground, clear, around } = openGround(map);
+  const h = map.half;
+  const site = (sign: number): Vec3 => {
+    const cx = SIDE_ZONE_X * h;
+    const cz = sign * SITE_Z * h;
+    for (const [x, z] of around(cx, cz)) {
+      if (x > CLEAR_HALF && sign * z > CLEAR_HALF && clear(x, z)) return [x, ground(x, z), z];
+    }
+    return [cx, 0, cz];
+  };
+  const sites: [Vec3, Vec3] = [site(-1), site(1)];
+  siteCache.set(map, sites);
+  return sites;
 }

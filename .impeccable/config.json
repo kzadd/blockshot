@@ -1,0 +1,22 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": ["client/.impeccable/mocks/propuesta/proto.css"],
+        "createdAt": "2026-10-27T19:16:04.028Z",
+        "reason": "Claude: team-colour underline on the scorebug (rojo/azul) is a domain convention in shooters, not a card accent; same exception as the client-relative entry"
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": ["client/.impeccable/mocks/propuesta/index.html"],
+        "createdAt": "2026-10-27T19:16:04.167Z",
+        "reason": "Claude: segmented control buttons fill their frame by design; same exception as the client-relative entry"
+      }
+    ]
+  }
+}

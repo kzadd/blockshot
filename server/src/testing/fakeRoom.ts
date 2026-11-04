@@ -1,11 +1,5 @@
 // Test helpers: real rooms and players, with a recording channel instead of Socket.IO.
-import {
-  CHAR_BY_ID,
-  createMoveState,
-  type CharacterId,
-  type ModeId,
-  type ServerToClientEvents,
-} from '@blockshot/shared';
+import { createMoveState, type ClassChoice, type ModeId, type ServerToClientEvents } from '@blockshot/shared';
 import type { Player } from '../players/player';
 import { spawnPlayer } from '../players/spawn';
 import { RoomRegistry } from '../rooms/registry';
@@ -43,11 +37,11 @@ export function makeRoom(mode: ModeId, scoreLimit?: number, mapId = 'patio', siz
   const room = registry.create({ mode, mapId, size, ...(scoreLimit !== undefined ? { scoreLimit } : {}) }, 'Host');
   let n = 0;
   /** Joins a player (team from the mode) and spawns it at (x, z) on the floor, protection off. */
-  const join = (name: string, x = 0, z = 0, character: CharacterId = 'soldado'): Player => {
+  const join = (name: string, x = 0, z = 0, cls?: ClassChoice): Player => {
     const id = `p${++n}`;
     registry.addPlayer(room, id, name);
     const p = room.players.get(id)!;
-    spawnPlayer(room, p, CHAR_BY_ID[character], 'base');
+    spawnPlayer(room, p, { ...cls, skin: 'base' });
     place(p, x, z);
     p.protUntil = 0;
     return p;

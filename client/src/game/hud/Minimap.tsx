@@ -12,6 +12,12 @@ export interface MinimapView {
   flags: { x: number; z: number; team: SideTeam }[];
   /** Domination zones: letter in the owner's colour */
   zones: { x: number; z: number; owner: number; letter: string }[];
+  /** health and armour lying on the floor now */
+  pickups: { x: number; z: number; k: 'hp' | 'armor' }[];
+  /** the power weapon lying on the map */
+  power: { x: number; z: number } | null;
+  /** Bomb mode: the bomb (carried, dropped or planted) */
+  bomb: { x: number; z: number } | null;
 }
 export interface MinimapSource {
   minimap(now: number): MinimapView;
@@ -118,6 +124,38 @@ export default function Minimap({
         g.stroke();
       }
 
+      // Health (green cross) and armour (blue square) on the floor
+      for (const pk of view.pickups) {
+        const x = toPx(pk.x);
+        const y = toPx(pk.z);
+        g.fillStyle = INK;
+        g.fillRect(x - 5, y - 5, 10, 10);
+        g.fillStyle = pk.k === 'hp' ? '#46d37f' : '#4c9dff';
+        if (pk.k === 'hp') {
+          g.fillRect(x - 1.5, y - 4, 3, 8);
+          g.fillRect(x - 4, y - 1.5, 8, 3);
+        } else g.fillRect(x - 3.5, y - 3.5, 7, 7);
+      }
+
+      // Power weapon: an orange star-like diamond with a ring
+      if (view.power) {
+        const x = toPx(view.power.x);
+        const y = toPx(view.power.z);
+        g.beginPath();
+        g.arc(x, y, 9, 0, Math.PI * 2);
+        g.strokeStyle = '#ff7a1a';
+        g.lineWidth = 2;
+        g.stroke();
+        g.beginPath();
+        g.moveTo(x, y - 6);
+        g.lineTo(x + 5, y);
+        g.lineTo(x, y + 6);
+        g.lineTo(x - 5, y);
+        g.closePath();
+        g.fillStyle = '#ff7a1a';
+        g.fill();
+      }
+
       // Domination: zone letters in their owner's colour
       for (const zn of view.zones) {
         const x = toPx(zn.x);
@@ -130,10 +168,24 @@ export default function Minimap({
         g.strokeStyle = INK;
         g.stroke();
         g.fillStyle = INK;
-        g.font = '700 10px Bungee, sans-serif';
+        g.font = "10px 'Black Ops One', sans-serif";
         g.textAlign = 'center';
         g.textBaseline = 'middle';
         g.fillText(zn.letter, x, y + 1);
+      }
+
+      // Bomb: a black disc with a red core, always visible
+      if (view.bomb) {
+        const x = toPx(view.bomb.x);
+        const y = toPx(view.bomb.z);
+        g.beginPath();
+        g.arc(x, y, 5.5, 0, Math.PI * 2);
+        g.fillStyle = INK;
+        g.fill();
+        g.beginPath();
+        g.arc(x, y, 3, 0, Math.PI * 2);
+        g.fillStyle = '#ff3b30';
+        g.fill();
       }
 
       // Capture the flag: flags always visible (they follow their carrier)
@@ -152,7 +204,7 @@ export default function Minimap({
         g.translate(toPx(view.me.x), toPx(view.me.z));
         g.rotate(-view.me.yaw);
         arrow(22, 24, INK);
-        arrow(14, 16, '#ffc531');
+        arrow(14, 16, '#ff7a1a');
         g.restore();
       }
     };

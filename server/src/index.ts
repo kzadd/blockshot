@@ -5,7 +5,10 @@ import { Server } from 'socket.io';
 import msgpackParser from 'socket.io-msgpack-parser';
 import { FIXED_DT, SIM_STEPS_PER_TICK } from '@blockshot/shared';
 import { serverConfig } from './config';
+import { tickAbilities } from './combat/abilities';
 import { tickGrenades } from './combat/grenades';
+import { tickStrikes } from './combat/strike';
+import { tickWorld } from './combat/worldObjects';
 import { startFixedLoop } from './game/loop';
 import { snapshotRoom } from './game/tick';
 import { createApp } from './http/app';
@@ -15,6 +18,7 @@ import { announce, findLanAddress, printBanner } from './network/lan';
 import { tickBots } from './players/bot';
 import { simulateRoom } from './players/movement';
 import { RoomRegistry } from './rooms/registry';
+import { loadRanking } from './stats/ranking';
 import type { RoomChannel } from './rooms/room';
 
 /** Every game message is a few hundred bytes; bigger ones are refused before being decoded. */
@@ -41,6 +45,8 @@ const channelFor = (roomId: string): RoomChannel => ({
   to: (playerId, event, args) => io.to(playerId).emit(event, ...args),
 });
 
+loadRanking(serverConfig.rankingFile, logger);
+
 const rooms = new RoomRegistry(channelFor, {
   changed: () => io.to(LOBBY_CHANNEL).emit('rooms', rooms.list()),
 });
@@ -56,6 +62,9 @@ startFixedLoop(FIXED_DT * MS_PER_S, (now) => {
       tickBots(room, now);
       simulateRoom(room, FIXED_DT, now);
       tickGrenades(room, FIXED_DT, now);
+      tickAbilities(room, now);
+      tickWorld(room, now);
+      tickStrikes(room, now);
       if (snapshot) snapshotRoom(room, now);
     } catch (err) {
       logger.error({ err, room: room.id }, 'room tick failed');

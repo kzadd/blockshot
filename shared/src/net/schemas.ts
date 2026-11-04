@@ -2,8 +2,10 @@
 // Schemas check shape and types only; game rules (cooldowns, ranges, ammo…) are enforced by the server logic.
 import * as v from 'valibot';
 import { OUTFIT_COLOR_HEXES } from '../characters/characters';
+import { CAMOS, FINISHES } from '../characters/looks';
 import { VOTE_OPTIONS } from '../modes/modes';
 import { QUICK_CHAT } from '../modes/quickChat';
+import { TOUR_ROUNDS } from '../modes/tournament';
 
 const finite = v.pipe(v.number(), v.finite());
 const vec3 = v.tuple([finite, finite, finite]);
@@ -33,13 +35,37 @@ export const JoinRoomSchema = v.object({
 export const PingSchema = v.object({ rtt: v.optional(finite) });
 
 export const SpawnSchema = v.object({
-  characterId: text,
+  /** older clients still send a character: ignored (the class below is all there is) */
+  characterId: v.optional(text),
   skin: v.optional(text),
   /** outfit colour: one of OUTFIT_COLORS */
   color: v.optional(v.picklist(OUTFIT_COLOR_HEXES)),
+  /** uniform camouflage and guns' finish: cosmetic picks (shared/characters/looks) */
+  camo: v.optional(v.picklist(CAMOS.map((c) => c.id))),
+  finish: v.optional(v.picklist(FINISHES.map((f) => f.id))),
+  /** the class: checked part by part by the server (classOf), anything missing or unknown → the default's */
+  primary: v.optional(text),
+  secondary: v.optional(text),
+  ability: v.optional(text),
+  accessory: v.optional(text),
+});
+
+/** The in-match loadout menu: the class for the next respawn (checked part by part at that spawn, like SpawnSchema). */
+export const ClassSchema = v.object({
+  primary: v.optional(text),
+  secondary: v.optional(text),
+  ability: v.optional(text),
+  accessory: v.optional(text),
 });
 
 export const TeamSetSchema = v.object({ team: finite });
+
+/** Server PC only: the player an admin action is about (a socket id). */
+export const AdminTargetSchema = v.object({ id: text });
+/** Server PC only: move the room to this map and mode now (checked by the server). */
+export const AdminRoomSchema = v.object({ mapId: text, mode: text });
+export const AdminLockSchema = v.object({ locked: v.boolean() });
+export const TournamentSchema = v.object({ rounds: v.picklist([0, ...TOUR_ROUNDS]) });
 
 const int = v.pipe(v.number(), v.integer());
 /** At most this many commands per batch (0.5 s worth): more means a flooding or broken client. */
@@ -68,6 +94,8 @@ export const ShootSchema = v.object({
 });
 
 export const GrenadeSchema = v.object({ o: vec3, d: vec3 });
+/** key E: eye and look direction (where the smoke is thrown / the wall goes) */
+export const AbilitySchema = GrenadeSchema;
 
 export const BotAddSchema = v.optional(v.object({ level: v.optional(v.picklist(['easy', 'normal', 'hard'])) }));
 

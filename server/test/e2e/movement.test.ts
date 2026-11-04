@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { CHAR_BY_ID, WEAPONS, type MoveInput } from '@blockshot/shared';
+import { BODY, WEAPONS, type MoveInput } from '@blockshot/shared';
 import { Bot, sleep, startServer, type TestServer } from './harness';
 
 let server: TestServer;
@@ -25,8 +25,9 @@ async function solo(name: string) {
 describe('authoritative movement', () => {
   it('simulates jump pads on the server', async () => {
     const a = await solo('Pad');
-    // Patio jump pad at (4.6, 9): walk to just south of it and run north (yaw 0 looks towards -z)
-    await a.goTo(4.6, 12);
+    // Patio jump pad at (5.5, 6.6), south of the tower's east terrace: walk to just south of it and run north
+    // (yaw 0 looks towards -z)
+    await a.goTo(5.5, 9.6);
     let top = 0;
     const raw = a.s as unknown as { emit: (ev: string, d: unknown) => void };
     let seq = 1_000_000;
@@ -63,7 +64,7 @@ describe('authoritative movement', () => {
     }
     const seconds = (Date.now() - t0) / 1000;
     const dist = Math.hypot(a.pos.x - start.x, a.pos.z - start.z);
-    const walk = CHAR_BY_ID.soldado.speed * WEAPONS.rifle.weight;
+    const walk = BODY.speed * WEAPONS.rifle.weight;
     // Real time plus the jitter bank, never three times as far
     expect(dist).toBeLessThan(walk * (seconds + 0.5));
   });

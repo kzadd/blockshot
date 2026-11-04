@@ -1,6 +1,6 @@
 // Statistics since the server started, per player name across every room and match. Only the server's own PC
 // can read them (pause menu): they show who plays what, which is how the teacher checks the balance.
-import type { CharacterId, SessionStatsRow } from '@blockshot/shared';
+import type { SessionStatsRow, WeaponId } from '@blockshot/shared';
 import { isBot } from '../players/bot';
 import type { Player } from '../players/player';
 import type { Room } from '../rooms/room';
@@ -18,7 +18,7 @@ function add(into: Totals, p: Player): void {
   into.hits += p.hits;
   into.heads += p.heads;
   into.medals += p.medals;
-  for (const [id, n] of Object.entries(p.picks) as [CharacterId, number][]) into.picks[id] = (into.picks[id] ?? 0) + n;
+  for (const [id, n] of Object.entries(p.picks) as [WeaponId, number][]) into.picks[id] = (into.picks[id] ?? 0) + n;
 }
 
 /** Keeps a player's match counters: call it right before they are reset or the player leaves. */

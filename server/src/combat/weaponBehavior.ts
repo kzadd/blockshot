@@ -49,7 +49,7 @@ function meleeAssist(w: Weapon, { origin: o, dir: d, colliders, targets }: Trace
     if ((v[0] * d[0] + v[1] * d[1] + v[2] * d[2]) / dist < MELEE_ASSIST_DOT) continue;
     const toTarget: Vec3 = [v[0] / dist, v[1] / dist, v[2] / dist];
     if (colliders.some((b) => rayAABB(o, toTarget, b.min, b.max) < dist)) continue;
-    best = { t: dist, hit: { type: 'player', id: t.id, head: false } };
+    best = { t: dist, hit: { type: 'player', id: t.id, head: false, zone: 'torso' } };
   }
   return best;
 }

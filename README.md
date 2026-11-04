@@ -58,11 +58,13 @@ pasan por Husky: lint-staged (ESLint + Prettier) y commitlint (conventional comm
 
 1. Escribe tu nombre.
 2. Crea una sala (nombre, contraseña opcional, mapa, tamaño y máximo de jugadores) o entra en una de la lista. Las salas con 🔒 piden contraseña.
-3. Elige personaje y skin (se ven en 3D; arrastra para girarlos). Al morir reapareces solo a los 3 s con el mismo; pulsa **B** mientras estás muerto si quieres cambiarlo.
+3. Monta tu clase: arma principal, secundaria, habilidad (tecla **E**) y aspecto (cara, color, camuflaje y acabado; se
+   ve en 3D, arrastra para girarlo). Se guarda en el navegador como «Mi clase». Al morir reapareces solo a los 3 s
+   con ella; pulsa **B** mientras estás muerto si quieres cambiarla.
 4. **Modos** (quien crea la sala elige a cuántos puntos se juega):
    - **Todos contra todos:** gana el primero en llegar a las bajas elegidas (20 por defecto).
    - **Por equipos** (Rojo contra Azul: al entrar se te pone en el equipo con menos gente y puedes cambiarte en la
-     pantalla de personaje o con **T**): gana el primer equipo en llegar a las bajas elegidas, sin fuego amigo.
+     pantalla de clase o con **T**): gana el primer equipo en llegar a las bajas elegidas, sin fuego amigo.
    - **Captura la bandera:** roba la bandera rival y llévala a tu base con la tuya en casa.
    - **Escalada de armas:** todos llevan la misma arma y cada baja da la siguiente; gana quien elimine con el cuchillo.
    - **Confirmar bajas** (Rojo contra Azul): cada baja suelta una placa; si la recoge el equipo del que mató suma un
@@ -72,12 +74,18 @@ pasan por Husky: lint-staged (ESLint + Prettier) y commitlint (conventional comm
      los supervivientes, si aguantan los minutos elegidos (2, 3 o 5).
    - **Dominio** (Rojo contra Azul): tres zonas, A, B y C. Quédate en una sin rivales dentro para capturarla; cada 2 s
      tu equipo suma un punto por zona. Gana el primero en llegar a los puntos elegidos (100, 150 o 250).
-   - **Rondas** (Rojo contra Azul, vale para 1 contra 1): no se reaparece durante la ronda; gana la ronda el equipo que
+   - **Supervivencia** (Rojo contra Azul, vale para 1 contra 1): no se reaparece durante la ronda; gana la ronda el equipo que
      deje al otro sin nadie en pie (si se acaban los 2 min, el que tenga más gente viva). Gana quien gane 3, 5 o 7 rondas.
+   - **Último en pie:** todos contra todos, individual y sin reapariciones; la ronda es para el último superviviente.
+   - **Disparo único:** todos contra todos con railgun de munición infinita y cuchillo: cualquier impacto mata.
+   - **Congelados** (Rojo contra Azul): quien cae queda congelado hasta que un compañero pase 3 s a su lado; gana
+     la ronda el equipo que congele a todos los rivales.
+   - **Bomba:** Rojo planta la bomba en A o B y Azul defiende o la desactiva. Una vida por ronda.
+   - **Carrera de saltos:** solo en Circuito; acrobacias y saltos del inicio a la meta, con armas para derribar rivales.
 
    Al terminar, durante 12 s se ve el resultado y se **vota** la siguiente partida entre tres mapas y modos (si nadie
    vota, se repite la misma). En los modos por equipos, los equipos se **equilibran** solos según la partida anterior.
-   Todos los personajes llevan cuchillo (tecla **3**); por la espalda mata de un golpe, y una **granada** por vida.
+   Todas las clases llevan cuchillo (tecla **3**); por la espalda mata de un golpe, y una **granada** por vida.
    Al morir ves una **repetición** de tus últimos segundos desde los ojos de quien te eliminó. Las bajas especiales dan
    **medallas** (primera sangre, doble y triple baja, venganza, desde el aire, por la espalda y tiro lejano).
 
@@ -93,11 +101,11 @@ pasan por Husky: lint-staged (ESLint + Prettier) y commitlint (conventional comm
 | G                 | Lanzar la granada (una por vida; rebota, explota a los 2 s y las paredes cubren)                   |
 | 1 / 2 / Q / rueda | Cambiar de arma                                                                                    |
 | Tab               | Marcador                                                                                           |
-| B                 | Cambiar de personaje (solo estando muerto)                                                         |
+| B                 | Cambiar de clase o de equipo (solo estando muerto)                                                 |
 | T                 | Cambiar de equipo (por equipos; espera 5 s entre cambios y no vale en pleno combate)               |
 | V y 1–8           | Chat rápido: frases fijas (las tácticas solo las ve tu equipo)                                     |
 | O                 | Ajustes: mira (6 estilos, color, tamaño…), sensibilidad, campo de visión y volumen                 |
-| H / F1            | Manual del juego (controles, personajes, armas y trucos)                                           |
+| H / F1            | Manual del juego (controles, clases, armas y trucos)                                               |
 | Esc               | Pausa (soltar el ratón); otro Esc vuelve al juego                                                  |
 
 **Ctrl+W no cierra el juego:** al pulsar "Jugar" el juego pasa siempre a pantalla completa y bloquea los atajos
@@ -112,33 +120,38 @@ aterrizar** (slide-hop) gana un poco de velocidad cada vez. En el aire la veloci
 de un tope suave, se frena poco a poco. Todo se ajusta en `PLAYER` (`softCap`, `maxSpeed`, `slideTime`, `slideGain`…).
 
 **Plataformas de salto:** las placas verdes del suelo lanzan a unos 5,5 m de altura conservando la velocidad. Hay en
-todos los mapas (junto a la torre del Patio, ante las entreplantas del Almacén, al pie de las mesetas del Desfiladero, en
-el medio de Polvo y en las calles de Ciudad). Para poner una en un mapa nuevo: `pad(B, x, z)`.
+varios mapas (junto a la torre del Patio, en los patios del Casco Viejo, junto al claustro del Monasterio…). Para poner
+una en un mapa nuevo: `pad(B, x, z)`.
 
 **Recompensas por racha:** con 5 bajas seguidas, **Radar** (12 s viendo a todos los enemigos en el minimapa, tú y tu
 equipo); con 7, **Blindaje** (+50 que se gasta antes que la vida y no se regenera). Se configuran en `STREAK_REWARDS`.
 No hay en Infectados.
 
-**Armas:** las pesadas (francotirador, ametralladora) frenan al llevarlas en la mano; saca la secundaria para correr.
+**Armas:** las pesadas (SR8, M60, bazuca) frenan al llevarlas en la mano; saca la secundaria para correr.
 Apuntar tarda un momento (más con las pesadas) y la precisión llega al terminar de subir el arma. Casi todas pierden
-daño con la distancia. El francotirador hace 120 al cuerpo y 240 a la cabeza: de un tiro al cuerpo mata a todos menos al Tanque (140 de vida), al que hay que darle en la cabeza; tras
-cada disparo hay que volver a apuntar (cerrojo), y si te mueves o saltas con la mira puesta el tiro se desvía.
+daño con la distancia. El SR8 hace 120 al cuerpo y 240 a la cabeza: de un tiro al cuerpo mata a cualquiera; el FR-F1
+(85) necesita la cabeza. Tras cada disparo hay que volver a apuntar (cerrojo), y si te mueves o saltas con la mira
+puesta el tiro se desvía.
 
 En pantalla: **minimapa** (aliados en verde; los enemigos solo aparecen en rojo 2 s después de disparar),
 **números de daño** al acertar, **rachas** (3, 5, 7 y 10 bajas seguidas) en el killfeed, indicador de dirección
 del daño y el **ping** arriba. En el marcador (Tab) se ven bajas, muertes, racha y ping de cada jugador.
 
-## Personajes
+## Clases
 
-Más vida = más lento. La velocidad (m/s) es con la principal / con la secundaria en la mano.
+Todos tienen el mismo cuerpo: 100 de vida y 7,3 m/s por el peso del arma que llevas en la mano. Cada jugador monta
+una clase (se empieza con M4 + Beretta 92G + Humo) y el servidor comprueba cada parte (lo que no vale vuelve a la de
+por defecto).
 
-| Personaje | Vida | Velocidad | Principal       | Secundaria |
-| --------- | ---- | --------- | --------------- | ---------- |
-| Rayo      | 90   | 8.6 / 8.9 | Subfusil        | Pistola    |
-| Cazador   | 90   | 7.2 / 7.8 | Francotirador   | Pistola    |
-| Soldado   | 100  | 7.1 / 7.5 | Rifle de asalto | Pistola    |
-| Bastión   | 120  | 6.6 / 7.3 | Ametralladora   | Revólver   |
-| Tanque    | 140  | 6.5 / 6.8 | Escopeta        | Revólver   |
+| Hueco      | Opciones                                                                                              |
+| ---------- | ----------------------------------------------------------------------------------------------------- |
+| Principal  | Fusiles (M4, AK103, LR300, G36), precisión (SR8, FR-F1, PSG1), subfusiles (MP5K, UMP45, P90, MAC-11), |
+|            | escopetas (SPAS-12, Benelli, Recortada), ametralladoras (M60, Negev), explosivos (Bazuca, HK69) o una |
+|            | pistola                                                                                               |
+| Secundaria | Beretta 92G, Colt 1911, Desert Eagle, Magnum, Glock 18                                                |
+| Habilidad  | Humo, Mina trampa, Escudo (disparar lo baja), Impulso, Radar, Botiquín (solo a cubierto), Muro        |
+
+El equipo que lleva el muñeco depende de la habilidad (el escudo, la armadura pesada; el impulso, el de corredor…).
 
 ## Estructura
 
@@ -146,7 +159,7 @@ Más vida = más lento. La velocidad (m/s) es con la principal / con la secundar
 shared/src/             ← lo que comparten servidor y cliente (aquí se balancea el juego)
   player/               PLAYER (movimiento, vida…) y PAD (plataformas de salto)
   weapons/              WEAPONS y WEAPON_HANDLING (dispersión, retroceso…)
-  characters/           CHARACTERS y SKINS
+  characters/           clases (BODY, PRIMARY_FAMILIES, SIDEARMS, DEFAULT_CLASS) y SKINS
   modes/                MODES, escaleras de armas, CTF, placas, infectados, rachas
   maps/                 un archivo por mapa en builders/, getMap
   movement/             simulación de movimiento determinista (la usan servidor y cliente)
@@ -201,8 +214,9 @@ client/src/
   baja, `tick`…), una línea en `server/src/modes/index.ts`, su entrada en `MODES` (`shared/src/modes`) y su
   presentación en `client/src/game/modeUi.ts`.
 - **Ajustes y mira:** valores por defecto en `client/src/settings/settingsStore.ts`; se guardan en el navegador.
-- **Mapas:** hay seis (Patio, Almacén, Desfiladero, Polvo, Ciudad y Obra) en tres tamaños (pequeño 52 m, mediano 80 m,
-  grande 112 m). Cada mapa es una función en `shared/src/maps/builders/` que recibe `H` (mitad del lado) y coloca cajas
+- **Mapas:** hay diez (Patio, Autopista, Monasterio, Pueblo, Casco Viejo, Obra, Puerto, Circuito, Estación y Nevada),
+  todos de un solo tamaño (80 × 80 m, `H` = 40), hechos a mano. Cada mapa es una función en
+  `shared/src/maps/builders/` que recibe `H` (mitad del lado) y coloca cajas
   con `B(x, y, z, ancho, alto, fondo, tipo)` (x/z = centro, y = base) y spawns con `S(x, z)`. Para añadir uno, escribe
   su función y regístrala en `MAP_DEFS` (`shared/src/maps/maps.ts`). Todo lo que sea caja tiene colisión y bloquea
   balas. Si cambias un mapa a propósito, actualiza su huella en `shared/src/maps/golden.test.ts`.

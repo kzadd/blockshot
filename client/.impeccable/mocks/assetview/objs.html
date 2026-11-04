@@ -1,0 +1,43 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Map objects view</title>
+<style>
+  body {
+    margin: 0;
+    background: #222;
+    display: flex;
+    flex-wrap: wrap;
+  }
+</style>
+<script type="module">
+  // Temporary: views of a map with its objects (?map=puerto&v=x,y,z,tx,ty,tz;...)
+  import * as THREE from 'three';
+  import { getMap } from '@blockshot/shared';
+  import { buildWorld } from '/src/game/render/world.ts';
+  import { MapObjects } from '/src/game/engine/mapObjects.ts';
+  const q = new URLSearchParams(location.search);
+  const map = getMap(q.get('map') || 'puerto', 'm');
+  const W = 960,
+    H = 540;
+  const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  r.setSize(W, H);
+  r.shadowMap.enabled = true;
+  r.toneMapping = THREE.ACESFilmicToneMapping;
+  r.outputColorSpace = THREE.SRGBColorSpace;
+  const scene = new THREE.Scene();
+  buildWorld(scene, map, 1024);
+  const objs = new MapObjects(scene, map);
+  await new Promise((res) => setTimeout(res, 4000));
+  objs.update(performance.now());
+  for (const v of (q.get('v') || '0,12,30,0,2,0').split(';')) {
+    const [x, y, z, tx, ty, tz] = v.split(',').map(Number);
+    const cam = new THREE.PerspectiveCamera(70, W / H, 0.05, 400);
+    cam.position.set(x, y, z);
+    cam.lookAt(tx, ty, tz);
+    r.render(scene, cam);
+    const img = new Image();
+    img.src = r.domElement.toDataURL();
+    document.body.append(img);
+  }
+  document.title = 'done';
+</script>

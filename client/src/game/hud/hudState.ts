@@ -1,5 +1,7 @@
 import type {
-  CharacterId,
+  AbilityId,
+  AccessoryId,
+  BombSnapshot,
   DomSnapshot,
   FlagSnapshot,
   InfectSnapshot,
@@ -8,6 +10,7 @@ import type {
   RoundSnapshot,
   SideTeam,
   Team,
+  WeaponId,
 } from '@blockshot/shared';
 
 /** Screen angle (radians, 0 = ahead, positive = right) of something around the player. */
@@ -24,33 +27,60 @@ export interface SoundMark extends ScreenMark {
 }
 
 /** A player as the HUD sees it: no positions (they change every tick and the HUD does not need them). */
-export type HudPlayer = Pick<PlayerSnapshot, 'id' | 'n' | 'c' | 'k' | 'd' | 'tm' | 'pg' | 'st' | 'cp' | 'lv' | 'md'>;
+export type HudPlayer = Pick<PlayerSnapshot, 'id' | 'n' | 'ab' | 'k' | 'd' | 'tm' | 'pg' | 'st' | 'cp' | 'lv' | 'md'>;
+
+/** The player followed while spectating; `target` null: nobody to watch (overview of the map). */
+export interface SpectateView {
+  target: {
+    name: string;
+    team: Team;
+    /** their class's ability (null before their first spawn) */
+    ability: AbilityId | null;
+    hp: number;
+    maxHp: number;
+    weapon: string | null;
+  } | null;
+}
 
 /** Everything the HUD shows, published by the engine a few times per second. */
 export interface HudState {
   alive: boolean;
   everSpawned: boolean;
   locked: boolean;
-  /** quick chat menu open */
-  chatOpen: boolean;
   /** grenades left this life */
   grenades: number;
   /** Domination zones */
   zones: DomSnapshot[] | null;
   /** Rounds: phase, round number and time left */
   round: RoundSnapshot | null;
+  /** Bomb mode: the bomb */
+  bomb: BombSnapshot | null;
   /** the death replay is playing */
   replay: boolean;
+  /** dead for the rest of the round: whom the camera follows (null while not spectating) */
+  spectate: SpectateView | null;
   hp: number;
   maxHp: number;
-  /** the health block shows the character's name and colour */
-  characterId: CharacterId | undefined;
-  // TODO(review): posible código muerto: the v3 HUD no longer shows the character name
-  charName: string | undefined;
   /** 0..1, null when stamina is disabled */
   stamina: number | null;
   staminaLow: boolean;
   sprinting: boolean;
+  /** 0..1 speed lines at the screen edges (slides and chained hops) */
+  speedFx: number;
+  /** the character's ability (key E) and ms until it is ready */
+  ability: { id: AbilityId; left: number } | null;
+  /** the class's accessory (shown next to the ability), null while dead */
+  accessory: AccessoryId | null;
+  /** ms left of our shield (Tanque), 0 when down */
+  shield: number;
+  /** the shield just stopped a bullet */
+  shieldHit: boolean;
+  /** fully aimed: the weapon whose sight the HUD draws (the 3D gun steps aside) */
+  adsSight: WeaponId | null;
+  /** 0..1: we are inside a smoke cloud */
+  smoke: number;
+  /** G held: aiming the grenade */
+  grenadeAim: boolean;
   armor: number;
   radar: boolean;
   infect: InfectSnapshot | null;

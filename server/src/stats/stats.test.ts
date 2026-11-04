@@ -1,8 +1,13 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MATCH_RESTART_MS, MULTI_KILL_MS, WEAPONS } from '@blockshot/shared';
 import { applyDamage } from '../combat/damage';
+import type { Logger } from '../logger';
 import type { Player } from '../players/player';
 import { makeRoom, type FakeRoom } from '../testing/fakeRoom';
+import { loadRanking, rankingRows, recordMatch } from './ranking';
 import { resetSessionStats, sessionStats } from './sessionStats';
 
 const at: [number, number, number] = [0, 1, 0];
@@ -56,7 +61,7 @@ describe('session stats', () => {
   it('adds up finished matches and the live one, per name, without bots or double counting', () => {
     const r = makeRoom('ffa', 2);
     const a = r.join('Ana');
-    const b = r.join('Beto', 3, 0, 'rayo');
+    const b = r.join('Beto', 3, 0, { primary: 'smg', ability: 'dash' });
     kill(r, a, b);
     revive(b);
     kill(r, a, b); // limit reached: the match ends
@@ -64,9 +69,47 @@ describe('session stats', () => {
     revive(b);
     kill(r, b, a);
     const rows = sessionStats([r.room]);
-    expect(rows.find((x) => x.name === 'Ana')).toMatchObject({ kills: 2, deaths: 1, picks: { soldado: 1 } });
-    expect(rows.find((x) => x.name === 'Beto')).toMatchObject({ kills: 1, deaths: 2, picks: { rayo: 1 } });
+    expect(rows.find((x) => x.name === 'Ana')).toMatchObject({ kills: 2, deaths: 1, picks: { rifle: 1 } });
+    expect(rows.find((x) => x.name === 'Beto')).toMatchObject({ kills: 1, deaths: 2, picks: { smg: 1 } });
     r.registry.removePlayer(r.room, b.id);
     expect(sessionStats([r.room]).find((x) => x.name === 'Beto')).toMatchObject({ kills: 1, deaths: 2 });
+  });
+});
+
+describe('ranking favourite weapon', () => {
+  const quiet = { info: () => {}, error: () => {} } as unknown as Logger;
+  let dir: string;
+  beforeEach(() => (dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rank-'))));
+  afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  it('old files load without favourites; picks and the last colour are kept across restarts', () => {
+    const file = path.join(dir, 'ranking.json');
+    fs.writeFileSync(file, JSON.stringify({ version: 1, rows: [{ name: 'Ana', matches: 2, wins: 1 }] }));
+    loadRanking(file, quiet);
+    expect(rankingRows()[0]).toMatchObject({ name: 'Ana', matches: 2, fav: null, favColor: '' });
+
+    const r = makeRoom('ffa');
+    const a = r.join('Ana', 0, 0, { primary: 'smg', ability: 'dash' });
+    a.picks = { rifle: 1, smg: 2 };
+    a.color = '#3f7fe0';
+    recordMatch(r.room, 'Ana', 0);
+    loadRanking(file, quiet); // as if the server started again
+    expect(rankingRows()[0]).toMatchObject({ name: 'Ana', matches: 3, wins: 2, fav: 'smg', favColor: '#3f7fe0' });
+
+    const r2 = makeRoom('ffa');
+    const b = r2.join('Ana', 0, 0, { ability: 'shield' });
+    b.picks = { shotgun: 5 };
+    b.color = '';
+    recordMatch(r2.room, 'Bea', 0);
+    // A match without a colour keeps the last one worn
+    expect(rankingRows()[0]).toMatchObject({ fav: 'shotgun', favColor: '#3f7fe0' });
+  });
+  it('a primary the mode does not hand out (InstaGib, race, gun game, a zombie) is no pick; the match still counts', () => {
+    loadRanking(path.join(dir, 'ranking.json'), quiet);
+    const r = makeRoom('insta');
+    const a = r.join('Ana', 0, 0, { primary: 'sniper' });
+    expect(a.picks).toEqual({});
+    recordMatch(r.room, 'Ana', 0);
+    expect(rankingRows()[0]).toMatchObject({ name: 'Ana', matches: 1, wins: 1, fav: null });
   });
 });

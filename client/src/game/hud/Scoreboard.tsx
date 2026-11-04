@@ -1,5 +1,5 @@
 import {
-  CHAR_BY_ID,
+  ABILITIES,
   WEAPONS,
   gunLadder,
   isTeamMode,
@@ -8,7 +8,7 @@ import {
   type SideTeam,
   type WeaponId,
 } from '@blockshot/shared';
-import { Icon } from '../../ui/icons';
+import { ABILITY_ICON, Icon } from '../../ui/icons';
 import { MODE_UI } from '../modeUi';
 import type { RoomView } from '../roomView';
 import type { HudPlayer } from './hudState';
@@ -25,16 +25,18 @@ interface TableProps {
   numbered?: boolean;
   caps?: string | null;
   ladder?: WeaponId[] | null;
+  /** Bomb mode: who carries the bomb */
+  carrier?: string | null;
 }
 
-function Table({ players, me, numbered, caps, ladder }: TableProps) {
+function Table({ players, me, numbered, caps, ladder, carrier }: TableProps) {
   return (
     <table className="sb-table">
       <thead>
         <tr>
           {numbered && <th>#</th>}
           <th>Jugador</th>
-          <th style={{ width: 130 }}>Personaje</th>
+          <th style={{ width: 130 }}>Habilidad</th>
           {caps && (
             <th className="num" style={{ width: 80 }}>
               {caps}
@@ -65,11 +67,17 @@ function Table({ players, me, numbered, caps, ladder }: TableProps) {
             <td>
               {p.n}
               {p.id === me && <span className="tag-sol you">TÚ</span>}
+              {p.id === carrier && (
+                <span title="Lleva la bomba">
+                  {' '}
+                  <Icon name="bomb" size={14} />
+                </span>
+              )}
             </td>
             <td>
-              {p.c ? (
-                <span className="chip-char" style={{ '--c': CHAR_BY_ID[p.c].color }}>
-                  {CHAR_BY_ID[p.c].name}
+              {p.ab ? (
+                <span className="chip-char">
+                  <Icon name={ABILITY_ICON[p.ab]} size={12} /> {ABILITIES[p.ab].name}
                 </span>
               ) : (
                 '—'
@@ -110,14 +118,19 @@ interface ScoreboardProps {
   scoreLimit: number;
   mode: ModeId;
   teamScore: Record<SideTeam, number> | null;
+  carrier?: string | null;
 }
 
-export default function Scoreboard({ players, me, info, scoreLimit, mode, teamScore }: ScoreboardProps) {
+export default function Scoreboard({ players, me, info, scoreLimit, mode, teamScore, carrier }: ScoreboardProps) {
   const ladder = MODE_UI[mode].top === 'ladder' ? gunLadder(scoreLimit) : null;
-  const sorted = [...players].sort((a, b) => (ladder ? b.lv - a.lv : 0) || b.k - a.k || a.d - b.d);
   const teams = isTeamMode(mode);
-  const infect = MODE_UI[mode].top === 'infect';
   const caps = MODE_UI[mode].points;
+  // Free for all with its own points (rounds won, races): those rank first
+  const ranked = !teams && caps;
+  const sorted = [...players].sort(
+    (a, b) => (ladder ? b.lv - a.lv : 0) || (ranked ? b.cp - a.cp : 0) || b.k - a.k || a.d - b.d,
+  );
+  const infect = MODE_UI[mode].top === 'infect';
   const goal = MODE_UI[mode].goal(scoreLimit);
   return (
     <div className="scoreboard">
@@ -144,11 +157,11 @@ export default function Scoreboard({ players, me, info, scoreLimit, mode, teamSc
                   <i style={{ width: `${((teamScore?.[t] ?? 0) / scoreLimit) * 100}%` }} />
                 </div>
               )}
-              <Table players={sorted.filter((p) => p.tm === t)} me={me} caps={caps} />
+              <Table players={sorted.filter((p) => p.tm === t)} me={me} caps={caps} carrier={carrier} />
             </div>
           ))
         ) : (
-          <Table players={sorted} me={me} numbered ladder={ladder} />
+          <Table players={sorted} me={me} numbered ladder={ladder} caps={caps} />
         )}
       </div>
     </div>

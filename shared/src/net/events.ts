@@ -1,7 +1,11 @@
 // Typed Socket.IO protocol. Short keys in high-frequency payloads keep snapshots small.
 import type { Vec3 } from '../core/math';
-import type { CharacterId, SkinId } from '../characters/characters';
-import type { MapId, SizeId } from '../maps/types';
+import type { AbilityId } from '../abilities/abilities';
+import type { AccessoryId } from '../characters/accessories';
+import type { PlayerClass, SkinId } from '../characters/characters';
+import type { CamoId, FinishId } from '../characters/looks';
+import type { TournamentResult } from '../modes/tournament';
+import type { MapId, PickupKind, SizeId } from '../maps/types';
 import type { BotLevel } from '../modes/bots';
 import type { MedalId } from '../modes/medals';
 import type { ModeId, SideTeam, Team } from '../modes/modes';
@@ -32,6 +36,10 @@ export interface RoomInfo {
   size: SizeId;
   mode: ModeId;
   max: number;
+  /** the admin closed the room: nobody new can join */
+  closed: boolean;
+  /** a league tournament is on: round being played and how many */
+  tour: { round: number; rounds: number; by: string } | null;
 }
 
 /** `admin`: the player opened the game on the server's own PC (practice bots and other test tools). */
@@ -59,12 +67,16 @@ export interface PlayerSnapshot {
   id: string;
   /** name */
   n: string;
-  /** character */
-  c: CharacterId | null;
+  /** the class's ability (key E); null before the player's first spawn (no class yet) */
+  ab: AbilityId | null;
   /** skin */
   sk: SkinId;
   /** outfit colour picked by the player (OUTFIT_COLORS) */
   co: string;
+  /** uniform camouflage */
+  cm: CamoId;
+  /** guns' finish */
+  fn: FinishId;
   x: number;
   y: number;
   z: number;
@@ -106,6 +118,18 @@ export interface PlayerSnapshot {
   rd: number;
   /** medals this match */
   md: number;
+  /** shield up (Tanque's ability) */
+  sh: number;
+  /** scoped in with a sniper: others see the lens glint */
+  gl: number;
+  /** ms until the ability is ready again (0 = ready) */
+  ac: number;
+  /** power weapon held (it takes the slot after the normal ones), null: none */
+  pw: WeaponId | null;
+  /** loadout pick: index of the primary and the secondary in the character's primaries / secondaries */
+  wc: [number, number];
+  /** the class's accessory (others see the vest, the laser, the suppressor); null before the first spawn */
+  ax: AccessoryId | null;
 }
 
 export interface FlagSnapshot {
@@ -138,8 +162,37 @@ export interface RoundSnapshot {
   t: number;
 }
 
+/** Freeze tag statue (a frozen player): [player id, x, y, z, team, thaw progress 0…100]. */
+export type IceSnapshot = [string, number, number, number, SideTeam, number];
+
+/** Bomb: where it is (carried: the carrier's feet), plant / defuse progress and the fuse. */
+export interface BombSnapshot {
+  /** 0 carried, 1 dropped on the floor, 2 planted */
+  st: 0 | 1 | 2;
+  /** carrier id (st 0) */
+  c: string | null;
+  x: number;
+  y: number;
+  z: number;
+  /** site it is planted at, or being planted at (0 = A, 1 = B, -1 none) */
+  s: number;
+  /** plant progress 0…100 */
+  pp: number;
+  /** defuse progress 0…100 */
+  dp: number;
+  /** ms until it explodes (planted), 0 otherwise */
+  t: number;
+}
+
 /** Grenade in flight: [id, x, y, z] */
 export type GrenadeSnapshot = [number, number, number, number];
+/** Ability objects in the world: [id, kind, x, y, z, along (wall: 0 = runs along x, 1 = along z), team, owner]. */
+export type DeployableKind = 'smoke' | 'mine' | 'wall';
+export type DeployableSnapshot = [number, DeployableKind, number, number, number, number, Team, string];
+
+/** Map objects not there right now (indices): [fallen barrels, broken crates, taken pickups]. */
+/** [fallen barrels, broken crates, taken pickups, dropped tiles, shaking tiles] */
+export type ObjectsSnapshot = [number[], number[], number[], number[], number[]];
 
 export interface StateSnapshot {
   players: PlayerSnapshot[];
@@ -148,8 +201,20 @@ export interface StateSnapshot {
   tg: TagSnapshot[] | null;
   inf: InfectSnapshot | null;
   gr: GrenadeSnapshot[];
+  /** smoke clouds, mines and cover walls */
+  dp: DeployableSnapshot[];
+  /** barrels, crates and pickups that are gone for now */
+  wo: ObjectsSnapshot;
+  /** server time (ms) when the snapshot was taken: clients run the moving obstacles on it */
+  t: number;
+  /** the power weapon lying on the map: [spot index into map.powerSpots, weapon] (null: none now) */
+  pw: [number, WeaponId] | null;
   dz: DomSnapshot[] | null;
   rd: RoundSnapshot | null;
+  /** freeze tag: frozen players */
+  ic: IceSnapshot[] | null;
+  /** bomb mode: the bomb */
+  bm: BombSnapshot | null;
 }
 
 /** A batch of input commands (sent every CLIENT_SEND_MS, one command per FIXED_DT step). */
@@ -176,10 +241,16 @@ export interface SpawnedMessage {
   y: number;
   z: number;
   ry: number;
-  characterId: CharacterId;
   skin: SkinId;
   /** outfit colour (OUTFIT_COLORS) */
   color: string;
+  camo: CamoId;
+  finish: FinishId;
+  /** the class the server equipped (the player's pick, validated) */
+  primary: WeaponId;
+  secondary: WeaponId;
+  ability: AbilityId;
+  accessory: AccessoryId;
   hp: number;
   level: number;
   team: Team;
@@ -191,7 +262,8 @@ export interface KillEvent {
   killer: string;
   killerName: string;
   killerTeam: Team;
-  killerChar: CharacterId | null;
+  /** the killer's class (null for the world or a kill outside a class, like a forced respawn) */
+  killerClass: PlayerClass | null;
   killerHp: number;
   victim: string;
   victimName: string;
@@ -224,9 +296,30 @@ export interface MatchEnd {
   restartIn: number;
   /** options for the next match (empty: the same one again) */
   vote: VoteOption[];
+  /** league tournament standings after this round */
+  tour?: TournamentResult;
 }
 
 export type FlagEventType = 'take' | 'drop' | 'return' | 'capture';
+
+/** All-time results of one player name, kept in the server's ranking file. */
+export interface RankingRow {
+  name: string;
+  matches: number;
+  wins: number;
+  kills: number;
+  deaths: number;
+  shots: number;
+  hits: number;
+  heads: number;
+  medals: number;
+  /** flag captures or confirmed tags */
+  caps: number;
+  /** most-carried primary weapon (null before the first spawn was recorded) */
+  fav: WeaponId | null;
+  /** outfit colour last worn ('' if unknown) */
+  favColor: string;
+}
 
 /** Session statistics of one player (server PC only). */
 export interface SessionStatsRow {
@@ -237,8 +330,8 @@ export interface SessionStatsRow {
   hits: number;
   heads: number;
   medals: number;
-  /** spawns per character */
-  picks: Partial<Record<CharacterId, number>>;
+  /** spawns per primary weapon carried */
+  picks: Partial<Record<WeaponId, number>>;
 }
 
 export interface ServerToClientEvents {
@@ -248,9 +341,13 @@ export interface ServerToClientEvents {
   'player:spawned': (d: SpawnedMessage) => void;
   'player:ack': (d: AckMessage) => void;
   damaged: (d: { hp: number; from: [number, number] }) => void;
-  hitmarker: (d: { head: boolean; kill: boolean; dmg: number; at: Vec3 }) => void;
+  /** `id`: who was hit (tactical goggles mark them on the minimap) */
+  hitmarker: (d: { head: boolean; kill: boolean; dmg: number; at: Vec3; id?: string }) => void;
   kill: (d: KillEvent) => void;
-  shot: (d: { id: string; w: WeaponId | null; e: Vec3[] }) => void;
+  /** a shot (`s`: silenced: no minimap mark, a muffled sound) */
+  shot: (d: { id: string; w: WeaponId | null; e: Vec3[]; s?: 1 }) => void;
+  /** a shot stopped by Tanque's shield (id = the shield's owner) */
+  'shield:hit': (d: { id: string; at: Vec3 }) => void;
   loadout: (d: { level: number; team?: Team }) => void;
   flag: (d: { type: FlagEventType; team?: SideTeam; name?: string }) => void;
   tag: (d: { type: 'confirm' | 'deny' }) => void;
@@ -264,6 +361,16 @@ export interface ServerToClientEvents {
   'room:changed': (room: RoomInfo) => void;
   /** a grenade exploded */
   boom: (d: { x: number; y: number; z: number }) => void;
+  /** an air strike is coming down on these points in `ms` */
+  strike: (d: { at: Vec3[]; ms: number }) => void;
+  /** a wooden crate broke (index into map.crates and its centre, for the splinters) */
+  crate: (d: { i: number; x: number; y: number; z: number }) => void;
+  /** you picked up health or armour */
+  pickup: (k: PickupKind | 'power') => void;
+  /** a moving obstacle knocked you this way (x, z) */
+  knocked: (d: { x: number; z: number }) => void;
+  /** the admin removed you from the room (you are back in the lobby) */
+  kicked: (reason: string) => void;
 }
 
 export interface ClientToServerEvents {
@@ -272,7 +379,20 @@ export interface ClientToServerEvents {
   'room:join': (data: JoinRoomRequest, cb: (res: JoinResult) => void) => void;
   'room:leave': () => void;
   'net:ping': (d: { rtt: number }, cb: () => void) => void;
-  'player:spawn': (d: { characterId: string; skin?: string; color?: string }) => void;
+  'player:spawn': (d: {
+    /** older clients still send it: ignored */
+    characterId?: string;
+    skin?: string;
+    color?: string;
+    camo?: string;
+    finish?: string;
+    primary?: string;
+    secondary?: string;
+    ability?: string;
+    accessory?: string;
+  }) => void;
+  /** the in-match loadout menu: the class to take at the next respawn (checked then, like a spawn request) */
+  'player:class': (d: { primary?: string; secondary?: string; ability?: string; accessory?: string }) => void;
   'team:set': (d: { team: number }) => void;
   'player:input': (d: InputMessage) => void;
   'player:switch': (d: { slot: number }) => void;
@@ -283,6 +403,21 @@ export interface ClientToServerEvents {
   'bot:clear': () => void;
   'chat:quick': (d: { i: number }) => void;
   'player:grenade': (d: { o: Vec3; d: Vec3 }) => void;
+  /** key E (the dash goes with the movement commands instead) */
+  'player:ability': (d: { o: Vec3; d: Vec3 }) => void;
   vote: (d: { i: number }) => void;
   'admin:stats': (cb: (rows: SessionStatsRow[]) => void) => void;
+  /** everybody: the ranking (best first) */
+  'ranking:get': (cb: (rows: RankingRow[]) => void) => void;
+  /** server PC only: room control */
+  'admin:kick': (d: { id: string }) => void;
+  'admin:kill': (d: { id: string }) => void;
+  'admin:team': (d: { id: string }) => void;
+  'admin:restart': () => void;
+  'admin:end': () => void;
+  'admin:room': (d: VoteOption) => void;
+  'admin:lock': (d: { locked: boolean }) => void;
+  'admin:ranking:reset': () => void;
+  /** start a league of that many rounds (0 = stop it) */
+  'tournament:set': (d: { rounds: number }) => void;
 }

@@ -12,6 +12,7 @@ import {
   getMap,
   isMapId,
   isModeId,
+  fitMapMode,
   isSizeId,
   teamName,
   type CreateRoomInput,
@@ -19,6 +20,7 @@ import {
   type RoomSummary,
 } from '@blockshot/shared';
 import { createMode } from '../modes';
+import { resetWorld } from '../combat/worldObjects';
 import { BOT_PREFIX } from '../players/bot';
 import { createPlayer } from '../players/player';
 import { foldPlayer } from '../stats/sessionStats';
@@ -80,11 +82,13 @@ export class RoomRegistry {
 
   create(data: CreateRoomInput, nickname: string): Room {
     const password = typeof data.password === 'string' ? data.password.slice(0, PASSWORD_MAX) : '';
-    const mapId = isMapId(data.mapId) ? data.mapId : 'patio';
+    // Carrera and Circuito only go together
+    const fit = fitMapMode(isMapId(data.mapId) ? data.mapId : 'patio', isModeId(data.mode) ? data.mode : 'ffa');
+    const mapId = fit.mapId;
     const size = isSizeId(data.size) ? data.size : 'm';
     const max = clamp(Number(data.max) || MAP_SIZES[size].players, ROOM_MIN_PLAYERS, ROOM_MAX_PLAYERS);
     const map = getMap(mapId, size);
-    const modeId = isModeId(data.mode) ? data.mode : 'ffa';
+    const modeId = fit.mode;
     const limit = Number(data.scoreLimit);
     const id = crypto.randomBytes(ROOM_ID_BYTES).toString('hex');
     const room: Room = {
@@ -107,16 +111,26 @@ export class RoomRegistry {
       channel: this.channelFor(id),
       vote: null,
       grenades: [],
+      strikes: [],
+      deployables: [],
+      // Filled right below (resetWorld also builds the colliders)
+      world: undefined as never,
+      closed: false,
+      banned: new Set(),
+      tournament: null,
       lobbyChanged: () => this.events.changed(),
     };
     room.mode = createMode(modeId, room);
+    resetWorld(room);
     this.rooms.set(id, room);
     return room;
   }
 
   /** Checks the room can be joined; returns an error message for the client otherwise. */
-  canJoin(room: Room | undefined, password: string | undefined): string | null {
+  canJoin(room: Room | undefined, password: string | undefined, nickname = ''): string | null {
     if (!room) return 'La sala ya no existe.';
+    if (room.banned.has(nickname)) return 'El admin te ha expulsado de esta sala.';
+    if (room.closed) return 'El admin ha cerrado la sala: espera a que la abra.';
     if (room.players.size >= room.max) return 'La sala está llena.';
     if (room.passHash && hash(String(password ?? '')) !== room.passHash) return 'Contraseña incorrecta.';
     return null;

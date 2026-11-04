@@ -1,10 +1,15 @@
 import {
+  BODY,
+  DEFAULT_OUTFIT_COLOR,
   PLAYER,
+  classOf,
   createMoveState,
   grenadesFor,
+  isCamoId,
+  isFinishId,
   isOutfitColor,
   isSkinId,
-  type Character,
+  type ClassChoice,
   type Spawn,
 } from '@blockshot/shared';
 import type { Room } from '../rooms/room';
@@ -38,15 +43,41 @@ export function pickSpawn(room: Room, me: Player): Spawn {
   return scored[Math.floor(Math.random() * Math.min(SPAWN_CANDIDATES, scored.length))]!.s;
 }
 
-/** Puts the player on a spawn point with full health and ammo, and tells its client. */
-export function spawnPlayer(room: Room, p: Player, ch: Character, skin: string | undefined, color?: string): void {
+/** A spawn request from the class screen: the class and the looks (untrusted, any field may be missing). */
+export interface SpawnRequest extends ClassChoice {
+  skin?: string;
+  color?: string;
+  camo?: string;
+  finish?: string;
+}
+
+/**
+ * Puts the player on a spawn point with full health and ammo, and tells its client. With a `req` (the class screen)
+ * each part is checked on its own and anything missing or not allowed falls back to the default; without one (a
+ * mode respawning the player) the player keeps its class and looks, or takes the class picked in the in-match
+ * loadout menu (`nextCls`, checked the same way).
+ */
+export function spawnPlayer(room: Room, p: Player, req?: SpawnRequest): void {
   const now = Date.now();
   const [x, y, z, ry] = pickSpawn(room, p);
-  const hp = Math.round(ch.hp * (room.mode.hpFactor?.(p) ?? 1));
+  const hp = Math.round(BODY.hp * (room.mode.hpFactor?.(p) ?? 1));
+  const r: SpawnRequest = req ?? {
+    ...p.cls,
+    ...p.nextCls,
+    skin: p.skin,
+    color: p.color,
+    camo: p.camo,
+    finish: p.finish,
+  };
+  const cls = classOf(r);
+  const { primary, secondary, ability, accessory } = cls;
   Object.assign(p, {
-    characterId: ch.id,
-    skin: isSkinId(skin) ? skin : 'base',
-    color: isOutfitColor(color) ? color : ch.color,
+    cls,
+    nextCls: null,
+    skin: isSkinId(r.skin) ? r.skin : 'base',
+    color: isOutfitColor(r.color) ? r.color : DEFAULT_OUTFIT_COLOR,
+    camo: isCamoId(r.camo) ? r.camo : 'liso',
+    finish: isFinishId(r.finish) ? r.finish : 'estandar',
     alive: true,
     hp,
     maxHp: hp,
@@ -67,10 +98,16 @@ export function spawnPlayer(room: Room, p: Player, ch: Character, skin: string |
     lastSeq: -1, // a new client engine (new map after a vote) numbers its commands from 0 again
     simBudget: 0,
     life: p.life + 1,
+    abilityAt: 0, // every life starts with the ability ready
+    shieldUntil: 0,
+    campSince: 0, // the anti-camping clock starts again
+    idle: true,
   });
-  p.picks[ch.id] = (p.picks[ch.id] ?? 0) + 1;
-  p.grenades = grenadesFor(room.modeId, p.team);
+  p.grenades = grenadesFor(room.modeId, p.team, accessory);
   equip(room, p);
+  p.played = true;
+  // Only a primary the mode really hands out (not in InstaGib, race, gun game nor as a zombie)
+  if (p.loadout.includes(primary)) p.picks[primary] = (p.picks[primary] ?? 0) + 1;
   recordPosition(p, now);
   room.channel.to(p.id, 'player:spawned', [
     {
@@ -78,9 +115,14 @@ export function spawnPlayer(room: Room, p: Player, ch: Character, skin: string |
       y,
       z,
       ry: p.ry,
-      characterId: ch.id,
       skin: p.skin,
       color: p.color,
+      camo: p.camo,
+      finish: p.finish,
+      primary,
+      secondary,
+      ability,
+      accessory,
       hp,
       level: p.level,
       team: p.team,

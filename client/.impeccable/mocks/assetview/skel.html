@@ -1,0 +1,40 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>skel</title>
+<pre id="o"></pre>
+<script type="module">
+  // Temporary: rest pose of the FPS arms rig (bone world positions and where each bone's local axes point)
+  import * as THREE from 'three';
+  import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+  const g = await new GLTFLoader().loadAsync('m/arms.glb');
+  g.scene.updateMatrixWorld(true);
+  const out = [];
+  const f = (v) =>
+    v
+      .toArray()
+      .map((n) => n.toFixed(3))
+      .join(',');
+  g.scene.traverse((o) => {
+    if (!o.isBone) return;
+    const p = o.getWorldPosition(new THREE.Vector3());
+    const q = o.getWorldQuaternion(new THREE.Quaternion());
+    const x = new THREE.Vector3(1, 0, 0).applyQuaternion(q),
+      y = new THREE.Vector3(0, 1, 0).applyQuaternion(q),
+      z = new THREE.Vector3(0, 0, 1).applyQuaternion(q);
+    out.push(`${o.name.padEnd(20)} p=${f(p)}  X=${f(x)} Y=${f(y)} Z=${f(z)}  parent=${o.parent?.name}`);
+  });
+  let mesh;
+  g.scene.traverse((o) => o.isSkinnedMesh && (mesh = o));
+  out.push(
+    'mesh ' +
+      mesh.name +
+      ' bind ' +
+      mesh.bindMode +
+      ' bbox ' +
+      f(new THREE.Box3().setFromObject(g.scene).min) +
+      ' / ' +
+      f(new THREE.Box3().setFromObject(g.scene).max),
+  );
+  document.getElementById('o').textContent = out.join('\n');
+  document.title = 'done';
+</script>

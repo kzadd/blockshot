@@ -1,0 +1,563 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>BLOCKSHOT · Panel de salidas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --flap: #0e0f11;
+        --flapt: #17191c;
+        --ink: #f4f4f0;
+        --steel: #8a8f98;
+        --steel3: #c9cdd3;
+        --steel4: #e1e3e6;
+        --dark: #1b1d21;
+        --amber: #ffb000;
+        --lock: #c0392b;
+        --rojo: #e0312b;
+        --azul: #1f63d6;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1440px;
+        height: 900px;
+        overflow: hidden;
+        margin: 0;
+      }
+      body {
+        background: var(--steel);
+        background-image: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 3px);
+        font:
+          500 14px/1.35 Barlow,
+          sans-serif;
+        color: var(--dark);
+        padding: 18px 24px;
+      }
+      .top {
+        display: flex;
+        align-items: center;
+        gap: 28px;
+        height: 56px;
+      }
+      .logo {
+        display: flex;
+        gap: 2px;
+      }
+      .logo i {
+        width: 30px;
+        height: 42px;
+        background: var(--flap);
+        color: var(--ink);
+        font: 700 32px/42px 'Barlow Condensed';
+        text-align: center;
+        font-style: normal;
+        position: relative;
+        border-radius: 2px;
+      }
+      .logo i,
+      .row i {
+        isolation: isolate;
+      }
+      .logo i::after,
+      .row i::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 50%;
+        height: 1px;
+        background: #000;
+        box-shadow: 0 1px 0 rgba(255, 255, 255, 0.07);
+      }
+      .logo i::before,
+      .row i::before {
+        content: '';
+        position: absolute;
+        inset: 0 0 50% 0;
+        background: var(--flapt);
+        border-radius: 2px 2px 0 0;
+        z-index: -1;
+      }
+      .name {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 600;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      input {
+        font:
+          500 15px Barlow,
+          sans-serif;
+        color: var(--dark);
+        background: var(--steel4);
+        border: 1px solid #5d626a;
+        border-radius: 3px;
+        height: 38px;
+        padding: 0 12px;
+      }
+      input:focus {
+        outline: 2px solid var(--amber);
+        outline-offset: 1px;
+      }
+      .name input {
+        width: 220px;
+        text-transform: none;
+        letter-spacing: 0;
+      }
+      nav {
+        margin-left: auto;
+        display: flex;
+        gap: 6px;
+      }
+      nav a,
+      .btn2 {
+        font: 600 15px Barlow;
+        color: var(--dark);
+        text-decoration: none;
+        padding: 9px 16px;
+        border: 1px solid #5d626a;
+        border-radius: 3px;
+        background: var(--steel3);
+        cursor: pointer;
+      }
+      .board {
+        background: #2a2c31;
+        border: 6px solid var(--steel3);
+        outline: 1px solid #5d626a;
+        border-radius: 4px;
+        padding: 14px 20px 16px;
+        margin-top: 12px;
+        color: var(--ink);
+      }
+      .bh {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        margin-bottom: 10px;
+      }
+      .bh h2 {
+        margin: 0;
+        font: 700 26px 'Barlow Condensed';
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .bh h2 small {
+        color: var(--amber);
+        font-size: 18px;
+        margin-left: 10px;
+        letter-spacing: 0.1em;
+      }
+      .bh span {
+        font-size: 13px;
+        color: #b7bbc2;
+      }
+      .labels {
+        display: flex;
+        gap: 14px;
+        padding-left: 32px;
+        font: 600 12px 'Barlow Condensed';
+        letter-spacing: 0.18em;
+        color: #9aa0a8;
+        margin-bottom: 6px;
+      }
+      .labels b {
+        font-weight: 600;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 6px 8px;
+        margin: 0 -8px;
+        border: 2px solid transparent;
+        border-radius: 3px;
+      }
+      .row + .row {
+        margin-top: 4px;
+      }
+      .row.sel {
+        border-color: var(--amber);
+        background: #33302a;
+      }
+      .col {
+        display: flex;
+        gap: 2px;
+      }
+      .row i {
+        width: 18px;
+        height: 32px;
+        background: var(--flap);
+        border-radius: 2px;
+        font: 600 24px/32px 'Barlow Condensed';
+        font-style: normal;
+        text-align: center;
+        position: relative;
+      }
+      .lamp {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #3b3d42;
+        border: 2px solid #55585e;
+        flex: none;
+      }
+      .lamp.white {
+        background: var(--ink);
+      }
+      .lamp.amber {
+        background: var(--amber);
+        border-color: #fff3c4;
+      }
+      .lamp.red {
+        background: var(--lock);
+      }
+      .legend {
+        display: flex;
+        gap: 22px;
+        margin-top: 12px;
+        font-size: 13px;
+        color: #c3c7cd;
+      }
+      .legend .lamp {
+        display: inline-block;
+        width: 11px;
+        height: 11px;
+        vertical-align: -1px;
+        margin-right: 6px;
+        border-width: 1px;
+      }
+      .halves {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        margin-top: 20px;
+      }
+      .panel {
+        background: var(--steel3);
+        border: 1px solid #5d626a;
+        border-radius: 4px;
+        box-shadow: inset 0 0 0 4px var(--steel4);
+        padding: 18px 22px;
+        height: 494px;
+        display: flex;
+        flex-direction: column;
+      }
+      .panel h3 {
+        margin: 0 0 2px;
+        font: 700 24px 'Barlow Condensed';
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .sub {
+        color: #454950;
+        font-size: 14px;
+        margin-bottom: 14px;
+      }
+      .tag {
+        font: 600 12px 'Barlow Condensed';
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #454950;
+        margin-bottom: 6px;
+        display: block;
+      }
+      .teams {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+      .team {
+        background: var(--steel4);
+        border: 1px solid var(--steel);
+        border-radius: 3px;
+      }
+      .team h4 {
+        margin: 0;
+        padding: 6px 12px;
+        font: 700 15px 'Barlow Condensed';
+        letter-spacing: 0.14em;
+        color: #fff;
+        border-radius: 2px 2px 0 0;
+      }
+      .r h4 {
+        background: var(--rojo);
+      }
+      .a h4 {
+        background: var(--azul);
+      }
+      .p {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 9px 12px;
+        border-top: 1px solid var(--steel3);
+        font-size: 15px;
+        font-weight: 600;
+      }
+      .st {
+        font-size: 13px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .st::before {
+        content: '';
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: var(--amber);
+        box-shadow: 0 0 0 1px #8a6000;
+      }
+      .st.no {
+        color: #4f545b;
+      }
+      .st.no::before {
+        background: transparent;
+        box-shadow: 0 0 0 1px #4f545b;
+      }
+      .foot {
+        margin-top: auto;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .btn {
+        font: 700 18px 'Barlow Condensed';
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        background: var(--amber);
+        color: #1b1400;
+        border: 1px solid #8a6000;
+        border-radius: 3px;
+        padding: 9px 26px;
+        cursor: pointer;
+      }
+      .count {
+        margin-right: auto;
+        font-weight: 600;
+      }
+      .maps {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 8px;
+        margin-bottom: 14px;
+      }
+      .map {
+        background: var(--steel4);
+        border: 1px solid var(--steel);
+        border-radius: 3px;
+        padding: 6px;
+        text-align: center;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .map.on {
+        outline: 2px solid var(--amber);
+        border-color: #8a6000;
+      }
+      .plan {
+        height: 46px;
+        background: #d9cfb8;
+        position: relative;
+        margin-bottom: 5px;
+        border: 1px solid #6d6a60;
+      }
+      .plan b {
+        position: absolute;
+        background: #5a5d63;
+      }
+      .modes {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+        margin-bottom: 14px;
+      }
+      .mode {
+        background: var(--steel4);
+        border: 1px solid var(--steel);
+        border-radius: 3px;
+        padding: 7px 6px;
+        font-size: 13px;
+        font-weight: 600;
+        text-align: center;
+      }
+      .mode.on {
+        background: var(--flap);
+        color: var(--ink);
+        border-color: var(--flap);
+        box-shadow: inset 0 -3px 0 var(--amber);
+      }
+    </style>
+  </head>
+  <body>
+    <header class="top">
+      <div class="logo"><i>B</i><i>L</i><i>O</i><i>C</i><i>K</i><i>S</i><i>H</i><i>O</i><i>T</i></div>
+      <label class="name">Tu nombre <input value="Ricardo" /></label>
+      <nav><a href="#">Ranking</a><a href="#">Manual</a><a href="#">Ajustes</a></nav>
+    </header>
+    <section class="board">
+      <div class="bh">
+        <h2>Unirse a una sala <small>· Salidas</small></h2>
+        <span>Red del aula · blockshot.local:3000 · 3 salas</span>
+      </div>
+      <div class="labels">
+        <span style="width: 298px">SALA</span><span style="width: 218px">MAPA</span
+        ><span style="width: 358px">MODO</span><span style="width: 98px">PLAZAS</span
+        ><span style="width: 178px">ESTADO</span><b>CLAVE</b>
+      </div>
+      <div class="row">
+        <span class="lamp white"></span>
+        <div class="col">
+          <i>S</i><i>A</i><i>L</i><i>A</i><i></i><i>D</i><i>E</i><i></i><i>R</i><i>I</i><i>C</i><i>A</i><i>R</i><i>D</i
+          ><i>O</i>
+        </div>
+        <div class="col"><i>P</i><i>A</i><i>T</i><i>I</i><i>O</i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="col">
+          <i>T</i><i>O</i><i>D</i><i>O</i><i>S</i><i></i><i>C</i><i>O</i><i>N</i><i>T</i><i>R</i><i>A</i><i></i><i>T</i
+          ><i>O</i><i>D</i><i>O</i><i>S</i>
+        </div>
+        <div class="col"><i>0</i><i>5</i><i>/</i><i>1</i><i>2</i></div>
+        <div class="col"><i>E</i><i>N</i><i></i><i>J</i><i>U</i><i>E</i><i>G</i><i>O</i><i></i></div>
+        <span class="lamp"></span>
+      </div>
+      <div class="row sel">
+        <span class="lamp amber"></span>
+        <div class="col">
+          <i>C</i><i>L</i><i>A</i><i>S</i><i>E</i><i></i><i>3</i><i>B</i><i></i><i></i><i></i><i></i><i></i><i></i
+          ><i></i>
+        </div>
+        <div class="col"><i>A</i><i>L</i><i>M</i><i>A</i><i>C</i><i>É</i><i>N</i><i></i><i></i><i></i><i></i></div>
+        <div class="col">
+          <i>P</i><i>O</i><i>R</i><i></i><i>E</i><i>Q</i><i>U</i><i>I</i><i>P</i><i>O</i><i>S</i><i></i><i></i><i></i
+          ><i></i><i></i><i></i><i></i>
+        </div>
+        <div class="col"><i>0</i><i>6</i><i>/</i><i>1</i><i>0</i></div>
+        <div class="col"><i>E</i><i>N</i><i></i><i>E</i><i>S</i><i>P</i><i>E</i><i>R</i><i>A</i></div>
+        <span class="lamp"></span>
+      </div>
+      <div class="row">
+        <span class="lamp amber"></span>
+        <div class="col">
+          <i>T</i><i>O</i><i>R</i><i>N</i><i>E</i><i>O</i><i></i><i>V</i><i>I</i><i>E</i><i>R</i><i>N</i><i>E</i><i>S</i
+          ><i></i>
+        </div>
+        <div class="col"><i>D</i><i>E</i><i>S</i><i>F</i><i>I</i><i>L</i><i>A</i><i>D</i><i>E</i><i>R</i><i>O</i></div>
+        <div class="col">
+          <i>T</i><i>O</i><i>D</i><i>O</i><i>S</i><i></i><i>C</i><i>O</i><i>N</i><i>T</i><i>R</i><i>A</i><i></i><i>T</i
+          ><i>O</i><i>D</i><i>O</i><i>S</i>
+        </div>
+        <div class="col"><i>0</i><i>3</i><i>/</i><i>0</i><i>8</i></div>
+        <div class="col"><i>E</i><i>N</i><i></i><i>E</i><i>S</i><i>P</i><i>E</i><i>R</i><i>A</i></div>
+        <span class="lamp red"></span>
+      </div>
+      <div class="legend">
+        <span><i class="lamp white"></i>En juego</span><span><i class="lamp amber"></i>En espera · se puede entrar</span
+        ><span><i class="lamp red"></i>Con contraseña / llena</span>
+      </div>
+    </section>
+    <div class="halves">
+      <section class="panel">
+        <h3>Clase 3B</h3>
+        <div class="sub">Almacén · Por equipos · 6/10 jugadores · abierta</div>
+        <div class="teams">
+          <div class="team r">
+            <h4>ROJO</h4>
+            <div class="p">Ana<span class="st">Listo</span></div>
+            <div class="p">Cris<span class="st no">No listo</span></div>
+            <div class="p">Eva<span class="st">Listo</span></div>
+          </div>
+          <div class="team a">
+            <h4>AZUL</h4>
+            <div class="p">Bea<span class="st">Listo</span></div>
+            <div class="p">Dani<span class="st">Listo</span></div>
+            <div class="p">Fran<span class="st no">No listo</span></div>
+          </div>
+        </div>
+        <p class="sub" style="margin: 16px 0 0">Las salas con luz roja en CLAVE piden contraseña al entrar.</p>
+        <div class="foot">
+          <span class="count">4 de 6 listos</span><button class="btn2">Entrar</button
+          ><button class="btn">Estoy listo</button>
+        </div>
+      </section>
+      <section class="panel">
+        <h3>Crear sala</h3>
+        <div class="sub">Tu PC hará de servidor para el aula.</div>
+        <span class="tag">Mapa</span>
+        <div class="maps">
+          <div class="map">
+            <div class="plan">
+              <b style="left: 20%; top: 20%; width: 20%; height: 25%"></b
+              ><b style="right: 15%; bottom: 20%; width: 25%; height: 30%"></b>
+            </div>
+            Patio
+          </div>
+          <div class="map on">
+            <div class="plan" style="background: #c9c3b4">
+              <b style="left: 10%; top: 15%; width: 15%; height: 70%"></b
+              ><b style="left: 40%; top: 15%; width: 15%; height: 70%"></b
+              ><b style="left: 70%; top: 15%; width: 15%; height: 70%"></b>
+            </div>
+            Almacén
+          </div>
+          <div class="map">
+            <div class="plan" style="background: #c99b6a">
+              <b style="left: 0; top: 0; width: 35%; height: 100%; background: #7a5636"></b
+              ><b style="right: 0; top: 0; width: 35%; height: 100%; background: #7a5636"></b>
+            </div>
+            Desfiladero
+          </div>
+          <div class="map">
+            <div class="plan" style="background: #ddc58f">
+              <b style="left: 30%; top: 30%; width: 40%; height: 40%; background: #9c7b45"></b>
+            </div>
+            Polvo
+          </div>
+          <div class="map">
+            <div class="plan" style="background: #9da3ab">
+              <b style="left: 10%; top: 10%; width: 30%; height: 35%"></b
+              ><b style="left: 55%; top: 10%; width: 35%; height: 35%"></b
+              ><b style="left: 10%; top: 60%; width: 80%; height: 28%"></b>
+            </div>
+            Ciudad
+          </div>
+          <div class="map">
+            <div class="plan" style="background: #d8b25a">
+              <b style="left: 15%; top: 55%; width: 70%; height: 12%"></b
+              ><b style="left: 45%; top: 10%; width: 10%; height: 80%"></b>
+            </div>
+            Obra
+          </div>
+        </div>
+        <span class="tag">Modo</span>
+        <div class="modes">
+          <div class="mode">Todos contra todos</div>
+          <div class="mode on">Por equipos</div>
+          <div class="mode">Captura la bandera</div>
+          <div class="mode">Escalada de armas</div>
+          <div class="mode">Confirmar bajas</div>
+          <div class="mode">Infectados</div>
+          <div class="mode">Dominio</div>
+          <div class="mode">Rondas</div>
+        </div>
+        <div class="foot">
+          <label style="flex: 1"
+            ><span class="tag">Contraseña (opcional)</span
+            ><input type="password" placeholder="Sin contraseña" style="width: 100%" /></label
+          ><button class="btn" style="align-self: flex-end">Crear sala</button>
+        </div>
+      </section>
+    </div>
+  </body>
+</html>

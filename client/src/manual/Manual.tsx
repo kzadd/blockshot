@@ -1,7 +1,19 @@
-import { useEffect, useState } from 'react';
-import { CHARACTERS, WEAPONS, MODE_BY_ID, PLAYER, weightName, damageAt, speedWith } from '@blockshot/shared';
-import { Icon } from '../ui/icons';
-import { Keys } from '../ui/ui';
+import {
+  ABILITIES,
+  ABILITY_IDS,
+  ACCESSORIES,
+  ACCESSORY_IDS,
+  BODY,
+  HELMET,
+  KEVLAR,
+  LIMB_MULT,
+  MODE_BY_ID,
+  PLAYER,
+  WEAPONS,
+  WEAPON_HANDLING,
+  staminaMult,
+} from '@blockshot/shared';
+import Modal from '../ui/Modal';
 
 export const CONTROLS: [string[], string][] = [
   [['W', 'A', 'S', 'D'], 'Moverse'],
@@ -11,21 +23,31 @@ export const CONTROLS: [string[], string][] = [
   [['Clic izq.'], 'Disparar'],
   [['Clic der.'], 'Apuntar (mira telescópica con el francotirador)'],
   [['R'], 'Recargar'],
-  [['G'], 'Lanzar la granada (una por vida; rebota y explota a los 2 s)'],
-  [['1', '2', '3', 'Q', 'Rueda'], 'Cambiar de arma (3: cuchillo, por la espalda mata de un golpe)'],
+  [['G'], 'Granada (una por vida): mantén G para ver la trayectoria y dónde cae, suéltala para lanzar'],
+  [
+    ['E'],
+    `Habilidad de tu clase (con recarga): ${ABILITY_IDS.map((id) => ABILITIES[id].name.toLowerCase()).join(', ')}`,
+  ],
+  [
+    ['1', '2', '3', '4', 'Q', 'Rueda'],
+    'Cambiar de arma (3: cuchillo, por la espalda mata de un golpe; 4: arma de poder)',
+  ],
   [['Tab'], 'Ver el marcador (mantener)'],
-  [['B'], 'Cambiar de personaje (solo estando muerto)'],
+  [['B'], 'Cambiar de clase o de equipo (solo estando muerto)'],
+  [['L'], 'Equipo: cambia armas, habilidad y accesorio en plena partida (se aplica al reaparecer; Esc lo cierra)'],
   [['T'], 'Cambiar de equipo (por equipos; no en pleno combate)'],
-  [['V', '1–8'], 'Chat rápido: abre las frases y elige una con su número'],
   [['O'], 'Ajustes: mira, sensibilidad, campo de visión, volumen'],
-  [['H', 'F1'], 'Abrir este manual'],
+  [['H', 'F1'], 'Abrir los controles'],
   [['Esc'], 'Soltar el ratón / pausa'],
 ];
 
-const STEPS: [string, string][] = [
+export const STEPS: [string, string][] = [
   ['Escribe tu nombre', 'Así te verán los demás en el marcador y en el killfeed.'],
   ['Crea una sala o entra en una', 'Si tiene candado, pide la contraseña a quien la creó.'],
-  ['Elige personaje y skin', 'Cada uno tiene vida, velocidad y armas distintas.'],
+  [
+    'Monta tu clase',
+    `Todos tenéis ${BODY.hp} de vida: elige arma principal, secundaria, habilidad y accesorio, y vístete a tu gusto. Cuanto más pesa el arma en la mano, más despacio vas. En partida, L cambia el equipo para la próxima vez que aparezcas.`,
+  ],
   [
     'Haz clic para jugar',
     'El ratón queda capturado. Esc lo suelta y abre la pausa; otro Esc (o un clic) vuelve al juego.',
@@ -36,7 +58,7 @@ const STEPS: [string, string][] = [
   ],
   [
     'Escalada de armas',
-    'Todos empiezan con la misma arma y cada baja da la siguiente. Gana quien elimine con el cuchillo.',
+    'Progresión de armas: todos empiezan con la misma arma y cada baja da la siguiente. Gana quien elimine con el cuchillo.',
   ],
   [
     'Captura la bandera',
@@ -52,19 +74,32 @@ const STEPS: [string, string][] = [
   ],
   [
     'Dominio',
-    'Quédate en una zona (A, B o C) sin rivales dentro para capturarla. Cada 2 s tu equipo suma un punto por zona.',
+    'Controla y mantén los puntos del mapa: quédate en una zona (A, B o C) sin rivales dentro para capturarla. Cada 2 s tu equipo suma un punto por zona.',
   ],
   [
-    'Rondas',
-    'No se reaparece durante la ronda: gana el equipo que deje al otro sin nadie en pie. Vale para 1 contra 1.',
+    'Supervivencia',
+    'Por equipos y sin reaparición: no se reaparece durante la ronda: gana el equipo que deje al otro sin nadie en pie. Vale para 1 contra 1.',
+  ],
+  [
+    'Último en pie',
+    'Como Supervivencia, pero cada uno por su cuenta: gana la ronda quien quede vivo. Si se acaba el tiempo, quien tenga más vida.',
+  ],
+  ['Disparo único', 'Todos llevan solo la railgun, con munición infinita, y el cuchillo: cualquier impacto mata.'],
+  [
+    'Congelados',
+    'Quien cae se queda congelado donde estaba. Quédate 3 s a su lado (más rápido si sois varios) para descongelarlo. Gana la ronda el equipo que congele a todos los rivales.',
+  ],
+  [
+    'Bomba',
+    'Rojo lleva la bomba y la planta quedándose 3 s en la zona A o B; explota a los 35 s. Azul la desactiva quedándose 6 s a su lado, o gana si se acaba el tiempo sin bomba plantada.',
   ],
   [
     'Si te eliminan',
-    `Ves la repetición desde los ojos de quien te eliminó y reapareces a los ${PLAYER.respawnDelay / 1000} s. B cambia de personaje.`,
+    `Ves la repetición desde los ojos de quien te eliminó y reapareces a los ${PLAYER.respawnDelay / 1000} s. B cambia de clase; L, solo el equipo.`,
   ],
 ];
 
-const TRICKS: [string, string][] = [
+export const TRICKS: [string, string][] = [
   ['Bunny hop', 'Mantén Espacio al aterrizar: cada salto encadenado conserva la velocidad.'],
   ['Deslízate', 'Corre y pulsa C para entrar en una esquina más rápido y más bajo.'],
   [
@@ -75,170 +110,96 @@ const TRICKS: [string, string][] = [
     'Plataformas de salto',
     'Las placas verdes del suelo te lanzan hacia arriba: úsalas para subir a torres, contenedores y azoteas.',
   ],
-  ['Armas pesadas', 'El francotirador y la ametralladora te frenan. Saca la secundaria para moverte más rápido.'],
-  ['Apunta a la cabeza', 'Multiplica el daño. Al Tanque, el francotirador solo lo tumba de un tiro a la cabeza.'],
+  [
+    'Armas pesadas',
+    `El ${WEAPONS.sniper.name} y la ${WEAPONS.lmg.name} te frenan. Saca la secundaria para moverte más rápido.`,
+  ],
+  [
+    'Apunta a la cabeza',
+    `Multiplica el daño. El ${WEAPONS.sniper.name} tumba de un tiro al cuerpo; el resto, mejor a la cabeza.`,
+  ],
   ['Francotirador quieto', 'Tarda en apuntar y, si te mueves o saltas con la mira puesta, el tiro se desvía.'],
   ['Agáchate al disparar', 'Con C la mira se abre menos y aciertas más ráfagas.'],
   [
-    'Recarga a cubierto',
-    `La ametralladora del Bastión tarda ${WEAPONS.lmg.reload / 1000} s. Hazlo detrás de una caja.`,
+    'Precisión y postura',
+    `Entre ráfagas la mira se cierra antes agachado y quieto (×${WEAPON_HANDLING.bloom.posture.crouchStill}), normal de pie, despacio corriendo (×${WEAPON_HANDLING.bloom.posture.run}) y casi nada en el aire (×${WEAPON_HANDLING.bloom.posture.air}).`,
   ],
-  ['Mira el minimapa', 'Los enemigos que disparan aparecen un momento en rojo.'],
+  [
+    'Cabeza, torso y piernas',
+    `La cabeza multiplica el daño; las piernas reciben el ${Math.round(LIMB_MULT * 100)} % del daño del torso. El ${WEAPONS.sniper.name} sigue tumbando de un tiro al torso.`,
+  ],
+  [
+    'Peso y estamina',
+    `Con un arma pesada en la mano el esprint y los saltos cansan más (la ${WEAPONS.lmg.name}, ×${staminaMult(WEAPONS.lmg.weight).toFixed(2)}). Con la pistola o el cuchillo, lo normal.`,
+  ],
+  [
+    'Accesorios',
+    `Uno por clase: ${ACCESSORY_IDS.filter((id) => id !== 'none')
+      .map((id) => ACCESSORIES[id].name)
+      .join(
+        ', ',
+      )}. El Kevlar quita un ${Math.round((1 - KEVLAR.torso) * 100)} % en el torso pero te frena; el casco, un ${Math.round((1 - HELMET.head) * 100)} % en la cabeza; el láser se ve.`,
+  ],
+  [
+    'Recarga a cubierto',
+    `La ${WEAPONS.lmg.name} tarda ${WEAPONS.lmg.reload / 1000} s en recargar. Hazlo detrás de una caja.`,
+  ],
+  ['Mira el minimapa', 'Los enemigos que disparan aparecen un momento en rojo (los que llevan silenciador, no).'],
   ['Ráfagas cortas', 'Cada disparo sube la mira; al soltar el gatillo vuelve sola a su sitio.'],
   ['Rachas', 'Encadena 3, 5, 7 o 10 bajas sin morir y toda la sala lo verá en el killfeed.'],
   [
     'Recompensas',
-    'Con 5 bajas seguidas ganas Radar (ves a todos los enemigos en el minimapa un rato); con 7, Blindaje (+50 que se gasta antes que la vida).',
+    'Con 3 bajas seguidas ganas Radar (ves a todos los enemigos en el minimapa un rato); con 5, Blindaje (+50 que se gasta antes que la vida); con 7, Bombardeo aéreo donde estés mirando (se marca en rojo en el suelo antes de caer).',
   ],
   ['Disparos justos', 'El servidor compensa el retraso de la red: si en tu pantalla le diste, cuenta.'],
   ['Granadas', 'Sácalos de una esquina: la explosión no atraviesa paredes y no daña a tu equipo ni a ti.'],
+  ['Botiquín y chaleco', 'Están en el suelo y en el minimapa: +40 de vida o +50 de blindaje. Vuelven a los 30 s.'],
+  [
+    'Barriles rojos',
+    'Dispárales y explotan: daño de granada alrededor, y la baja es tuya. Las cajas de madera se rompen.',
+  ],
+  [
+    'Escaleras y tirolinas',
+    'Camina hacia una escalera para subir (mira abajo para bajar). Salta al cable de una tirolina para agarrarte: va hacia donde mires; salta otra vez para soltarte.',
+  ],
+  [
+    'Saltos de pared y bordes',
+    'En el aire, pegado a un muro, salta otra vez para rebotar en él (hasta 3 seguidos). Salta hacia un borde alto y mantén Espacio para subirte.',
+  ],
+  [
+    'Armas de poder',
+    `Cada minuto aparece una (${WEAPONS.railgun.name}, ${WEAPONS.minigun.name} o ${WEAPONS.autoshotgun.name}): se anuncia y sale en el minimapa con una luz naranja. Un solo cargador; tecla 4.`,
+  ],
   [
     'Medallas',
     'Primera sangre, doble baja, venganza, desde el aire, por la espalda o tiro lejano: suman en el marcador.',
   ],
 ];
 
-const TABS = ['Controles', 'Cómo jugar', 'Personajes', 'Armas', 'Trucos'];
-const CARD_COLS = 4;
-/** Cards of an incomplete last row widen to fill it, so the grid stays symmetric (when they divide it evenly). */
-const lastRowSpan = (count: number, i: number): string | undefined => {
-  const rest = count % CARD_COLS;
-  return rest && CARD_COLS % rest === 0 && i >= count - rest ? `span ${CARD_COLS / rest}` : undefined;
-};
-
-export default function Manual({ onClose }: { onClose: () => void }) {
-  const [tab, setTab] = useState(0);
-
-  useEffect(() => {
-    const esc = (e: KeyboardEvent) => e.code === 'Escape' && onClose();
-    window.addEventListener('keydown', esc);
-    return () => window.removeEventListener('keydown', esc);
-  }, [onClose]);
-
+/** The keys window (H / F1 in game, pause menu, «Ver controles» in Settings): the proposal's #keysModal. */
+export default function Controls({ onClose }: { onClose: () => void }) {
   return (
-    <div className="modal-bg" onClick={onClose}>
-      <div className="modal manual" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <h2>Manual de BLOCKSHOT</h2>
-          <button className="btn icon" onClick={onClose} aria-label="Cerrar">
-            <Icon name="x" size={18} />
-          </button>
-        </div>
-        <nav className="seg tabs">
-          {TABS.map((t, i) => (
-            <button key={t} className={tab === i ? 'on' : ''} onClick={() => setTab(i)}>
-              {t}
-            </button>
-          ))}
-        </nav>
-
-        <div className="manual-body">
-          {tab === 0 && (
-            <div className="controls-grid">
-              {CONTROLS.map(([keys, what]) => (
-                <div className="key-row" key={what}>
-                  <Keys keys={keys} />
-                  <span>{what}</span>
-                </div>
+    <Modal className="wide" labelledBy="keysTitle" onClose={onClose}>
+      <h2 id="keysTitle">Controles</h2>
+      <div className="keys">
+        {CONTROLS.map(([keys, what]) => (
+          <div className="key" key={what}>
+            <span>
+              {keys.map((k) => (
+                <kbd className="k" key={k}>
+                  {k}
+                </kbd>
               ))}
-            </div>
-          )}
-
-          {tab === 1 && (
-            <div className="steps">
-              {STEPS.map(([t, d], i) => (
-                <div className="step" key={t} style={{ gridColumn: lastRowSpan(STEPS.length, i) }}>
-                  <span className="n">{i + 1}</span>
-                  <div>
-                    <b>{t}</b>
-                    <p>{d}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {tab === 2 && (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Personaje</th>
-                  <th>Vida</th>
-                  <th>Velocidad (1 / 2)</th>
-                  <th>Principal</th>
-                  <th>Secundaria</th>
-                  <th>Estilo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {CHARACTERS.map((c) => (
-                  <tr key={c.id}>
-                    <td>
-                      <span className="chip-char" style={{ '--c': c.color }}>
-                        {c.name}
-                      </span>
-                    </td>
-                    <td className="b">{c.hp}</td>
-                    <td className="b">
-                      {speedWith(c, c.primary)} / {speedWith(c, c.secondary)}
-                    </td>
-                    <td>{WEAPONS[c.primary].name}</td>
-                    <td>{WEAPONS[c.secondary].name}</td>
-                    <td className="desc">{c.desc}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-
-          {tab === 3 && (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Arma</th>
-                  <th>Daño (cerca → lejos)</th>
-                  <th>Cabeza</th>
-                  <th>Disparos/s</th>
-                  <th>Cargador</th>
-                  <th>Recarga</th>
-                  <th>Peso</th>
-                  <th>Modo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.values(WEAPONS).map((w) => (
-                  <tr key={w.name}>
-                    <td className="b">{w.name}</td>
-                    <td className="n">
-                      {w.pellets > 1 ? `${w.damage}×${w.pellets}` : w.damage}
-                      {w.falloff && ` → ${Math.round(damageAt(w, w.falloff[1]))}`}
-                    </td>
-                    <td className="head">×{w.headMult}</td>
-                    <td className="n">{(1000 / w.fireRate).toFixed(1)}</td>
-                    <td className="n">{w.melee ? '—' : w.mag}</td>
-                    <td className="n">{w.melee ? '—' : `${(w.reload / 1000).toFixed(1)} s`}</td>
-                    <td>{weightName(w)}</td>
-                    <td>
-                      {w.melee ? `Cuerpo a cuerpo · espalda ${w.backstab}` : w.auto ? 'Automática' : 'Semiautomática'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-
-          {tab === 4 && (
-            <div className="tricks">
-              {TRICKS.map(([t, d], i) => (
-                <div className="trick" key={t} style={{ gridColumn: lastRowSpan(TRICKS.length, i) }}>
-                  <b>{t}</b>
-                  <p>{d}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+            </span>
+            {what}
+          </div>
+        ))}
       </div>
-    </div>
+      <div className="modal-actions">
+        <button className="btn primary" value="ok">
+          Cerrar
+        </button>
+      </div>
+    </Modal>
   );
 }

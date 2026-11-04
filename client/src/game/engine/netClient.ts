@@ -6,6 +6,7 @@ import {
   type ShootMessage,
   type Vec3,
 } from '@blockshot/shared';
+import type { Look } from '../../characters/looks';
 import type { GameSocket } from '../../network/socket';
 
 /** Smoothing of the measured round trip time (weight of the old value). */
@@ -46,14 +47,15 @@ export class NetClient {
   switchSlot(slot: number): void {
     this.socket.emit('player:switch', { slot });
   }
+  ability(o: Vec3, d: Vec3): void {
+    this.socket.emit('player:ability', { o, d });
+  }
+
   grenade(o: Vec3, d: Vec3): void {
     this.socket.emit('player:grenade', { o, d });
   }
-  chat(i: number): void {
-    this.socket.emit('chat:quick', { i });
-  }
-  spawn(characterId: string, skin: string, color?: string): void {
-    this.socket.emit('player:spawn', { characterId, skin, color });
+  spawn(look: Look): void {
+    this.socket.emit('player:spawn', { ...look });
   }
 
   dispose(): void {

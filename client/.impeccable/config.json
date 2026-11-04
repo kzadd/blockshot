@@ -1,0 +1,36 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [".impeccable/mocks/propuesta/proto.css"],
+        "createdAt": "2026-10-27T17:48:20.960Z",
+        "reason": "Claude: team-colour underline on the scorebug (rojo/azul) is a domain convention in shooters, not a card accent"
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [".impeccable/mocks/propuesta/index.html"],
+        "createdAt": "2026-10-27T17:48:21.169Z",
+        "reason": "Claude: segmented control buttons fill their frame by design (standard segmented control); buttons carry their own padding"
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": ["src/styles/proposal.css"],
+        "createdAt": "2026-10-27T21:11:31.695Z",
+        "reason": "Claude: generated copy of the approved proposal CSS; the flagged rule is the team-colour underline on the HUD scorebug sample (rojo/azul), already a sanctioned exception in proto.css"
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": ["src/styles/styles.css"],
+        "createdAt": "2026-10-28T07:06:24.523Z",
+        "reason": "flagged rules are top/bottom inset accents copied from the user-approved proposal (.modal inset 0 3px 0, .seg on inset 0 -2px 0); HUD edge strips were approved by the user"
+      }
+    ]
+  }
+}

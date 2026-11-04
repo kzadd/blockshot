@@ -3,6 +3,8 @@ import { useSyncExternalStore } from 'react';
 // Player settings: saved in this browser and applied immediately
 export type CrosshairStyle = 'cross' | 'crossdot' | 'dot' | 'circle' | 't' | 'x';
 export type ColorblindMode = 'off' | 'rg' | 'by';
+/** Graphics quality: baja for integrated graphics (default), alta adds antialias, soft shadows and full resolution. */
+export type Quality = 'baja' | 'alta';
 
 export const CROSSHAIRS: { id: CrosshairStyle; name: string }[] = [
   { id: 'cross', name: 'Cruz' },
@@ -35,6 +37,7 @@ export interface Settings {
   /** soft HUD and camera shake when taking damage */
   shake: boolean;
   colorblind: ColorblindMode;
+  quality: Quality;
   crosshair: CrosshairConfig;
 }
 
@@ -47,16 +50,29 @@ export const DEFAULTS: Settings = {
   volume: 0.8,
   shake: true,
   colorblind: 'off',
-  crosshair: { style: 'cross', color: '#ffffff', size: 8, thickness: 2, gap: 5, outline: true, dynamic: true },
+  quality: 'baja',
+  // Valorant-like: thin, short and steady, so it never hides a far target
+  crosshair: { style: 'cross', color: '#ffffff', size: 4, thickness: 1, gap: 3, outline: true, dynamic: false },
 };
 
 const KEY = 'blockshot:settings';
+const OLD_DEFAULT_CROSSHAIR = JSON.stringify({
+  style: 'cross',
+  color: '#ffffff',
+  size: 6,
+  thickness: 2,
+  gap: 4,
+  outline: true,
+  dynamic: true,
+});
 let state: Settings = load();
 const listeners = new Set<(s: Settings) => void>();
 
 function load(): Settings {
   try {
     const s = (JSON.parse(localStorage.getItem(KEY) ?? 'null') as Partial<Settings> | null) ?? {};
+    // A crosshair saved as the old default (never customised) takes the new one
+    if (JSON.stringify(s.crosshair) === OLD_DEFAULT_CROSSHAIR) delete s.crosshair;
     return { ...DEFAULTS, ...s, crosshair: { ...DEFAULTS.crosshair, ...s.crosshair } };
   } catch {
     return DEFAULTS;

@@ -1,0 +1,54 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Scopes</title>
+<style>
+  body {
+    margin: 0;
+    background: #222;
+  }
+</style>
+<script type="module">
+  // Temporary: the pack's three sights side by side
+  import * as THREE from 'three';
+  import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+  import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
+  const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  r.setSize(1500, 500);
+  r.setClearColor(0x87b8e0);
+  document.body.append(r.domElement);
+  const s = new THREE.Scene();
+  s.add(new THREE.HemisphereLight(0xffffff, 0x777777, 2.5));
+  const l = new THREE.DirectionalLight(0xffffff, 1.5);
+  l.position.set(1, 2, 3);
+  s.add(l);
+  const L = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+  for (let i = 1; i <= 3; i++) {
+    const g = (await L.loadAsync(`m/Scope_${i}.glb`)).scene;
+    const b = new THREE.Box3().setFromObject(g);
+    const sz = b.getSize(new THREE.Vector3());
+    const c = b.getCenter(new THREE.Vector3());
+    console.log(
+      'scope',
+      i,
+      sz
+        .toArray()
+        .map((v) => v.toFixed(3))
+        .join(','),
+    );
+    const k = 1 / Math.max(sz.x, sz.y, sz.z);
+    g.scale.setScalar(k);
+    g.position.copy(c).multiplyScalar(-k);
+    g.position.x += (i - 2) * 1.3;
+    const p = new THREE.Group();
+    p.add(g);
+    p.rotation.y = 0.7;
+    p.position.x = (i - 2) * 1.3;
+    g.position.x -= (i - 2) * 1.3;
+    s.add(p);
+  }
+  const cam = new THREE.PerspectiveCamera(35, 3, 0.1, 50);
+  cam.position.set(0, 0.6, 3.6);
+  cam.lookAt(0, 0, 0);
+  r.render(s, cam);
+  document.title = 'done';
+</script>

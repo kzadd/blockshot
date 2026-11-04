@@ -9,6 +9,7 @@ import {
 } from '@blockshot/shared';
 import type { Player } from '../players/player';
 import { notice, type Room } from '../rooms/room';
+import { callStrike } from './strike';
 
 /** A victim's streak is announced as "ended" from this length. */
 const ANNOUNCED_STREAK = 3;
@@ -18,7 +19,8 @@ function grantStreakReward(room: Room, shooter: Player, now: number): string | u
   const reward = STREAK_REWARDS[shooter.streak];
   if (!reward) return undefined;
   if (reward.id === 'radar') shooter.radarUntil = now + reward.ms;
-  else shooter.armor = reward.amount;
+  else if (reward.id === 'armor') shooter.armor = reward.amount;
+  else callStrike(room, shooter, now);
   return reward.name;
 }
 
@@ -59,6 +61,7 @@ export function applyDamage(
   const now = Date.now();
   // Just respawned: invulnerable for a few seconds (until it shoots)
   if (!victim.alive || now < victim.protUntil) return;
+  dmg = room.mode.damage?.(shooter, victim, w, dmg) ?? dmg;
   // Armor (streak reward) is spent before health
   const absorbed = Math.min(victim.armor || 0, dmg);
   victim.armor -= absorbed;
@@ -70,7 +73,7 @@ export function applyDamage(
 
   const at: Vec3 = [round2(at3[0]), round2(at3[1]), round2(at3[2])];
   if (victim.hp > 0) {
-    room.channel.to(shooter.id, 'hitmarker', [{ head, kill: false, dmg: Math.round(dmg), at }]);
+    room.channel.to(shooter.id, 'hitmarker', [{ head, kill: false, dmg: Math.round(dmg), at, id: victim.id }]);
     return;
   }
   victim.alive = false;
@@ -85,13 +88,13 @@ export function applyDamage(
   shooter.bestStreak = Math.max(shooter.bestStreak, shooter.streak);
   const reward = grantStreakReward(room, shooter, now);
   const medals = medalsFor(room, shooter, victim, w, dmg, head, now);
-  room.channel.to(shooter.id, 'hitmarker', [{ head, kill: true, dmg: Math.round(dmg), at }]);
+  room.channel.to(shooter.id, 'hitmarker', [{ head, kill: true, dmg: Math.round(dmg), at, id: victim.id }]);
   room.channel.broadcast('kill', [
     {
       killer: shooter.id,
       killerName: shooter.name,
       killerTeam: shooter.team,
-      killerChar: shooter.characterId,
+      killerClass: shooter.cls,
       killerHp: Math.ceil(shooter.hp),
       victim: victim.id,
       victimName: victim.name,

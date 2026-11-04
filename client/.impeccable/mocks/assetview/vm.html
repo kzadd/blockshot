@@ -1,0 +1,207 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>VM view</title>
+<style>
+  body {
+    margin: 0;
+    background: #222;
+    color: #ddd;
+    font: 12px sans-serif;
+    display: flex;
+    flex-wrap: wrap;
+  }
+  div {
+    position: relative;
+  }
+  span {
+    position: absolute;
+    left: 4px;
+    top: 2px;
+  }
+</style>
+<script type="module">
+  // Temporary: the first-person view model (?w=rifle,pistol&aim=0&nade=1&cam=r) over a sky colour
+  import * as THREE from 'three';
+  import { WEAPONS } from '@blockshot/shared';
+  import { ViewModel } from '/src/game/engine/viewModel.ts';
+  const q = new URLSearchParams(location.search);
+  const ids = (q.get('w') || 'rifle,pistol,knife').split(',');
+  const W = Number(q.get('W') || 960),
+    H = Number(q.get('H') || 540);
+  const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  r.setSize(W, H);
+  r.setClearColor(0x87b8e0);
+  for (const id of ids) {
+    const vm = new ViewModel(W / H);
+    vm.initEnvironment(r);
+    vm.setGun(id, q.get('color') || '#3f7fe0', 'base');
+    await new Promise((res) => setTimeout(res, 900));
+    const f = {
+      weapon: WEAPONS[id],
+      speed: 0,
+      grounded: true,
+      sliding: false,
+      sprintLerp: 0,
+      aimLerp: Number(q.get('aim') || 0),
+      kick: 0,
+      reloadEnd: 0,
+      swapUntil: 0,
+      swingAt: -1e9,
+      flashTime: -1e9,
+      grenadeAim: !!q.get('nade'),
+    };
+    let now = performance.now();
+    for (let i = 0; i < 40; i++) vm.update(0.05, (now += 50), true, f);
+    if (false) {
+      // Mock only: Krunker-like box arms instead of the rigged ones
+      const gun = vm.scene.children.find((c) => c.type === 'Group').children[0];
+      gun.traverse((o) => {
+        if (o.isSkinnedMesh) o.visible = false;
+      });
+      const variant = Number(q.get('blocky')) - 1;
+      const arm = (hand, dir, len, roll) => {
+        const g = buildFpBlockArm(q.get('color') || '#3f7fe0', 'base', 'liso', len, variant);
+        g.position.copy(hand);
+        g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir.clone().normalize());
+        g.rotateZ(roll);
+        gun.add(g);
+        window.lastArm = g;
+      };
+      const long = gun.userData.muzzleZ < -0.4;
+      arm(new THREE.Vector3(0.0, -0.08, 0.1), new THREE.Vector3(0.7, -0.55, 0.7), 0.7, 0.5);
+      if (long)
+        arm(
+          new THREE.Vector3(-0.02, -0.06, Math.round(gun.userData.muzzleZ * 0.42 * 100) / 100),
+          new THREE.Vector3(-1, -0.4, 0.55),
+          0.9,
+          -0.9,
+        );
+    }
+    // Mock only (?ads=1..3): three ways to aim with the gun in view, and a far target to judge what it hides
+    const ads = Number(q.get('ads') || 0);
+    let xhair = false;
+    if (ads) {
+      const holder = vm.scene.children.find((c) => c.type === 'Group');
+      const gun = holder.children[0];
+      const sc = holder.scale.y;
+      const sy = gun.userData.sightY;
+      const target = new THREE.Group();
+      const red = new THREE.MeshLambertMaterial({ color: 0xd0533a });
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.3, 0.08), red);
+      body.position.y = -0.1;
+      target.add(body);
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.08), red);
+      head.position.y = 0.1;
+      target.add(head);
+      target.position.set(0.0, -0.1, -9.5);
+      vm.scene.add(target);
+      if (ads === 1) {
+        // Valorant: the gun comes in and drops, its top below the centre; the thin crosshair stays
+        holder.position.set(0.035, -sy * sc - 0.03, -0.2);
+        holder.rotation.set(0.02, 0.03, 0.05);
+        xhair = true;
+      } else if (ads === 2) {
+        // COD: a holographic sight on top of the gun; the eye looks through its window at the red dot
+        const holo = new THREE.Group();
+        const dark = new THREE.MeshLambertMaterial({ color: 0x23262b });
+        const B = (w, h, d, x, y, z, m = dark) => {
+          const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
+          b.position.set(x, y, z);
+          holo.add(b);
+        };
+        const W = 0.075,
+          H = 0.055;
+        B(0.04, 0.012, 0.08, 0, 0.012, 0.01); // base on the rail
+        B(W + 0.012, 0.008, 0.012, 0, H + 0.022, -0.03); // hood
+        B(0.005, H, 0.012, -W / 2 - 0.002, 0.018 + H / 2, -0.03);
+        B(0.005, H, 0.012, W / 2 + 0.002, 0.018 + H / 2, -0.03); // sides
+        B(0.02, 0.012, 0.03, W / 2 + 0.01, 0.03, 0.02); // battery knob
+        const glass = new THREE.Mesh(
+          new THREE.PlaneGeometry(W, H),
+          new THREE.MeshBasicMaterial({ color: 0x9fd0ff, transparent: true, opacity: 0.18 }),
+        );
+        glass.position.set(0, 0.018 + H / 2, -0.03);
+        holo.add(glass);
+        const dot = new THREE.Mesh(
+          new THREE.CircleGeometry(0.0022, 12),
+          new THREE.MeshBasicMaterial({ color: 0xff2a1a }),
+        );
+        dot.position.set(0, 0.018 + H / 2, -0.031);
+        holo.add(dot);
+        const top = sy - 0.004;
+        holo.position.set(0, top, gun.userData.muzzleZ * 0.25 + 0.06);
+        gun.add(holo);
+        const eye = top + 0.018 + H / 2;
+        holder.position.set(0, -eye * sc, -0.2);
+        holder.rotation.set(0, 0, 0);
+      } else {
+        // Urban Terror: the gun stays to the right, a bit higher and nearer the middle; zoom and the crosshair
+        holder.position.set(0.1, -0.075, -0.32);
+        holder.rotation.set(0.05, 0.03, 0.03);
+        xhair = true;
+      }
+      vm.camera.fov = 60 / 1.4;
+      vm.camera.updateProjectionMatrix();
+    }
+    let cam = vm.camera;
+    const view = q.get('cam');
+    if (view) {
+      const holder = vm.scene.children.find((c) => c.type === 'Group');
+      const c =
+        view === 'a'
+          ? window.lastArm.localToWorld(new THREE.Vector3(0, 0, 0.15))
+          : new THREE.Box3().setFromObject(holder.children[0]).getCenter(new THREE.Vector3());
+      cam = new THREE.PerspectiveCamera(40, W / H, 0.01, 10);
+      const off = {
+        r: [0.9, 0.1, 0],
+        l: [-0.9, 0.1, 0],
+        t: [0, 0.9, 0.05],
+        f: [0, 0.1, -0.9],
+        a: [-0.25, 0.12, -0.12],
+      }[view];
+      cam.position.copy(c).add(new THREE.Vector3(...off));
+      cam.lookAt(c);
+    }
+    r.clear();
+    r.render(vm.scene, cam);
+    let url = r.domElement.toDataURL();
+    if (xhair) {
+      const c2 = document.createElement('canvas');
+      c2.width = W;
+      c2.height = H;
+      const g2 = c2.getContext('2d');
+      const im = new Image();
+      im.src = url;
+      await im.decode();
+      g2.drawImage(im, 0, 0);
+      g2.fillStyle = 'rgba(0,0,0,.6)';
+      const cx = W / 2,
+        cy = H / 2;
+      for (const [x, y, w, h] of [
+        [cx - 9, cy - 1, 6, 2],
+        [cx + 3, cy - 1, 6, 2],
+        [cx - 1, cy - 9, 2, 6],
+        [cx - 1, cy + 3, 2, 6],
+      ])
+        g2.fillRect(x - 1, y - 1, w + 2, h + 2);
+      g2.fillStyle = '#fff';
+      for (const [x, y, w, h] of [
+        [cx - 9, cy - 0.5, 6, 1],
+        [cx + 3, cy - 0.5, 6, 1],
+        [cx - 0.5, cy - 9, 1, 6],
+        [cx - 0.5, cy + 3, 1, 6],
+      ])
+        g2.fillRect(x, y, w, h);
+      url = c2.toDataURL();
+    }
+    const img = new Image();
+    img.src = url;
+    const d = document.createElement('div');
+    d.append(img);
+    const s = document.createElement('span');
+    s.textContent = id;
+    d.append(s);
+    document.body.append(d);
+  }
+  document.title = 'done';
+</script>

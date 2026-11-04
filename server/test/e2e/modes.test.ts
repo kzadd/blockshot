@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { CHAR_BY_ID, INFECT, getMap, type KillEvent, type MatchEnd } from '@blockshot/shared';
+import { BODY, INFECT, WEAPONS, getMap, type KillEvent, type MatchEnd } from '@blockshot/shared';
 import { Bot, shootUntil, sleep, startServer, type TestServer } from './harness';
 
 const SPOT_A = [8, -2.5] as const;
@@ -74,8 +74,7 @@ describe('infected', () => {
     const zombie = a.me()?.tm === 2 ? a : b;
     const human = zombie === a ? b : a;
     expect(zombie.find('loadout', (d: { team?: number }) => d.team === 2)).toBeTruthy();
-    const zombieChar = CHAR_BY_ID[zombie === a ? 'soldado' : 'rayo'];
-    expect(zombie.me()?.mh).toBe(Math.round(zombieChar.hp * INFECT.hp));
+    expect(zombie.me()?.mh).toBe(Math.round(BODY.hp * INFECT.hp));
     await both(4100);
     await shootUntil(zombie, human, () => zombie.count('kill') > 0, { tries: 10, every: 520, dy: 1 });
     expect(zombie.find<KillEvent>('kill')?.weapon).toBe('Cuchillo');
@@ -86,21 +85,21 @@ describe('infected', () => {
 
 describe('streak rewards', () => {
   // Slow on purpose: the victim respawns 7 times and walks back to its spot every time
-  it('gives radar at 5 and armor at 7 kills in a row', { timeout: 240_000 }, async () => {
+  it('gives radar at 3 and armor at 5 kills in a row', { timeout: 240_000 }, async () => {
     const { a, b } = await room('ffa', 20);
     await Promise.all([a.goTo(...SPOT_A), b.goTo(...SPOT_B)]);
     b.dropProtection();
-    for (let k = 1; k <= 7; k++) {
+    for (let k = 1; k <= 5; k++) {
       await shootUntil(a, b, () => a.count('kill') >= k);
-      if (k === 5) {
+      if (k === 3) {
         await a.idle(100);
         expect(a.me()?.rd).toBe(1);
       }
       a.reload(); // the bot does not auto-reload like the real client
-      if (k < 7) await respawnAtSpot(b);
+      if (k < 5) await respawnAtSpot(b);
     }
     const last = a.events.filter(([e]) => e === 'kill').pop()?.[1] as KillEvent;
-    expect(last).toMatchObject({ streak: 7, reward: 'Blindaje' });
+    expect(last).toMatchObject({ streak: 5, reward: 'Blindaje' });
     await a.idle(100);
     expect(a.me()?.ar).toBe(50);
     await respawnAtSpot(b);
@@ -109,7 +108,7 @@ describe('streak rewards', () => {
     b.shootAt(a);
     await a.idle(200);
     expect(a.me()?.h).toBe(100);
-    expect(a.me()?.ar).toBe(26);
+    expect(a.me()?.ar).toBe(50 - WEAPONS.rifle.damage); // the armour took the shot
   });
 });
 
@@ -133,11 +132,11 @@ describe('capture the flag', () => {
 
 describe('gun game', () => {
   it('gives the next weapon on a kill', async () => {
-    const { a, b } = await room('gungame', 5);
+    const { a, b } = await room('gungame', 10);
     await Promise.all([a.goTo(...SPOT_A), b.goTo(...SPOT_B)]);
     b.dropProtection();
     await shootUntil(a, b, () => a.count('kill') > 0);
-    expect(a.find<KillEvent>('kill')?.weapon).toBe('Subfusil');
+    expect(a.find<KillEvent>('kill')?.weapon).toBe('M4');
     await a.until(() => a.count('loadout', (d: { level: number }) => d.level === 1) > 0, 2000, 'level up');
     await a.idle(150);
     expect(a.me()?.lv).toBe(1);

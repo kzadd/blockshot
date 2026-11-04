@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>BLOCKSHOT · Vestíbulo</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ground: #f2efe8;
+        --card: #fbfaf6;
+        --ink: #16181d;
+        --mute: #5d5f66;
+        --red: #d7263d;
+        --blue: #1d5fbf;
+        --yel: #f2b705;
+        --grn: #1f9d55;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1440px;
+        height: 900px;
+        overflow: hidden;
+        margin: 0;
+      }
+      body {
+        background: var(--ground);
+        color: var(--ink);
+        font:
+          500 15px/1.35 Archivo,
+          sans-serif;
+      }
+      h1,
+      h2,
+      .disp {
+        font-family: 'Archivo Black', sans-serif;
+        margin: 0;
+        font-weight: 400;
+      }
+      button,
+      input {
+        font: inherit;
+        color: inherit;
+      }
+      header {
+        height: 84px;
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: center;
+        padding: 0 40px;
+        border-bottom: 3px solid var(--ink);
+      }
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 30px;
+        letter-spacing: 0.02em;
+      }
+      .logo i {
+        display: grid;
+        grid-template-columns: repeat(2, 13px);
+        gap: 3px;
+      }
+      .logo i b {
+        width: 13px;
+        height: 13px;
+        border: 2px solid var(--ink);
+      }
+      .nick {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .nick label {
+        font-weight: 700;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      input {
+        background: var(--card);
+        border: 2px solid var(--ink);
+        border-radius: 6px;
+        padding: 9px 12px;
+        font-weight: 600;
+      }
+      .nick input {
+        width: 230px;
+        font-size: 17px;
+      }
+      nav {
+        justify-self: end;
+        display: flex;
+        gap: 8px;
+      }
+      .ghost {
+        background: var(--card);
+        border: 2px solid var(--ink);
+        border-radius: 6px;
+        padding: 8px 16px;
+        font-weight: 700;
+        box-shadow: 0 3px 0 var(--ink);
+      }
+      .go {
+        background: var(--yel);
+        border: 3px solid var(--ink);
+        border-radius: 8px;
+        padding: 14px 28px;
+        font: 400 18px 'Archivo Black';
+        box-shadow: 0 4px 0 var(--ink);
+        letter-spacing: 0.02em;
+      }
+      main {
+        display: grid;
+        grid-template-columns: 1fr 36px 1fr;
+        height: 816px;
+      }
+      section {
+        padding: 26px 40px 30px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+      .hd {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+      }
+      h2 {
+        font-size: 26px;
+      }
+      .hd small {
+        font-weight: 600;
+        color: var(--mute);
+      }
+      .track {
+        border-left: 3px solid var(--ink);
+        border-right: 3px solid var(--ink);
+        display: grid;
+        grid-template-rows: repeat(17, 1fr);
+      }
+      .track b {
+        border-bottom: 2px solid var(--ink);
+      }
+      .track b:nth-child(4n + 3) {
+        background: var(--grn);
+      }
+      .track b:nth-child(9) {
+        background: var(--ink);
+      }
+      .rooms {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .room {
+        display: grid;
+        grid-template-columns: 8px 1fr auto 118px;
+        align-items: center;
+        gap: 16px;
+        background: var(--card);
+        border: 2px solid var(--ink);
+        border-radius: 8px;
+        padding: 12px 16px 12px 0;
+        overflow: hidden;
+      }
+      .room .band {
+        height: 56px;
+        margin: -12px 0;
+      }
+      .room.sel {
+        border-width: 3px;
+        box-shadow: 5px 5px 0 var(--ink);
+        transform: translate(-2px, -2px);
+      }
+      .room .name {
+        font: 400 18px 'Archivo Black';
+      }
+      .room .meta {
+        color: var(--mute);
+        font-weight: 600;
+        font-size: 13px;
+      }
+      .pips {
+        display: grid;
+        grid-auto-flow: column;
+        grid-template-rows: repeat(2, 7px);
+        gap: 3px;
+      }
+      .pips b {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        border: 1.5px solid var(--ink);
+      }
+      .pips b.on {
+        background: var(--ink);
+      }
+      .cnt {
+        font-weight: 800;
+        font-size: 13px;
+        margin-top: 3px;
+      }
+      .tag {
+        justify-self: end;
+        font-weight: 800;
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        padding: 4px 8px;
+        border: 2px solid var(--ink);
+        border-radius: 4px;
+      }
+      .tag.live {
+        background: var(--ink);
+        color: var(--card);
+      }
+      .board {
+        flex: 1;
+        background: var(--card);
+        border: 3px solid var(--ink);
+        border-radius: 10px;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+      }
+      .board .top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 18px;
+        border-bottom: 2px solid var(--ink);
+      }
+      .field {
+        display: grid;
+        grid-template-columns: 1fr 1.25fr 1fr;
+      }
+      .home {
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .home.r {
+        background: var(--red);
+      }
+      .home.b {
+        background: var(--blue);
+      }
+      .home .lbl,
+      .salida .lbl {
+        font: 400 13px 'Archivo Black';
+        letter-spacing: 0.08em;
+        color: var(--card);
+      }
+      .home .nest {
+        flex: 1;
+        border: 3px solid var(--ink);
+        border-radius: 50%;
+        background: var(--card);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        aspect-ratio: 1;
+        max-height: 150px;
+        align-self: center;
+      }
+      .salida {
+        border-left: 3px solid var(--ink);
+        border-right: 3px solid var(--ink);
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        background: repeating-linear-gradient(90deg, transparent 0 49.5%, var(--ink) 49.5% 50.5%, transparent 50.5%);
+      }
+      .salida .lbl {
+        color: var(--ink);
+        text-align: center;
+      }
+      .slots {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px 26px;
+        align-content: center;
+        justify-items: center;
+      }
+      .tok {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        font-weight: 700;
+        font-size: 13px;
+      }
+      .tok i {
+        width: 46px;
+        height: 46px;
+        border-radius: 50%;
+        border: 3px solid var(--ink);
+        box-shadow: 0 4px 0 var(--ink);
+        display: grid;
+        place-items: center;
+        font: 400 17px 'Archivo Black';
+        color: #fff;
+        position: relative;
+      }
+      .tok i::after {
+        content: '';
+        position: absolute;
+        inset: 5px;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.55);
+      }
+      .tok.r i {
+        background: var(--red);
+      }
+      .tok.b i {
+        background: var(--blue);
+      }
+      .tok small {
+        font-weight: 600;
+        font-size: 11px;
+        color: var(--mute);
+      }
+      .board .foot {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 14px 18px;
+        border-top: 2px solid var(--ink);
+      }
+      .lab {
+        font-weight: 800;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+        display: block;
+      }
+      .maps {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+      }
+      .map {
+        background: var(--card);
+        border: 2px solid var(--ink);
+        border-radius: 8px;
+        padding: 6px;
+        text-align: left;
+        font-weight: 700;
+      }
+      .map.on {
+        border-width: 3px;
+        box-shadow: 5px 5px 0 var(--ink);
+        transform: translate(-2px, -2px);
+      }
+      .map .pl {
+        height: 84px;
+        border: 2px solid var(--ink);
+        border-radius: 4px;
+        position: relative;
+        margin-bottom: 6px;
+        overflow: hidden;
+      }
+      .pl b {
+        position: absolute;
+        background: var(--ink);
+      }
+      .map span {
+        padding: 0 4px;
+      }
+      .modes {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+      }
+      .mode {
+        background: var(--card);
+        border: 2px solid var(--ink);
+        border-radius: 6px;
+        padding: 0;
+        display: flex;
+        align-items: stretch;
+        text-align: left;
+        font-weight: 700;
+        font-size: 13px;
+        min-height: 52px;
+        overflow: hidden;
+      }
+      .mode b {
+        width: 12px;
+        border-right: 2px solid var(--ink);
+        flex: none;
+      }
+      .mode span {
+        padding: 8px 10px;
+        align-self: center;
+        line-height: 1.15;
+      }
+      .mode.on {
+        background: var(--yel);
+        border-width: 3px;
+        box-shadow: 0 3px 0 var(--ink);
+      }
+      .row {
+        display: flex;
+        gap: 16px;
+        align-items: end;
+        margin-top: auto;
+      }
+      .row input {
+        flex: 1;
+        padding: 13px 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="logo">
+        <i
+          ><b style="background: var(--red)"></b><b style="background: var(--blue)"></b
+          ><b style="background: var(--grn)"></b><b style="background: var(--ink)"></b></i
+        ><span class="disp">BLOCKSHOT</span>
+      </div>
+      <div class="nick"><label for="nk">Tu nombre</label><input id="nk" value="Ricardo" /></div>
+      <nav>
+        <button class="ghost">Ranking</button><button class="ghost">Manual</button
+        ><button class="ghost">Ajustes</button>
+      </nav>
+    </header>
+    <main>
+      <section>
+        <div class="hd">
+          <h2>Unirse a una sala</h2>
+          <small>3 salas en la red de clase</small>
+        </div>
+        <ul class="rooms">
+          <li class="room">
+            <span class="band" style="background: var(--grn)"></span>
+            <div>
+              <div class="name">Sala de Ricardo</div>
+              <div class="meta">Patio · Todos contra todos</div>
+            </div>
+            <div>
+              <div class="pips">
+                <b class="on"></b><b class="on"></b><b class="on"></b><b class="on"></b><b class="on"></b><b></b><b></b
+                ><b></b><b></b><b></b><b></b><b></b>
+              </div>
+              <div class="cnt">5/12</div>
+            </div>
+            <span class="tag live">EN JUEGO</span>
+          </li>
+          <li class="room sel">
+            <span class="band" style="background: linear-gradient(var(--red) 50%, var(--blue) 50%)"></span>
+            <div>
+              <div class="name">Clase 3B</div>
+              <div class="meta">Almacén · Por equipos · 4 de 6 listos</div>
+            </div>
+            <div>
+              <div class="pips">
+                <b class="on"></b><b class="on"></b><b class="on"></b><b class="on"></b><b class="on"></b
+                ><b class="on"></b><b></b><b></b><b></b><b></b>
+              </div>
+              <div class="cnt">6/10</div>
+            </div>
+            <span class="tag">EN ESPERA</span>
+          </li>
+          <li class="room">
+            <span class="band" style="background: var(--ink)"></span>
+            <div>
+              <div class="name">Torneo viernes &#128274;</div>
+              <div class="meta">Desfiladero · Todos contra todos · con contraseña</div>
+            </div>
+            <div>
+              <div class="pips">
+                <b class="on"></b><b class="on"></b><b class="on"></b><b></b><b></b><b></b><b></b><b></b>
+              </div>
+              <div class="cnt">3/8</div>
+            </div>
+            <span class="tag">EN ESPERA</span>
+          </li>
+        </ul>
+        <div class="board">
+          <div class="top">
+            <span class="disp" style="font-size: 18px">Clase 3B · jugadores</span
+            ><span style="font-weight: 700">4 de 6 en la salida</span>
+          </div>
+          <div class="field">
+            <div class="home r">
+              <span class="lbl">CASA ROJO</span>
+              <div class="nest">
+                <span class="tok r"><i>C</i>Cris<small>no listo</small></span>
+              </div>
+            </div>
+            <div class="salida">
+              <span class="lbl">SALIDA</span>
+              <div class="slots">
+                <span class="tok r"><i>A</i>Ana<small>listo</small></span
+                ><span class="tok b"><i>B</i>Bea<small>listo</small></span
+                ><span class="tok r"><i>E</i>Eva<small>listo</small></span
+                ><span class="tok b"><i>D</i>Dani<small>listo</small></span>
+              </div>
+            </div>
+            <div class="home b" style="text-align: right">
+              <span class="lbl">CASA AZUL</span>
+              <div class="nest">
+                <span class="tok b"><i>F</i>Fran<small>no listo</small></span>
+              </div>
+            </div>
+          </div>
+          <div class="foot">
+            <span style="color: var(--mute); font-weight: 600">Sala abierta · Rojo 3 · Azul 3</span
+            ><button class="go">Estoy listo</button>
+          </div>
+        </div>
+      </section>
+      <div class="track" aria-hidden="true">
+        <b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b
+        ><b style="border: 0"></b>
+      </div>
+      <section>
+        <div class="hd">
+          <h2>Crear sala</h2>
+          <small>Tú serás el anfitrión</small>
+        </div>
+        <div>
+          <span class="lab">Mapa</span>
+          <div class="maps">
+            <button class="map">
+              <div class="pl" style="background: #c9cfc4">
+                <b style="left: 20%; top: 25%; width: 22%; height: 22%"></b
+                ><b style="right: 18%; bottom: 20%; width: 28%; height: 14%"></b>
+              </div>
+              <span>Patio</span>
+            </button>
+            <button class="map on">
+              <div class="pl" style="background: #d8c3a0">
+                <b style="left: 12%; top: 18%; width: 14%; height: 64%"></b
+                ><b style="left: 43%; top: 18%; width: 14%; height: 64%"></b
+                ><b style="right: 12%; top: 18%; width: 14%; height: 64%"></b>
+              </div>
+              <span>Almacén</span>
+            </button>
+            <button class="map">
+              <div class="pl" style="background: #c98a5a">
+                <b style="left: 0; top: 0; width: 30%; height: 100%"></b
+                ><b style="right: 0; top: 0; width: 30%; height: 100%"></b
+                ><b style="left: 46%; top: 40%; width: 8%; height: 20%"></b>
+              </div>
+              <span>Desfiladero</span>
+            </button>
+            <button class="map">
+              <div class="pl" style="background: #e3d2ad">
+                <b style="left: 15%; top: 15%; width: 30%; height: 12%"></b
+                ><b style="left: 55%; top: 50%; width: 12%; height: 35%"></b
+                ><b style="left: 20%; top: 60%; width: 18%; height: 18%"></b>
+              </div>
+              <span>Polvo</span>
+            </button>
+            <button class="map">
+              <div class="pl" style="background: #a9b0b8">
+                <b style="left: 8%; top: 10%; width: 25%; height: 35%"></b
+                ><b style="left: 40%; top: 10%; width: 20%; height: 35%"></b
+                ><b style="left: 8%; top: 58%; width: 52%; height: 30%"></b
+                ><b style="right: 8%; top: 10%; width: 22%; height: 78%"></b>
+              </div>
+              <span>Ciudad</span>
+            </button>
+            <button class="map">
+              <div class="pl" style="background: #e2b48a">
+                <b style="left: 18%; top: 20%; width: 64%; height: 8%"></b
+                ><b style="left: 18%; top: 20%; width: 8%; height: 60%"></b
+                ><b style="left: 60%; top: 55%; width: 16%; height: 16%"></b>
+              </div>
+              <span>Obra</span>
+            </button>
+          </div>
+        </div>
+        <div>
+          <span class="lab">Modo</span>
+          <div class="modes">
+            <button class="mode"><b style="background: var(--grn)"></b><span>Todos contra todos</span></button>
+            <button class="mode on">
+              <b style="background: linear-gradient(var(--red) 50%, var(--blue) 50%)"></b><span>Por equipos</span>
+            </button>
+            <button class="mode"><b style="background: #e8590c"></b><span>Captura la bandera</span></button>
+            <button class="mode"><b style="background: #6a3fb5"></b><span>Escalada de armas</span></button>
+            <button class="mode"><b style="background: #0f8b8d"></b><span>Confirmar bajas</span></button>
+            <button class="mode"><b style="background: #5a8a1f"></b><span>Infectados</span></button>
+            <button class="mode"><b style="background: #b0306b"></b><span>Dominio</span></button>
+            <button class="mode"><b style="background: var(--ink)"></b><span>Rondas</span></button>
+          </div>
+        </div>
+        <div class="row">
+          <div style="flex: 1; display: flex; flex-direction: column">
+            <label class="lab" for="pw">Contraseña (opcional)</label
+            ><input id="pw" type="password" placeholder="Déjala vacía para sala abierta" />
+          </div>
+          <button class="go">Crear sala</button>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

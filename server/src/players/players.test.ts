@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CHAR_BY_ID, FIXED_DT, MAX_QUEUED_INPUTS, MAX_SIM_BUDGET_S, type MoveInput } from '@blockshot/shared';
+import { FIXED_DT, MAX_QUEUED_INPUTS, MAX_SIM_BUDGET_S, type MoveInput } from '@blockshot/shared';
 import { bestPlays } from '../match/match';
 import { makeRoom } from '../testing/fakeRoom';
 import { queueInputs, simulateRoom } from './movement';
@@ -24,9 +24,19 @@ describe('input queue', () => {
     const { room, join } = makeRoom('ffa');
     const p = join('A', 0, 20);
     p.lastSeq = 20000; // last command of the previous match
-    spawnPlayer(room, p, CHAR_BY_ID.soldado, 'base');
+    spawnPlayer(room, p);
     queueInputs(p, [cmd(0), cmd(1)]);
     expect(p.inputs.map((c) => c.seq)).toEqual([0, 1]);
+  });
+
+  it('keeps the camouflage and finish picked at spawn, and ignores unknown ones', () => {
+    const { room, join } = makeRoom('ffa');
+    const p = join('A', 0, 20);
+    spawnPlayer(room, p, { camo: 'tigre', finish: 'oro' });
+    expect([p.camo, p.finish]).toEqual(['tigre', 'oro']);
+    p.alive = false;
+    spawnPlayer(room, p, { camo: 'rosa', finish: 'diamante' });
+    expect([p.camo, p.finish]).toEqual(['liso', 'estandar']);
   });
 
   it('only simulates the time that passed (plus the jitter bank)', () => {
@@ -44,13 +54,13 @@ describe('input queue', () => {
 
   it('moves the player forwards (yaw 0 looks towards -z) and records it for lag compensation', () => {
     const { room, join } = makeRoom('ffa');
-    const p = join('A', 0, 20);
+    const p = join('A', 5, 30); // open ground (the fountain stands at (0, 21.5))
     queueInputs(
       p,
       Array.from({ length: 30 }, (_, i) => cmd(i)),
     );
     for (let i = 0; i < 30; i++) simulateRoom(room, FIXED_DT, Date.now() + i);
-    expect(p.z).toBeLessThan(20);
+    expect(p.z).toBeLessThan(30);
     expect(p.hist.length).toBeGreaterThan(0);
   });
 

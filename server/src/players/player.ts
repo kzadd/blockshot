@@ -1,10 +1,11 @@
 import {
   createMoveState,
   type CamoId,
-  type CharacterId,
+  type ClassChoice,
   type FinishId,
   type MoveInput,
   type MoveState,
+  type PlayerClass,
   type SkinId,
   type Team,
   type WeaponId,
@@ -28,7 +29,10 @@ export interface HistoryEntry {
 export interface Player {
   id: string;
   name: string;
-  characterId: CharacterId | null;
+  /** the class (weapons and ability), validated at spawn; null before the first spawn */
+  cls: PlayerClass | null;
+  /** the class picked in the in-match loadout menu, taken at the next respawn (unchecked until then); null: none */
+  nextCls: ClassChoice | null;
   skin: SkinId;
   /** outfit colour (one of OUTFIT_COLORS) */
   color: string;
@@ -40,6 +44,13 @@ export interface Player {
   hp: number;
   maxHp: number;
   armor: number;
+  /** power weapon picked up on the map (also the last entry of the loadout), null: none */
+  power: WeaponId | null;
+  /** anti-camping: where the player settled and since when (ms) */
+  campAt: [number, number, number];
+  campSince: number;
+  /** has not moved or jumped since spawning (PLAYER.idleGrace) */
+  idle: boolean;
   x: number;
   y: number;
   z: number;
@@ -103,8 +114,10 @@ export interface Player {
   aiming: boolean;
   /** last quick chat phrase (ms) */
   chatAt: number;
-  /** spawns per character this match (session stats) */
-  picks: Partial<Record<CharacterId, number>>;
+  /** spawns per primary weapon this match (session stats and ranking), only where the mode hands it out */
+  picks: Partial<Record<WeaponId, number>>;
+  /** spawned at least once this match (the ranking and the league count only those who played) */
+  played: boolean;
 }
 
 const DEFAULT_MAX_HP = 100;
@@ -113,7 +126,8 @@ export function createPlayer(id: string, name: string, team: Team): Player {
   return {
     id,
     name,
-    characterId: null,
+    cls: null,
+    nextCls: null,
     skin: 'base',
     color: '',
     camo: 'liso',
@@ -123,6 +137,10 @@ export function createPlayer(id: string, name: string, team: Team): Player {
     hp: 0,
     maxHp: DEFAULT_MAX_HP,
     armor: 0,
+    power: null,
+    campAt: [0, 0, 0],
+    campSince: 0,
+    idle: false,
     x: 0,
     y: 0,
     z: 0,
@@ -161,6 +179,7 @@ export function createPlayer(id: string, name: string, team: Team): Player {
     lastKillAt: 0,
     lastKillerId: null,
     picks: {},
+    played: false,
     chatAt: 0,
     grenades: 0,
     abilityAt: 0,
@@ -183,11 +202,16 @@ export function resetMatchStats(p: Player): void {
     caps: 0,
     level: 0,
     armor: 0,
+    power: null,
+    campAt: [0, 0, 0],
+    campSince: 0,
+    idle: false,
     radarUntil: 0,
     medals: 0,
     multi: 0,
     lastKillAt: 0,
     lastKillerId: null,
     picks: {},
+    played: false,
   });
 }

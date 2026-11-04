@@ -14,4 +14,6 @@ export const serverConfig = {
   logLevel: process.env.LOG_LEVEL ?? 'info',
   /** All-time ranking, kept between restarts. Change it with RANKING (tests use their own file). */
   rankingFile: process.env.RANKING || path.join(ROOT, 'data', 'ranking.json'),
+  /** Anti-camping on (NO_CAMP=1 turns it off: the end-to-end tests keep their bots standing still on purpose) */
+  campRule: process.env.NO_CAMP !== '1',
 };

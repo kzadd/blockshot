@@ -3,7 +3,9 @@ import {
   BTN_DASH,
   DASH,
   FIXED_DT,
+  MEDKIT_COMBAT_MS,
   MEDKIT_HP,
+  PLAYER,
   MINE,
   RADAR_MS,
   SMOKE,
@@ -18,6 +20,7 @@ import {
 import { makeRoom } from '../testing/fakeRoom';
 import { shieldBlocks, shootMines, smokeBlocks, tickAbilities, useAbility } from './abilities';
 import { launchRound, tickGrenades } from './grenades';
+import { handleShoot } from './shooting';
 
 const LOOK_NORTH: [number, number, number] = [0, 0, -1];
 
@@ -27,7 +30,7 @@ afterEach(() => vi.useRealTimers());
 describe('abilities', () => {
   it('wall: stands in front, blocks movement and bullets, has a cooldown and goes away', () => {
     const r = makeRoom('ffa');
-    const a = r.join('Ana', 0, 30, 'bastion');
+    const a = r.join('Ana', 0, 30, { ability: 'wall' });
     const now = Date.now();
     expect(useAbility(r.room, a, [0, 1.6, 30], LOOK_NORTH, now)).toBe(true);
     const wall = r.room.deployables.find((d) => d.kind === 'wall')!;
@@ -41,7 +44,7 @@ describe('abilities', () => {
 
   it('wall: never on top of a player (no sitio), and the cooldown is not spent', () => {
     const r = makeRoom('ffa');
-    const a = r.join('Ana', 0, 30, 'bastion');
+    const a = r.join('Ana', 0, 30, { ability: 'wall' });
     r.join('Bea', 0, 30 - WALL.dist);
     expect(useAbility(r.room, a, [0, 1.6, 30], LOOK_NORTH, Date.now())).toBe(false);
     expect(a.abilityAt).toBe(0);
@@ -50,7 +53,7 @@ describe('abilities', () => {
 
   it('mine: arms, ignores teammates, hurts a rival but cannot kill one at full health', () => {
     const r = makeRoom('teams');
-    const hunter = r.join('Caza', 0, 30, 'cazador');
+    const hunter = r.join('Caza', 0, 30, { ability: 'mine' });
     const mate = r.join('Mate', 20, 30);
     const rival = r.join('Riva', 20, 20);
     if (mate.team !== hunter.team) [mate.team, rival.team] = [hunter.team, mate.team];
@@ -75,7 +78,7 @@ describe('abilities', () => {
 
   it('mine: a rival shoots it away; a shot from a teammate does not', () => {
     const r = makeRoom('teams');
-    const hunter = r.join('Caza', 0, 30, 'cazador');
+    const hunter = r.join('Caza', 0, 30, { ability: 'mine' });
     const mate = r.join('Mate', 20, 30);
     const rival = r.join('Riva', 20, 20);
     if (mate.team !== hunter.team) [mate.team, rival.team] = [hunter.team, mate.team];
@@ -92,7 +95,7 @@ describe('abilities', () => {
 
   it('shield: blocks shots from the front only, for a few seconds', () => {
     const r = makeRoom('ffa');
-    const t = r.join('Tan', 0, 0, 'tanque');
+    const t = r.join('Tan', 0, 0, { ability: 'shield' });
     t.ry = 0; // facing -z
     const now = Date.now();
     useAbility(r.room, t, [0, 1.6, 0], LOOK_NORTH, now);
@@ -101,9 +104,33 @@ describe('abilities', () => {
     expect(shieldBlocks(t, [0, 1.6, -10], t.shieldUntil + 1)).toBe(false); // over
   });
 
+  it('shield: firing lowers it (no shooting from behind a free shield)', () => {
+    const r = makeRoom('ffa');
+    const t = r.join('Tan', 0, 0, { primary: 'shotgun', ability: 'shield' });
+    t.ry = 0;
+    const now = Date.now();
+    useAbility(r.room, t, [0, 1.6, 0], LOOK_NORTH, now);
+    expect(shieldBlocks(t, [0, 1.6, -10], now)).toBe(true);
+    handleShoot(r.room, t, { o: [t.x, t.y + PLAYER.eye, t.z], d: Array(10).fill(LOOK_NORTH), lag: 0 });
+    expect(t.shots).toBe(1);
+    expect(shieldBlocks(t, [0, 1.6, -10], Date.now())).toBe(false);
+  });
+
+  it('medkit: only out of the fight, not right after taking damage', () => {
+    const r = makeRoom('ffa');
+    const a = r.join('Art', 10, 30, { ability: 'medkit' });
+    a.hp = 40;
+    a.lastDamage = Date.now() - 500;
+    expect(useAbility(r.room, a, [10, 1.6, 30], LOOK_NORTH, Date.now())).toBe(false);
+    expect([a.hp, a.abilityAt]).toEqual([40, 0]); // nothing spent
+    vi.advanceTimersByTime(MEDKIT_COMBAT_MS);
+    expect(useAbility(r.room, a, [10, 1.6, 30], LOOK_NORTH, Date.now())).toBe(true);
+    expect(a.hp).toBe(40 + MEDKIT_HP);
+  });
+
   it('smoke: the canister pops into a cloud nobody sees through, which clears later', () => {
     const r = makeRoom('ffa');
-    const s = r.join('Sol', 0, 30, 'soldado');
+    const s = r.join('Sol', 0, 30, { ability: 'smoke' });
     const now = Date.now();
     useAbility(r.room, s, [0, 1.6, 30], LOOK_NORTH, now);
     expect(r.room.grenades).toHaveLength(1);
@@ -121,8 +148,8 @@ describe('abilities', () => {
 
   it('radar shows the rivals for a few seconds; the medkit heals, but not at full health', () => {
     const r = makeRoom('ffa');
-    const e = r.join('Exp', 0, 30, 'explorador');
-    const a = r.join('Art', 10, 30, 'artillero');
+    const e = r.join('Exp', 0, 30, { ability: 'radar' });
+    const a = r.join('Art', 10, 30, { ability: 'medkit' });
     const now = Date.now();
     expect(useAbility(r.room, e, [0, 1.6, 30], LOOK_NORTH, now)).toBe(true);
     expect(e.radarUntil).toBe(now + RADAR_MS);
@@ -135,7 +162,7 @@ describe('abilities', () => {
 
   it('grenade launcher: the round flies and blows up on a rival, hurting the ones around', () => {
     const r = makeRoom('ffa');
-    const art = r.join('Art', 0, 30, 'artillero');
+    const art = r.join('Art', 0, 30, { ability: 'medkit' });
     const rival = r.join('Riv', 0, 28.4); // in front of the low wall at z 27.8
     const now = Date.now();
     launchRound(r.room, art, [0, 1.2, 29.5], LOOK_NORTH, now);
@@ -146,13 +173,13 @@ describe('abilities', () => {
     expect(art.hp).toBe(art.maxHp); // no self damage
   });
 
-  it('dash: part of the movement, only for the dash character, then on cooldown', () => {
+  it('dash: part of the movement, only for a class with the dash, then on cooldown', () => {
     const cols = getColliders(getMap('patio', 'm'));
     const st = createMoveState(0, 0, 30);
     st.grounded = true;
     const ctx = { colliders: cols, walk: 8.6, adsMove: 1, fallback: [0, 0, 30] as [number, number, number] };
     const input = { seq: 1, f: 1, s: 0, yaw: 0, pitch: 0, b: BTN_DASH, slot: 0 };
-    expect(stepMovement(st, input, FIXED_DT, ctx).dash).toBe(false); // not Rayo
+    expect(stepMovement(st, input, FIXED_DT, ctx).dash).toBe(false); // no dash in the class
     expect(stepMovement(st, input, FIXED_DT, { ...ctx, dash: true }).dash).toBe(true);
     expect(Math.hypot(st.vx, st.vz)).toBeGreaterThan(DASH.speed * 0.9);
     expect(stepMovement(st, { ...input, seq: 2 }, FIXED_DT, { ...ctx, dash: true }).dash).toBe(false); // cooldown

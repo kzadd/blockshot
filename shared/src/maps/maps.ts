@@ -3,15 +3,17 @@
 import { rng, round2, seedOf, type Vec3 } from '../core/math';
 import { rayAABB, type Collider } from '../physics/raycast';
 import { PLAYER } from '../player/player';
-import { buildAlmacen } from './builders/almacen';
+import { buildAutopista } from './builders/autopista';
 import { buildCiudad } from './builders/ciudad';
-import { buildDesfiladero } from './builders/desfiladero';
+import { buildMonasterio } from './builders/monasterio';
 import { buildObra } from './builders/obra';
 import { buildPatio } from './builders/patio';
-import { buildPolvo } from './builders/polvo';
+import { buildPueblo } from './builders/pueblo';
 import { buildPuerto } from './builders/puerto';
 import { buildEstacion } from './builders/estacion';
 import { buildNevada } from './builders/nevada';
+import { buildCircuito } from './builders/circuito';
+import { addParkour } from './parkour';
 import { PROP_COLORS } from './props';
 import { ROOF_KINDS, STRUCTURE_COLORS } from './structures';
 import { BARREL, LADDER_DIRS, ZIPLINE } from './objects';
@@ -40,9 +42,9 @@ const MAP_DEFS: Record<MapId, MapDef> = {
   patio: {
     name: 'Patio',
     tag: 'Equilibrado',
-    desc: 'Torre central y habitaciones en las esquinas. Equilibrado.',
+    desc: 'Patio amurallado: torre mirador en el centro, casas en las esquinas y pasarelas sobre los muros.',
     build: buildPatio,
-    wallH: 8,
+    wallH: 9,
     sky: '#9fd4ff',
     colors: {
       floor: '#d6cdb8',
@@ -52,100 +54,138 @@ const MAP_DEFS: Record<MapId, MapDef> = {
       step: '#c2bbaf',
       crate: '#c99a55',
       crate2: '#6f8f5a',
+      bridge: '#9a7550',
     },
   },
-  almacen: {
-    name: 'Almacén',
-    tag: 'Combate cercano',
-    desc: 'Pasillos entre contenedores. Combate cercano y esquinas.',
-    build: buildAlmacen,
-    wallH: 9,
-    sky: '#c4d0dc',
+  autopista: {
+    name: 'Autopista',
+    tag: 'Paso elevado',
+    desc: 'Barrio partido por un paso elevado: azoteas, gasolinera y coches abandonados bajo el puente.',
+    build: buildAutopista,
+    wallH: 11,
+    sky: '#b9c3cc',
     colors: {
-      floor: '#a8a8a0',
-      wall: '#5d6b78',
-      platform: '#7d8a96',
-      step: '#9aa6b1',
-      rail: '#e0b33a',
-      railing: '#e0b33a',
-      metal: '#8d9aa6',
-      crate: '#c9944a',
-      crate2: '#8d6a3f',
-      cont1: '#c0503e',
-      cont2: '#3f78b5',
-      cont3: '#4f9a5a',
+      floor: '#6f706d',
+      wall: '#8a877f',
+      wall2: '#c8c4b8',
+      bridge: '#5c5d5e',
+      concrete: '#9e9b93',
+      brick: '#9c6a57',
+      plaster: '#c4b9a5',
+      platform: '#d6d2c6',
+      step: '#aaa69c',
+      slab: '#7d7a74',
+      stair: '#a39d90',
+      railing: '#3d4248',
+      metal: '#8a939b',
+      crate: '#b98c50',
+      cont1: '#b5513f',
+      cont2: '#4d6b4a',
+      awning: '#a8463a',
+      trim: '#d9d3c4',
     },
   },
-  desfiladero: {
-    name: 'Desfiladero',
-    tag: 'Francotiradores',
-    desc: 'Cañón entre dos mesetas. Líneas largas para francotiradores.',
-    build: buildDesfiladero,
-    wallH: 12,
-    sky: '#ffd8a6',
+  monasterio: {
+    name: 'Monasterio',
+    tag: 'Claustro',
+    desc: 'Claustro con arcadas, campanario, huerto y muralla con adarve.',
+    build: buildMonasterio,
+    wallH: 7,
+    sky: '#b9d3ea',
     colors: {
-      floor: '#e0c08f',
-      wall: '#b0704a',
-      wall2: '#c98a5a',
-      platform: '#d19a64',
-      step: '#a87a4e',
-      bridge: '#8a6440',
-      rock: '#9b8b7a',
-      crate: '#d4a24c',
-      concrete: '#d6bc94',
-      stair: '#cdb089',
-      slab: '#a8916f',
-      plaster: '#ecd9b8',
-    },
-  },
-  polvo: {
-    name: 'Polvo',
-    tag: 'Pasillos',
-    desc: 'Pueblo del desierto: túnel, medio y pasillo largo hasta dos zonas.',
-    build: buildPolvo,
-    wallH: 9,
-    sky: '#ffe7c2',
-    colors: {
-      floor: '#dcc49a',
-      wall: '#c9a878',
-      wall2: '#e0c9a0',
-      roof: '#8a6a4a',
-      platform: '#c7b08a',
-      step: '#b9a27c',
-      crate: '#c99a55',
-      crate2: '#8f7a52',
-      plaster: '#e2c79c',
-      slab: '#b39a74',
-      stair: '#c9b08a',
-      tile: '#d9a77a',
+      floor: '#cdb48a',
+      wall: '#b39773',
+      wall2: '#d9c49e',
+      roof: '#b4573a',
+      platform: '#6f9248',
+      step: '#a88a64',
+      rock: '#9c8c74',
+      crate: '#b98a4e',
+      crate2: '#d8bf72',
+      plaster: '#eadbbd',
+      brick: '#b0653f',
+      stair: '#c9b28c',
+      tile: '#c27c56',
+      wood: '#8a6440',
+      railing: '#4a3a2a',
+      trim: '#efe3c9',
       frame: '#5b3d26',
-      awning: '#b5553a',
-      trim: '#f0e2c6',
+      shutter: '#5f7d4a',
+      water: '#4f86a6',
+    },
+  },
+  pueblo: {
+    name: 'Pueblo',
+    tag: 'Cuestas',
+    desc: 'Pueblo blanco junto al mar: escalinatas, patios, iglesia en lo alto y azoteas.',
+    build: buildPueblo,
+    wallH: 11,
+    sky: '#cfe6f5',
+    colors: {
+      floor: '#d8c39c',
+      wall: '#f1ede4',
+      wall2: '#cdb48a',
+      roof: '#b8603e',
+      platform: '#d2bc92',
+      step: '#c4ab80',
+      stair: '#cdb68e',
+      plaster: '#f6f3ec',
+      slab: '#c2714a',
+      tile: '#b9623f',
+      wood: '#8a6440',
+      crate: '#b98a4e',
+      crate2: '#8f7a52',
+      railing: '#1f3f73',
+      trim: '#fbf9f4',
+      frame: '#2456a0',
+      shutter: '#2f6db5',
+      awning: '#2f6db5',
+      quay: '#cbb48c',
+      hull: '#2a5c9a',
+      deck: '#a87a4f',
+      metal: '#3a4450',
+      water: '#2f7fb0',
     },
   },
   ciudad: {
-    name: 'Ciudad',
-    tag: 'Calles',
-    desc: 'Manzanas de edificios, callejones, plazas y azoteas.',
+    name: 'Casco Viejo',
+    tag: 'Tejados',
+    desc: 'Ciudad vieja: calles estrechas, plaza con torre del reloj, callejones y tejados conectados.',
     build: buildCiudad,
-    wallH: 14,
+    wallH: 10,
     sky: '#a9cbe8',
     colors: {
-      floor: '#6b6e74',
-      wall: '#8a8f99',
-      bld1: '#c9b79a',
-      bld2: '#9fb0c4',
-      bld3: '#d8c8b0',
-      bld4: '#b58c74',
+      floor: '#9a948a',
+      wall: '#c8b8a0',
+      bld1: '#e6b3ad',
+      bld2: '#b4d1bc',
+      bld3: '#ead08e',
+      bld4: '#a9c3df',
+      plaster: '#efe1c6',
+      brick: '#b5654a',
+      slab: '#8f8b84',
+      roof: '#9c4a32',
+      bridge: '#8a6440',
+      quay: '#aaa49a',
+      water: '#3f7f95',
+      wood: '#8a6a4a',
+      tile: '#d8cbb0',
+      stair: '#bdb3a2',
+      trim: '#f3ecdf',
+      frame: '#5b3d26',
+      shutter: '#4f7a5a',
+      awning: '#b5553a',
+      railing: '#2f3338',
       platform: '#a8a196',
       step: '#bdb6aa',
       crate: '#c99a55',
+      crate2: '#8d6a3f',
     },
   },
   obra: {
     name: 'Obra',
     tag: 'Vertical',
-    desc: 'Edificio en obra de tres plantas, andamios y grúa. Combate en altura.',
+    desc: 'Esqueleto de hormigón de tres plantas con andamios, una grúa de pluma transitable y un bloque vecino a medio levantar. Combate en altura.',
     build: buildObra,
     wallH: 10,
     sky: '#bcd4e6',
@@ -165,14 +205,16 @@ const MAP_DEFS: Record<MapId, MapDef> = {
       crate2: '#8d6a3f',
       cont1: '#d9772e',
       cont2: '#4a7fb0',
+      roof: '#8b8f93',
+      wood: '#a5824f',
     },
   },
   puerto: {
     name: 'Puerto',
     tag: 'Altura y agua',
-    desc: 'Contenedores, un canal con grúa pórtico y un carguero en su dique. Tirolinas desde la grúa.',
+    desc: 'Carguero en un canal: cubierta, puente y bodega. Grúa pórtico, pasarela, almacenes y contenedores.',
     build: buildPuerto,
-    wallH: 7,
+    wallH: 9,
     sky: '#9cc2dd',
     colors: {
       floor: '#4f5a5e',
@@ -192,12 +234,32 @@ const MAP_DEFS: Record<MapId, MapDef> = {
       cont3: '#5f8f4e',
     },
   },
+  circuito: {
+    name: 'Circuito',
+    tag: 'Carrera de saltos',
+    desc: 'Pista sobre lava en tres tramos: saltos, cornisas, tirolina, losas que caen, martillos, túnel para deslizarse, chimenea de rebotes y la meta en lo alto.',
+    build: buildCircuito,
+    wallH: 4,
+    sky: '#f2b77a',
+    colors: {
+      floor: '#3a1c12',
+      wall: '#5a3a30',
+      rock: '#8a5c44',
+      platform: '#4c9dff',
+      step: '#7fb6ff',
+      metal: '#ffd23a',
+      railing: '#ffd23a',
+      lava: '#ff5a1f',
+      awning: '#ff7a1a',
+      pad: '#46d37f',
+    },
+  },
   estacion: {
     name: 'Estación',
     tag: 'Dos niveles',
-    desc: 'Calles arriba y un andén hundido con un tren parado que se puede atravesar.',
+    desc: 'Calles arriba y andenes hundidos: un tren parado que se recorre, vestíbulo, pasarelas, marquesinas y garitas.',
     build: buildEstacion,
-    wallH: 9,
+    wallH: 12,
     sky: '#b4cde3',
     colors: {
       floor: '#5d5a55',
@@ -220,14 +282,17 @@ const MAP_DEFS: Record<MapId, MapDef> = {
       sleeper: '#5a4632',
       tunnel: '#121417',
       awning: '#c0503e',
+      metal: '#6f7a84',
+      cont1: '#3f6f8f',
+      shutter: '#4f6f5a',
     },
   },
   nevada: {
     name: 'Nevada',
     tag: 'Bosque y nieve',
-    desc: 'Puesto de montaña: lago helado al centro, bosques de pinos, torres de vigilancia con tirolina.',
+    desc: 'Puesto de montaña: lago helado al centro, cresta rocosa con radio, refugio de dos plantas y torres con tirolina.',
     build: buildNevada,
-    wallH: 5,
+    wallH: 9,
     sky: '#c9d7e4',
     colors: {
       floor: '#eef2f5',
@@ -240,6 +305,10 @@ const MAP_DEFS: Record<MapId, MapDef> = {
       pine: '#3f6e4a',
       logs: '#8a6440',
       sandbag: '#a89a78',
+      wall2: '#dfe7ee',
+      metal: '#8a949c',
+      crate: '#8a6a44',
+      crate2: '#6f5536',
     },
   },
 };
@@ -368,7 +437,9 @@ export function getColliders(map: Pick<GameMap, 'boxes'>): Collider[] {
 const mapCache = new Map<string, GameMap>();
 export function getMap(mapId: string, sizeId: string): GameMap {
   const id = isMapId(mapId) ? mapId : DEFAULT_MAP;
-  const size = isSizeId(sizeId) ? sizeId : DEFAULT_SIZE;
+  // Every map is laid out by hand for one size (the medium one); `sizeId` is still accepted from old clients
+  void sizeId;
+  const size = DEFAULT_SIZE;
   const key = `${id}:${size}`;
   const cached = mapCache.get(key);
   if (cached) return cached;
@@ -396,6 +467,10 @@ export function getMap(mapId: string, sizeId: string): GameMap {
   const pickups: [MapPickup['k'], number, number, number | undefined][] = [];
   const ladders: MapLadder[] = [];
   const ziplines: MapZipline[] = [];
+  const powerSpots: [number, number, number | undefined][] = [];
+  const checkpoints: GameMap['checkpoints'] = [];
+  const hazards: GameMap['hazards'] = [];
+  const tiles: MapBox[] = [];
   def.build({
     B,
     D,
@@ -406,10 +481,36 @@ export function getMap(mapId: string, sizeId: string): GameMap {
     PK: (k, x, z, y) => pickups.push([k, x, z, y]),
     LD: (x, z, y1, dir) => ladders.push({ x: round2(x), z: round2(z), y0: 0, y1: round2(y1), dir }),
     ZL: (a, b) => ziplines.push([a.map(round2) as Vec3, b.map(round2) as Vec3]),
+    PW: (x, z, y) => powerSpots.push([x, z, y]),
+    CP: (x, y, z, w, d) => checkpoints.push({ x: round2(x), y: round2(y), z: round2(z), w, d }),
+    HZ: (h) => hazards.push(h),
+    TL: (x, y, z, s) => tiles.push({ x: round2(x), y: round2(y - 0.5), z: round2(z), w: s, h: 0.5, d: s, c: 'xtile' }),
     H,
     rand: rng(seedOf(key)),
   });
-  placeProps(boxes, points, props);
+  // Props keep clear of spawn points and of the ground in front of every ladder
+  const ladderSpots = ladders.map((l): [number, number] => {
+    const [dx, dz] = LADDER_DIRS[l.dir]!;
+    return [l.x - dx * 0.8, l.z - dz * 0.8];
+  });
+  placeProps(boxes, [...points, ...ladderSpots, ...powerSpots.map(([x, z]): [number, number] => [x, z])], props);
+  // Places to climb in the open ground (not on the race course)
+  if (id !== 'circuito')
+    addParkour(
+      boxes,
+      H,
+      [
+        ...points,
+        ...ladderSpots,
+        ...powerSpots.map(([x, z]): [number, number] => [x, z]),
+        ...pickups.map(([, x, z]): [number, number] => [x, z]),
+        ...barrels,
+        ...crates.map(([x, z]): [number, number] => [x, z]),
+      ],
+      ziplines,
+      rng(seedOf(`${key}:parkour`)),
+      id === 'nevada',
+    );
   // Objects stand on the ground there (decided once every box is in)
   const objBox = (x: number, z: number, w: number, h: number, c: MapBox['c'], y?: number): MapBox => ({
     x: round2(x),
@@ -472,6 +573,10 @@ export function getMap(mapId: string, sizeId: string): GameMap {
     pickups: pickups.map(([k, x, z, y]) => ({ k, x: round2(x), y: y ?? standAt(boxes, x, z), z: round2(z) })),
     ladders,
     ziplines: clearLines,
+    powerSpots: powerSpots.map(([x, z, y]): Vec3 => [round2(x), y ?? standAt(boxes, x, z), round2(z)]),
+    checkpoints,
+    hazards,
+    tiles,
   };
   mapCache.set(key, map);
   return map;

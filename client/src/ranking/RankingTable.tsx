@@ -1,13 +1,30 @@
 // The parts of the ranking both the lobby screen and the in-game window show: your season card and the table.
 // Markup and classes are the approved proposal's (styles/proposal.css).
 import type { CSSProperties } from 'react';
-import { CHAR_BY_ID, type RankingRow } from '@blockshot/shared';
+import {
+  DEFAULT_OUTFIT_COLOR,
+  WEAPONS,
+  divisionOf,
+  seasonPoints,
+  type RankingRow,
+  type WeaponId,
+} from '@blockshot/shared';
 
 const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)} %` : '—');
 const kd = (r: RankingRow) => (r.kills / Math.max(1, r.deaths)).toFixed(2);
-/** The colour a row is drawn in: the outfit worn with the favourite, else that class's colour. */
-export const rowColor = (r: RankingRow) => r.favColor || CHAR_BY_ID[r.fav ?? 'soldado'].color;
-export const favName = (r: RankingRow) => (r.fav ? CHAR_BY_ID[r.fav].name : '—');
+/** Division and season points, e.g. "Oro · 512". */
+const division = (r: RankingRow) => {
+  const pts = seasonPoints(r);
+  return `${divisionOf(pts).name} · ${pts}`;
+};
+/** The colour a row is drawn in: the outfit last worn, else the default outfit colour. */
+export const rowColor = (r: RankingRow) => r.favColor || DEFAULT_OUTFIT_COLOR;
+/** The most-carried primary, if it is still a weapon of the game (old records may name something else). */
+export const favWeapon = (r: RankingRow): WeaponId | null => (r.fav && r.fav in WEAPONS ? r.fav : null);
+export const favName = (r: RankingRow) => {
+  const w = favWeapon(r);
+  return w ? WEAPONS[w].name : '—';
+};
 export const pc = (color: string) => ({ '--pc': color }) as CSSProperties;
 
 /** Your position and season numbers, and how far the next place is. */
@@ -35,6 +52,7 @@ export function YouCard({ rows, you }: { rows: RankingRow[]; you: string }) {
       <dl>
         {(
           [
+            ['División', division(me)],
             ['Victorias', me.wins],
             ['% victorias', pct(me.wins, me.matches)],
             ['K/D', kd(me)],
@@ -69,7 +87,8 @@ export function RankTable({ rows, you }: { rows: RankingRow[]; you: string }) {
         <tr>
           <th>#</th>
           <th>Jugador</th>
-          <th>Personaje</th>
+          <th>Arma favorita</th>
+          <th>División</th>
           <th className="r">Victorias</th>
           <th className="r">Partidas</th>
           <th className="r">K/D</th>
@@ -90,9 +109,10 @@ export function RankTable({ rows, you }: { rows: RankingRow[]; you: string }) {
               )}
             </td>
             <td>
-              {r.fav && <span className="sw" style={{ background: rowColor(r) }} />}
+              {favWeapon(r) && <span className="sw" style={{ background: rowColor(r) }} />}
               {favName(r)}
             </td>
+            <td>{division(r)}</td>
             <td className="r">{r.wins}</td>
             <td className="r">{r.matches}</td>
             <td className="r">{kd(r)}</td>

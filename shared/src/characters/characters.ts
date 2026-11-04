@@ -1,113 +1,48 @@
-import type { AbilityId } from '../abilities/abilities';
+import { ABILITIES, ABILITY_IDS, type AbilityId } from '../abilities/abilities';
 import { WEAPONS, type WeaponId } from '../weapons/weapons';
+import { ACCESSORY_IDS, accessorySpeed, fitAccessory, type AccessoryId } from './accessories';
 
-export type CharacterId = 'soldado' | 'cazador' | 'tanque' | 'rayo' | 'bastion' | 'explorador' | 'artillero';
+// Classes (Urban Terror style): everybody has the same body, and a class is a primary, a sidearm, an ability and an
+// accessory (accessories.ts), worn with the player's looks (face, outfit colour, camouflage, finish). There are no
+// named characters: each player builds one class («Mi clase») on the class screen.
 
-export interface Character {
-  id: CharacterId;
-  name: string;
-  color: string;
-  hp: number;
-  speed: number;
+/** The body every player shares: health and walking speed (m/s); only the held weapon's `weight` changes the speed. */
+export const BODY = { hp: 100, speed: 7.3 } as const;
+
+/** Sidearms (key 2). */
+export const SIDEARMS: WeaponId[] = ['pistol', 'colt', 'heavypistol', 'revolver', 'mpistol'];
+
+/**
+ * Primaries (key 1) by family, in the order the class screen shows them. Never the knife nor a power weapon, and
+ * (2026-11-04) never a pistol: pistols are sidearms only.
+ */
+export const PRIMARY_FAMILIES: { name: string; weapons: WeaponId[] }[] = [
+  { name: 'Fusiles', weapons: ['rifle', 'heavyrifle', 'lightrifle', 'carbine'] },
+  { name: 'Precisión', weapons: ['sniper', 'frf1', 'dmr'] },
+  { name: 'Subfusiles', weapons: ['smg', 'ump45', 'pdw', 'compact'] },
+  { name: 'Escopetas', weapons: ['shotgun', 'benelli', 'sawedoff'] },
+  { name: 'Ametralladoras', weapons: ['lmg', 'lightlmg'] },
+  { name: 'Explosivos', weapons: ['launcher', 'grenadelauncher'] },
+];
+export const PRIMARIES: WeaponId[] = PRIMARY_FAMILIES.flatMap((f) => f.weapons);
+
+/** What a player goes out with besides the looks: key 1, key 2, key E and the accessory. */
+export interface PlayerClass {
   primary: WeaponId;
   secondary: WeaponId;
-  /** key E */
   ability: AbilityId;
-  role: string;
-  desc: string;
+  accessory: AccessoryId;
 }
 
-export const CHARACTERS: Character[] = [
-  {
-    id: 'soldado',
-    name: 'Soldado',
-    color: '#3f7fe0',
-    hp: 100,
-    speed: 7.3,
-    primary: 'rifle',
-    secondary: 'pistol',
-    ability: 'smoke',
-    role: 'Equilibrado',
-    desc: 'Equilibrado. Rinde a cualquier distancia y perdona los fallos.',
-  },
-  {
-    id: 'cazador',
-    name: 'Cazador',
-    color: '#3aa65a',
-    hp: 90,
-    speed: 7.6,
-    primary: 'sniper',
-    secondary: 'mpistol',
-    ability: 'mine',
-    role: 'Larga distancia',
-    desc: 'Un tiro al cuerpo tumba a todos menos al Tanque (a él, a la cabeza). Busca altura.',
-  },
-  {
-    id: 'tanque',
-    name: 'Tanque',
-    color: '#d0533a',
-    hp: 140,
-    speed: 6.8,
-    primary: 'shotgun',
-    secondary: 'revolver',
-    ability: 'shield',
-    role: 'Cuerpo a cuerpo',
-    desc: 'Mucha vida y escopeta. Letal de cerca, lento de lejos.',
-  },
-  {
-    id: 'rayo',
-    name: 'Rayo',
-    color: '#e8b923',
-    hp: 90,
-    speed: 8.2,
-    primary: 'smg',
-    secondary: 'pistol',
-    ability: 'dash',
-    role: 'Velocidad',
-    desc: 'El más rápido. Entra, dispara y sal antes de que te vean.',
-  },
-  {
-    id: 'bastion',
-    name: 'Bastión',
-    color: '#8a5cd6',
-    hp: 120,
-    speed: 7.3,
-    primary: 'lmg',
-    secondary: 'revolver',
-    ability: 'wall',
-    role: 'Supresión',
-    desc: 'Cargador de 80 balas. Aguanta una esquina él solo.',
-  },
-  {
-    id: 'explorador',
-    name: 'Explorador',
-    color: '#26b0a6',
-    hp: 90,
-    speed: 8.0,
-    primary: 'dmr',
-    secondary: 'pistol',
-    ability: 'radar',
-    role: 'Media distancia',
-    desc: 'Fusil de tirador semiautomático: dos tiros a la cabeza. Rápido y con radar para cazar francotiradores.',
-  },
-  {
-    id: 'artillero',
-    name: 'Artillero',
-    color: '#e0782e',
-    hp: 115,
-    speed: 7.4,
-    primary: 'launcher',
-    secondary: 'sawedoff',
-    ability: 'medkit',
-    role: 'Área',
-    desc: 'Bazuca: un cohete recto que estalla al tocar y daña a todos alrededor. Lento y un tiro por carga.',
-  },
-];
+/** The class everybody starts from (and what any missing or unknown part falls back to). */
+export const DEFAULT_CLASS: PlayerClass = {
+  primary: 'rifle',
+  secondary: 'pistol',
+  ability: 'smoke',
+  accessory: 'none',
+};
 
-export const CHAR_BY_ID = Object.fromEntries(CHARACTERS.map((c) => [c.id, c])) as Record<CharacterId, Character>;
-export const isCharacterId = (v: unknown): v is CharacterId => typeof v === 'string' && Object.hasOwn(CHAR_BY_ID, v);
-
-/** Who you are (the head and bare skin); `base` is the human. The class still decides the body and stats. */
+/** Who you are (the head and bare skin); `base` is the human. Only a look: the body and stats are the same. */
 export type SkinId =
   | 'base'
   | 'alien'
@@ -156,8 +91,8 @@ export const SKINS: { id: SkinId; name: string }[] = [
 export const isSkinId = (v: unknown): v is SkinId => SKINS.some((k) => k.id === v);
 
 /**
- * Outfit colours a player can pick per character. Only seen in free for all: team modes dress everybody in
- * the team colour. The first five are the class colours (each character's default).
+ * Outfit colours a player can pick. Only seen in free for all: team modes dress everybody in the team colour.
+ * The first one is the default.
  */
 export const OUTFIT_COLORS = [
   { hex: '#3f7fe0', name: 'Azul' },
@@ -172,8 +107,49 @@ export const OUTFIT_COLORS = [
   { hex: '#b8935a', name: 'Arena' },
 ] as const;
 export type OutfitColor = (typeof OUTFIT_COLORS)[number]['hex'];
+export const DEFAULT_OUTFIT_COLOR: string = OUTFIT_COLORS[0].hex;
 export const OUTFIT_COLOR_HEXES = OUTFIT_COLORS.map((c) => c.hex);
 export const isOutfitColor = (v: unknown): v is OutfitColor => OUTFIT_COLORS.some((c) => c.hex === v);
 
-/** Real speed of a character holding a weapon (m/s). */
-export const speedWith = (c: Character, weaponId: WeaponId): number => +(c.speed * WEAPONS[weaponId].weight).toFixed(1);
+/** The player's class pick (from the class screen; untrusted on the server). */
+export interface ClassChoice {
+  primary?: string | null;
+  secondary?: string | null;
+  ability?: string | null;
+  accessory?: string | null;
+}
+
+/**
+ * The class a player goes out with: each part of the pick when it is allowed, the default's otherwise (an accessory
+ * the weapons do not take, like a silencer on a shotgun, becomes none). The server runs every spawn request through
+ * this, so a client cannot equip anything else.
+ */
+export function classOf(choice?: ClassChoice | null): PlayerClass {
+  const pick = <T extends string>(list: readonly T[], v: string | null | undefined, fallback: T): T =>
+    list.find((id) => id === v) ?? fallback;
+  const primary = pick(PRIMARIES, choice?.primary, DEFAULT_CLASS.primary);
+  const secondary = pick(SIDEARMS, choice?.secondary, DEFAULT_CLASS.secondary);
+  return {
+    primary,
+    secondary,
+    ability: pick(ABILITY_IDS, choice?.ability, DEFAULT_CLASS.ability),
+    accessory: fitAccessory(pick(ACCESSORY_IDS, choice?.accessory, DEFAULT_CLASS.accessory), primary, secondary),
+  };
+}
+
+/** The class as two small indices plus the ability, for snapshots: [primary in PRIMARIES, secondary in SIDEARMS]. */
+export const classIndex = (c: Pick<PlayerClass, 'primary' | 'secondary'>): [number, number] => [
+  Math.max(0, PRIMARIES.indexOf(c.primary)),
+  Math.max(0, SIDEARMS.indexOf(c.secondary)),
+];
+export const classFromIndex = (wc: readonly number[] | undefined): Pick<PlayerClass, 'primary' | 'secondary'> => ({
+  primary: PRIMARIES[wc?.[0] ?? 0] ?? DEFAULT_CLASS.primary,
+  secondary: SIDEARMS[wc?.[1] ?? 0] ?? DEFAULT_CLASS.secondary,
+});
+
+/** A class in a few words for the HUD and the death card: «M4 · Humo». */
+export const classLabel = (c: PlayerClass): string => `${WEAPONS[c.primary].name} · ${ABILITIES[c.ability].name}`;
+
+/** Real speed of a player holding a weapon (m/s): the common body times the weapon's weight (and the Kevlar's). */
+export const speedWith = (weaponId: WeaponId, accessory?: AccessoryId | null): number =>
+  +(BODY.speed * WEAPONS[weaponId].weight * accessorySpeed(accessory)).toFixed(1);

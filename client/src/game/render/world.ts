@@ -203,6 +203,7 @@ const COMMON: Partial<Record<BoxKind, Look>> = {
   rail: ['hazard', 1],
   bridge: ['planks', 2],
   planter: ['concrete', 1.6],
+  rock: ['rock', 3],
   roof: ['planks', 2],
   bld1: ['plaster', 3],
   bld2: ['brick', 2.4],
@@ -235,60 +236,85 @@ const THEMES: Record<MapId, Theme> = {
     floor: ['paving', 3],
     wall: ['brick', 2.4],
     wall2: ['plaster', 3],
-    platform: ['concrete', 3],
+    platform: ['paving', 2],
     step: ['concrete', 2],
+    stair: ['paving', 1.5],
+    slab: ['tiles', 1.5],
+    bridge: ['planks', 1.5],
     ground: ['grass', 4, '#6f9a4a'],
     sun: 0xfff1d6,
     sky: '#5d9fe0',
     scenery: town,
   },
-  almacen: {
-    floor: ['concrete', 4],
-    wall: ['corrugated', 3],
-    platform: ['diamond', 2],
-    step: ['diamond', 2],
-    ground: ['asphalt', 5, '#7d7d78'],
-    sun: 0xffffff,
-    sky: '#7c95b0',
-    scenery: industrial,
-  },
-  desfiladero: {
-    floor: ['sand', 4],
-    wall: ['rock', 6],
-    wall2: ['plaster', 3],
-    platform: ['rock', 6],
-    step: ['planks', 2],
-    ground: ['sand', 6, '#d9b98a'],
-    sun: 0xffe0b0,
-    sky: '#5f86c4',
-    scenery: desert,
-  },
-  polvo: {
-    floor: ['sand', 4],
-    wall: ['plaster', 3],
-    wall2: ['plaster', 3],
-    platform: ['paving', 3],
-    step: ['paving', 2],
-    ground: ['sand', 6, '#d9bf90'],
-    sun: 0xfff0d0,
-    sky: '#6f9fd8',
-    scenery: desert,
-  },
-  ciudad: {
+  autopista: {
     floor: ['asphalt', 5],
     wall: ['concrete', 4],
+    wall2: ['concrete', 2],
+    bridge: ['asphalt', 5],
+    platform: ['metalPanel', 2],
+    step: ['concrete', 2],
+    ground: ['asphalt', 5, '#6a6b68'],
+    sun: 0xfff2dc,
+    sky: '#8a9fb4',
+    scenery: city,
+  },
+  monasterio: {
+    floor: ['paving', 3],
+    wall: ['rock', 4],
+    wall2: ['paving', 2],
+    roof: ['tiles', 2],
+    platform: ['grass', 3],
+    step: ['paving', 2],
+    rock: ['rock', 3],
+    wood: ['planks', 2],
+    water: [null],
+    ground: ['grass', 4, '#7a9a52'],
+    sun: 0xfff0d2,
+    sky: '#6f9fd4',
+    scenery: town,
+  },
+  pueblo: {
+    floor: ['paving', 3],
+    wall: ['plaster', 3],
+    wall2: ['rock', 4],
+    platform: ['paving', 3],
+    step: ['paving', 2],
+    stair: ['paving', 1.5],
+    slab: ['tiles', 1.5],
+    quay: ['paving', 3],
+    hull: ['planks', 1.5],
+    deck: ['planks', 1],
+    metal: ['metalPanel', 2],
+    water: [null],
+    ground: ['sand', 6, '#d8c39c'],
+    sun: 0xfff4e0,
+    sky: '#4f9be0',
+    scenery: town,
+  },
+  ciudad: {
+    floor: ['paving', 2.5],
+    wall: ['plaster', 3],
     platform: ['concrete', 2],
     step: ['concrete', 2],
-    ground: ['asphalt', 5, '#6b6e74'],
-    sun: 0xffffff,
-    sky: '#5d8fd0',
-    scenery: city,
+    bld1: ['plaster', 3],
+    bld2: ['plaster', 3],
+    bld3: ['plaster', 3],
+    bld4: ['plaster', 3],
+    quay: ['paving', 2],
+    water: [null],
+    ground: ['paving', 3, '#8f897e'],
+    sun: 0xfff1d6,
+    sky: '#6f9fd8',
+    scenery: town,
   },
   obra: {
     floor: ['gravel', 3],
     wall: ['panels', 3],
     platform: ['planks', 2],
     step: ['concrete', 2],
+    slab: ['concrete', 3],
+    cont1: ['corrugated', 3],
+    cont2: ['corrugated', 3],
     ground: ['gravel', 4, '#9a8f7c'],
     sun: 0xffe9cc,
     sky: '#6f9ccc',
@@ -316,6 +342,8 @@ const THEMES: Record<MapId, Theme> = {
     step: ['concrete', 2],
     quay: ['paving', 3],
     train: ['metalPanel', 2],
+    roof: ['corrugated', 2],
+    bridge: ['diamond', 2],
     ballast: ['gravel', 1.5],
     track: [null],
     sleeper: ['planks', 1],
@@ -330,11 +358,26 @@ const THEMES: Record<MapId, Theme> = {
     wall: ['rock', 6],
     wood: ['planks', 2],
     roof: ['planks', 2],
+    rock: ['rock', 4],
+    wall2: ['sand', 2],
     ice: [null],
     ground: ['sand', 5, '#e6ecf0'],
     sun: 0xf2f6ff,
     sky: '#c3d3e2',
     scenery: snowfield,
+  },
+  circuito: {
+    floor: ['rock', 6],
+    wall: ['rock', 6],
+    rock: ['rock', 4],
+    platform: ['diamond', 2],
+    step: ['diamond', 2],
+    metal: ['metalPanel', 2],
+    lava: [null],
+    ground: ['rock', 6, '#3a1c12'],
+    sun: 0xffd2a0,
+    sky: '#f0a868',
+    scenery: volcano,
   },
 };
 const CAR_COLORS = ['#c0503e', '#3d6e9e', '#e8e4dc', '#2b2f36', '#c9a13a', '#4f7a45'];
@@ -495,7 +538,6 @@ function mat(
 const glow = (color: string): THREE.MeshLambertMaterial => mat(color, null, { emissive: color, emissiveIntensity: 1 });
 
 const BOX = new THREE.BoxGeometry(1, 1, 1);
-const CONE4 = new THREE.ConeGeometry(0.71, 1, 4);
 const BLOB = new THREE.IcosahedronGeometry(0.5, 1);
 
 // ------------------------------------------------------------ Props: pack models (worldModels.ts)
@@ -505,6 +547,9 @@ const PINES = ['world/n-tree_pineTallA', 'world/n-tree_pineRoundA', 'world/n-tre
 const BARRELS = ['#3d6e9e', '#b04a3a', '#c9a13a', '#4f7a45'];
 /** Spot of a tree: its height (m) in the arena; outside they are bigger. */
 const TREE_H = 5.2;
+/** A rock box up to this wide (m) is a boulder: drawn with a rock model on it too. */
+const BOULDER_MAX = 4;
+const BOULDER_BULGE = 1.08;
 
 type PropBox = Pick<MapBox, 'x' | 'y' | 'z' | 'w' | 'h' | 'd' | 'c'>;
 /** Props drawn with a pack model (false: drawn as a box). The model fills the prop's collision box. */
@@ -556,11 +601,17 @@ function addProp(models: WorldModels, b: PropBox, rand: Rand, i: number): boolea
       models.add('props/sacks', { ...at, ...along, ry: turn });
       return true;
     case 'rock':
-      models.add(rand() < 0.5 ? 'world/s-rock-sand-a' : 'world/s-rock-sand-b', {
-        ...at,
-        ry: Math.round(rand() * 4) * (Math.PI / 2),
-      });
-      return true;
+      // The rock models are mountain-shaped (a peak, low edges): stretched over the box they left its corners as
+      // invisible ledges. The box itself is drawn as rock (what you see is what you hit); a boulder also gets a
+      // rock model as relief, BOULDER_BULGE wider so it shows round the box (half turns keep its width on x)
+      if (Math.max(b.w, b.d) <= BOULDER_MAX)
+        models.add(rand() < 0.5 ? 'world/s-rock-sand-a' : 'world/s-rock-sand-b', {
+          ...at,
+          w: b.w * BOULDER_BULGE,
+          d: b.d * BOULDER_BULGE,
+          ry: Math.round(rand()) * Math.PI,
+        });
+      return false;
     default:
       return false;
   }
@@ -759,6 +810,25 @@ function harbour(batch: Batch, map: GameMap, rand: Rand, models: WorldModels): v
   factories(map, rand, models);
 }
 
+/** Race course: a sea of lava all round under an orange sky, rocks sticking out of it. */
+function volcano(batch: Batch, map: GameMap, rand: Rand, models: WorldModels): void {
+  const H = map.half;
+  batch.add(BOX, glow(map.colors.lava ?? '#ff5a1f'), 0, 0.02, 0, 0, H * 12, 0.04, H * 12);
+  for (let i = 0; i < 18; i++) {
+    const [x, z] = outside(rand, H, 6, 60);
+    models.add(rand() < 0.5 ? 'world/n-rock_tallA' : 'world/n-rock_largeA', {
+      x,
+      y: 0,
+      z,
+      w: 1,
+      h: 4 + rand() * 9,
+      d: 1,
+      fit: 'height',
+      ry: rand() * 6,
+    });
+  }
+}
+
 /** Snow: pine forest and rocks all round, and the hills white. */
 function snowfield(batch: Batch, map: GameMap, rand: Rand, models: WorldModels): void {
   const H = map.half;
@@ -781,23 +851,6 @@ function snowfield(batch: Batch, map: GameMap, rand: Rand, models: WorldModels):
   }
   models.add('world/n-tent_detailedClosed', { x: H + 9, y: 0, z: -6, w: 1, h: 2.2, d: 1, fit: 'height', ry: 0.6 });
   hills(batch, map, rand, '#e9eef2');
-}
-
-function industrial(batch: Batch, map: GameMap, rand: Rand, models: WorldModels): void {
-  const H = map.half;
-  // Warehouse roof structure: trusses and hanging lights
-  const steel = mat('#4a5562', null);
-  const y = map.wallH + 0.4;
-  for (let x = -H + 4; x < H; x += 8) {
-    batch.add(BOX, steel, x, y, 0, 0, 0.35, 0.7, 2 * H + 1);
-    for (let z = -H + 10; z < H - 4; z += 14) {
-      batch.add(BOX, mat('#2b2f36', null), x, y - 0.5, z, 0, 0.04, 0.9, 0.04);
-      batch.add(CONE4, mat('#3a4048', null), x, y - 1.2, z, Math.PI / 4, 1.1, 0.6, 1.1);
-      batch.add(BOX, glow('#fff6d6'), x, y - 1.52, z, 0, 0.6, 0.05, 0.6);
-    }
-  }
-  for (const z of [-H / 2, 0, H / 2]) batch.add(BOX, steel, 0, y + 0.5, z, 0, 2 * H + 1, 0.35, 0.35);
-  factories(map, rand, models);
 }
 
 /** Kenney's factories, tanks and chimneys around the arena. */
@@ -827,48 +880,6 @@ function factories(map: GameMap, rand: Rand, models: WorldModels): void {
       h: 22 + rand() * 18,
       d: 1,
       fit: 'height',
-    });
-  }
-}
-
-function desert(_batch: Batch, map: GameMap, rand: Rand, models: WorldModels): void {
-  const H = map.half;
-  const rockCols = ['#e0a070', '#c98a5a', '#e8b07a', '#c27a52'];
-  // Mesas and buttes: Kenney's tall rocks stretched big and tinted to the desert's rock
-  for (let i = 0; i < 22; i++) {
-    const w = 18 + rand() * 30;
-    const d = 18 + rand() * 30;
-    const h = 12 + rand() * 30;
-    const [x, z] = outside(rand, H, 15, 110, Math.hypot(w, d) / 2);
-    const ry = rand() * 3;
-    const tint = pick(rockCols, i);
-    models.add(i % 2 ? 'world/n-rock_tallA' : 'world/n-rock_tallC', { x, y: 0, z, w, h: h + 6, d, ry, tint });
-  }
-  for (let i = 0; i < 40; i++) {
-    const [x, z] = outside(rand, H, 2, 50);
-    models.add(i % 3 ? 'world/n-cactus_tall' : 'world/n-cactus_short', {
-      x,
-      y: 0,
-      z,
-      w: 1,
-      h: 2 + rand() * 1.6,
-      d: 1,
-      fit: 'height',
-      ry: rand() * 6,
-    });
-  }
-  for (let i = 0; i < 16; i++) {
-    const [x, z] = outside(rand, H, 4, 40);
-    const s = 1.5 + rand() * 3;
-    models.add(i % 2 ? 'world/n-rock_largeA' : 'world/n-rock_largeC', {
-      x,
-      y: 0,
-      z,
-      w: s * 2,
-      h: s * 0.8,
-      d: s * 2,
-      ry: rand() * 6,
-      tint: pick(rockCols, i),
     });
   }
 }

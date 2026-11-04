@@ -1,12 +1,12 @@
-// The top three on a 3D podium, each as their favourite character in their colour, under studio light.
+// The top three on a 3D podium, each in their outfit colour holding their favourite primary, under studio light.
 // Renders only while on screen and frees its WebGL context on unmount (school laptops keep few alive).
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { CHAR_BY_ID, type RankingRow } from '@blockshot/shared';
+import { WEAPONS, type RankingRow } from '@blockshot/shared';
 import { loadGun } from '../game/render/gunAssets';
 import { buildCharacter, type CharacterModel } from '../game/render/models';
-import { pc, rowColor } from './RankingTable';
+import { favWeapon, pc, rowColor } from './RankingTable';
 
 const ACCENT = 0xff7a1a;
 /** Steps left to right: [place (0 = 1st), x, height] */
@@ -75,9 +75,8 @@ export default function Podium({ top }: { top: RankingRow[] }) {
       edge.position.set(x, h - 0.035, 0.56);
       scene.add(edge);
       if (!r) continue;
-      const ch = CHAR_BY_ID[r.fav ?? 'soldado'];
       const color = rowColor(r);
-      const m = buildCharacter(ch.id, 'base', color);
+      const m = buildCharacter('smoke', 'base', color);
       m.group.traverse((o) => {
         if (o instanceof THREE.Mesh) o.castShadow = true;
       });
@@ -86,7 +85,7 @@ export default function Podium({ top }: { top: RankingRow[] }) {
       m.aim.rotation.x = 0.12;
       scene.add(m.group);
       figures.push(m);
-      void loadGun(ch.primary, { color }).then((g) => {
+      void loadGun(favWeapon(r) ?? 'rifle', { color }).then((g) => {
         if (!alive) return;
         g.scale.setScalar(GUN_SCALE);
         m.holdGun(g);
@@ -148,7 +147,7 @@ export default function Podium({ top }: { top: RankingRow[] }) {
               <b>{r ? r.name : 'Libre'}</b>
               <span>
                 {r
-                  ? `${r.wins} ${r.wins === 1 ? 'victoria' : 'victorias'} · ${CHAR_BY_ID[r.fav ?? 'soldado'].name}`
+                  ? `${r.wins} ${r.wins === 1 ? 'victoria' : 'victorias'} · ${WEAPONS[favWeapon(r) ?? 'rifle'].name}`
                   : 'Puesto sin ocupar'}
               </span>
             </div>

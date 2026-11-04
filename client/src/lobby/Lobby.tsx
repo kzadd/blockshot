@@ -1,18 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
-import {
-  MAPS,
-  MAP_SIZES,
-  MODES,
-  MODE_BY_ID,
-  NICKNAME_MAX,
-  ROOM_MAX_PLAYERS,
-  ROOM_MIN_PLAYERS,
-  type JoinResult,
-  type MapId,
-  type ModeId,
-  type RoomSummary,
-  type SizeId,
-} from '@blockshot/shared';
+import { MAPS, MAP_SIZES, MODE_BY_ID, NICKNAME_MAX, type JoinResult, type RoomSummary } from '@blockshot/shared';
 import type { Session } from '../app/App';
 import { sfx } from '../game/audio/sound';
 import { clearGameLost, useConnection } from '../network/connection';
@@ -22,7 +9,7 @@ import { SettingsPanels } from '../settings/SettingsDialog';
 import { Icon } from '../ui/icons';
 import Modal from '../ui/Modal';
 import { blurredMap, mapImage } from './mapImage';
-import { MODE_HOW, MODE_ICON, MODE_SUB } from './modeCopy';
+import CreateRoom, { Lock, type RoomForm } from './CreateRoom';
 import '../styles/proposal.css';
 import '../styles/pz-extra.css';
 
@@ -32,8 +19,6 @@ import '../styles/pz-extra.css';
 const NICK_KEY = 'blockshot:nick';
 /** Show the "cannot connect" toast after this long without a connection. */
 const OFFLINE_NOTICE_MS = 3000;
-/** More players than this × the size's recommendation gets a warning. */
-const CROWDED_FACTOR = 1.5;
 /** The backdrop dims while the map changes (proposal's setMap). */
 const SWAP_MS = 180;
 const LOGO = `${import.meta.env.BASE_URL}brand/blockshot-logo-transparente.svg`;
@@ -47,16 +32,6 @@ const loadNick = (): string => {
   }
 };
 
-interface RoomForm {
-  name: string;
-  password: string;
-  mapId: MapId;
-  size: SizeId;
-  mode: ModeId;
-  scoreLimit: number;
-  max: number;
-}
-
 type Screen = 'jugar' | 'ranking' | 'ajustes';
 const SCREENS: [Screen, string][] = [
   ['jugar', 'Jugar'],
@@ -65,15 +40,6 @@ const SCREENS: [Screen, string][] = [
 ];
 const screenFromHash = (): Screen => SCREENS.find(([id]) => `#${id}` === location.hash)?.[0] ?? 'jugar';
 type Tab = 'salas' | 'crear';
-
-const ModeIcon = ({ id }: { id: ModeId }) => (
-  <svg viewBox="0 0 24 24" aria-hidden="true" dangerouslySetInnerHTML={{ __html: MODE_ICON[id] }} />
-);
-const Lock = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M7 10V7a5 5 0 0 1 10 0v3h2v11H5V10zm2 0h6V7a3 3 0 0 0-6 0z" />
-  </svg>
-);
 
 function Toast({
   title,
@@ -217,29 +183,6 @@ export default function Lobby({ onJoined }: { onJoined: (s: Session) => void }) 
 
   // Opens on the room list when there are rooms and on «Crear sala» when there are none
   const shown: Tab = tab ?? (rooms.length ? 'salas' : 'crear');
-  const map = MAPS.find((m) => m.id === form.mapId) ?? MAPS[0]!;
-  const mode = MODE_BY_ID[form.mode];
-  const size = MAP_SIZES[form.size];
-  const crowded = form.max > size.players * CROWDED_FACTOR;
-  const placeholder = `SALA DE ${(nickname || 'tu clase').toUpperCase()}`;
-  const summary: [string, ReactNode][] = [
-    ['Sala', (form.name.trim() || placeholder).toUpperCase()],
-    ['Mapa', `${map.name} · ${size.name}`],
-    ['Modo', mode.name],
-    ['Para ganar', `${form.scoreLimit} ${mode.unit}`],
-    ['Jugadores', crowded ? `Hasta ${form.max} · recomendado ${size.players}` : `Hasta ${form.max}`],
-    [
-      'Acceso',
-      form.password.trim() ? (
-        <>
-          <Lock /> Con contraseña
-        </>
-      ) : (
-        'Libre'
-      ),
-    ],
-  ];
-
   return (
     <>
       <div className="pz">
@@ -337,145 +280,14 @@ export default function Lobby({ onJoined }: { onJoined: (s: Session) => void }) 
                     </button>
                   </div>
                 </div>
-                <form className="lt create" hidden={shown !== 'crear'} onSubmit={create}>
-                  <div className="c-left">
-                    <h2 className="lbl">Mapa</h2>
-                    <div className="maps">
-                      {MAPS.map((m) => (
-                        <button
-                          type="button"
-                          key={m.id}
-                          className={`map ${form.mapId === m.id ? 'on' : ''}`}
-                          onClick={() => setForm({ ...form, mapId: m.id })}
-                        >
-                          <img src={mapImage(m.id)} alt="" />
-                          <span>{m.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                    <h2 className="lbl">Modo de juego</h2>
-                    <div className="modes">
-                      {MODES.map((m) => (
-                        <button
-                          type="button"
-                          key={m.id}
-                          className={`mode ${form.mode === m.id ? 'on' : ''}`}
-                          onClick={() => setForm({ ...form, mode: m.id, scoreLimit: m.def })}
-                        >
-                          <ModeIcon id={m.id} />
-                          <span>
-                            {m.name}
-                            <small>{MODE_SUB[m.id]}</small>
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                    <div className="rules">
-                      <div>
-                        <h2 className="lbl">Para ganar</h2>
-                        <div className="seg">
-                          {mode.limits.map((n) => (
-                            <button
-                              type="button"
-                              key={n}
-                              className={form.scoreLimit === n ? 'on' : ''}
-                              onClick={() => setForm({ ...form, scoreLimit: n })}
-                            >
-                              {n} {mode.unit}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <div>
-                        <h2 className="lbl">Tamaño</h2>
-                        <div className="seg">
-                          {Object.values(MAP_SIZES).map((z) => (
-                            <button
-                              type="button"
-                              key={z.id}
-                              className={form.size === z.id ? 'on' : ''}
-                              onClick={() => setForm({ ...form, size: z.id, max: z.players })}
-                            >
-                              {z.name}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <div>
-                        <h2 className="lbl">Jugadores</h2>
-                        <div className="stepper">
-                          <button
-                            type="button"
-                            aria-label="Menos"
-                            disabled={form.max <= ROOM_MIN_PLAYERS}
-                            onClick={() => setForm({ ...form, max: form.max - 1 })}
-                          >
-                            −
-                          </button>
-                          <b>{form.max}</b>
-                          <button
-                            type="button"
-                            aria-label="Más"
-                            disabled={form.max >= ROOM_MAX_PLAYERS}
-                            onClick={() => setForm({ ...form, max: form.max + 1 })}
-                          >
-                            +
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="c-right">
-                    <div className="preview">
-                      <img src={mapImage(map.id)} alt="" />
-                      <div>
-                        <b>{map.name}</b>
-                        <span className="chip">
-                          <ModeIcon id={mode.id} />
-                          {mode.name}
-                        </span>
-                        <p className="meta">
-                          {map.desc} {MODE_HOW[mode.id]}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="two">
-                      <label>
-                        <span className="lbl">Nombre de la sala</span>
-                        <input
-                          className="upper"
-                          value={form.name}
-                          maxLength={24}
-                          placeholder={placeholder}
-                          onChange={(e) => setForm({ ...form, name: e.target.value })}
-                        />
-                      </label>
-                      <label>
-                        <span className="lbl">Contraseña · opcional</span>
-                        <input
-                          value={form.password}
-                          maxLength={32}
-                          placeholder="Vacía: entra cualquiera"
-                          onChange={(e) => setForm({ ...form, password: e.target.value })}
-                        />
-                      </label>
-                    </div>
-                    <div>
-                      <h2 className="lbl">Resumen</h2>
-                      <dl className="summary">
-                        {summary.map(([k, v]) => (
-                          <div key={k}>
-                            <dt>{k}</dt>
-                            <dd>{v}</dd>
-                          </div>
-                        ))}
-                      </dl>
-                    </div>
-                    <button className="btn primary wide" disabled={!connected}>
-                      Crear y entrar
-                    </button>
-                  </div>
-                </form>
+                <CreateRoom
+                  form={form}
+                  setForm={setForm}
+                  hidden={shown !== 'crear'}
+                  connected={connected}
+                  nickname={nickname}
+                  onSubmit={create}
+                />
               </section>
             </main>
           )}

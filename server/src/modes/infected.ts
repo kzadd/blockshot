@@ -1,7 +1,8 @@
 // Once 2 players are alive a countdown starts and the first infected (side 2) is picked. Infected only
 // carry the knife, have more health and run faster; every survivor they kill joins them. They win when
-// nobody is left; survivors win if they last the match minutes.
-import { CHAR_BY_ID, INFECT } from '@blockshot/shared';
+// nobody is left; survivors win if they last the match minutes. No power weapons: none for the infected (knife
+// only), and none for the survivors either, to keep it simple (a railgun would make holding out too easy).
+import { BODY, INFECT } from '@blockshot/shared';
 import { endMatch } from '../match/match';
 import { equip } from '../players/loadout';
 import type { Player } from '../players/player';
@@ -26,9 +27,9 @@ export function createInfected(room: Room): GameMode {
   function infect(p: Player): void {
     p.team = 2;
     p.streak = 0;
-    if (!p.alive || !p.characterId) return;
+    if (!p.alive || !p.cls) return;
     equip(room, p);
-    p.maxHp = p.hp = Math.round(CHAR_BY_ID[p.characterId].hp * INFECT.hp);
+    p.maxHp = p.hp = Math.round(BODY.hp * INFECT.hp);
     room.channel.to(p.id, 'loadout', [{ level: p.level, team: p.team }]);
   }
 
@@ -52,6 +53,7 @@ export function createInfected(room: Room): GameMode {
 
   return {
     streakRewards: false,
+    powerWeapons: false,
     initialTeam: () => (state.started ? 2 : 1),
     hpFactor: (p) => (p.team === 2 ? INFECT.hp : 1),
     speedFactor: (p) => (p.team === 2 ? INFECT.speed : 1),

@@ -5,14 +5,13 @@ import {
   STREAKS,
   canSwitchTeam,
   getMap,
-  type CharacterId,
   type KillEvent,
   type MatchEnd,
   type SideTeam,
   type RoomInfo,
 } from '@blockshot/shared';
 import type { Session } from '../app/App';
-import { loadChar, lookOf, saveChar, saveLook, type Look } from '../characters/looks';
+import { saveClass, type Look } from '../characters/looks';
 import Controls from '../manual/Manual';
 import { markGameLost, markKicked } from '../network/connection';
 import { socket } from '../network/socket';
@@ -27,6 +26,7 @@ import { hudStore, publishHud, resetHud, useHud } from './hud/hudStore';
 import type { RoomView } from './roomView';
 import CharacterScreen from './screens/CharacterScreen';
 import DeathScreen, { type LastDeath } from './screens/DeathScreen';
+import LoadoutMenu from './screens/LoadoutMenu';
 import PauseMenu from './screens/PauseMenu';
 import AdminDialog from './screens/AdminDialog';
 import StatsDialog from './screens/StatsDialog';
@@ -44,7 +44,7 @@ const FEED_PRUNE_MS = 300;
 const BANNER_MS = 2300;
 const SHAKE_MS = 170;
 
-type Menu = 'settings' | 'controls' | 'stats' | 'admin' | 'ranking' | 'tour' | null;
+type Menu = 'settings' | 'controls' | 'stats' | 'admin' | 'ranking' | 'tour' | 'loadout' | null;
 type NewFeedItem = FeedItem extends infer F ? (F extends FeedItem ? Omit<F, 'key' | 't'> : never) : never;
 
 interface GameProps {
@@ -61,9 +61,10 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [showScores, setShowScores] = useState(false);
   const [match, setMatch] = useState<MatchState | null>(null);
-  const [charId, setCharId] = useState(loadChar);
-  // The look of each character (skin, colour, camouflage, finish) lives in characters/looks (localStorage)
-  const [selecting, setSelecting] = useState(true); // the character is chosen when entering
+  // The class in play (weapons, ability and looks; null until the first «Jugar»). The saved one lives in
+  // characters/looks (localStorage)
+  const [playing, setPlaying] = useState<Look | null>(null);
+  const [selecting, setSelecting] = useState(true); // the class is built when entering
   const [menu, setMenu] = useState<Menu>(null);
   const [banner, setBanner] = useState<KillBanner | null>(null); // centre notice when you kill someone
   const [lastDeath, setLastDeath] = useState<LastDeath | null>(null); // who killed you
@@ -80,10 +81,10 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
   }));
   const live = useRef({ match, menu });
   live.current = { match, menu };
-  const resume = useRef({ selecting, charId });
+  const resume = useRef({ selecting, playing });
   // New map or mode after a vote: a light "click to start" instead of the pause menu (the browser needs a click)
   const [fresh, setFresh] = useState(false);
-  resume.current = { selecting, charId };
+  resume.current = { selecting, playing };
 
   const info: RoomView = {
     name: room.name,
@@ -106,8 +107,8 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
     );
     engine.current = e;
     const keep = resume.current;
-    if (!keep.selecting && keep.charId) {
-      e.autoChar = { id: keep.charId, look: lookOf(keep.charId) };
+    if (!keep.selecting && keep.playing) {
+      e.autoChar = keep.playing;
       e.respawnSoon();
       setFresh(true);
     }
@@ -129,8 +130,8 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
 
   // While choosing a character there is no automatic respawn
   useEffect(() => {
-    if (engine.current) engine.current.autoChar = selecting || !charId ? null : { id: charId, look: lookOf(charId) };
-  }, [selecting, charId]);
+    if (engine.current) engine.current.autoChar = selecting ? null : playing;
+  }, [selecting, playing]);
 
   // Block curtain when spawning / respawning
   const wasAlive = useRef(false);
@@ -160,7 +161,7 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
       const label = STREAKS[d.streak];
       if (label) push({ type: 'streak', name: d.killerName, team: d.killerTeam, label, n: d.streak });
       if (d.ended) push({ type: 'notice', text: `${d.killerName} acabó con la racha de ${d.victimName} (${d.ended})` });
-      if (d.victim === you) setLastDeath({ name: d.killerName, char: d.killerChar, weapon: d.weapon, hp: d.killerHp });
+      if (d.victim === you) setLastDeath({ name: d.killerName, cls: d.killerClass, weapon: d.weapon, hp: d.killerHp });
       if (d.killer === you) {
         if (label || d.reward) sfx.streak();
         clearTimeout(bannerTimer);
@@ -229,6 +230,21 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
       }
       const h = hudStore.getState().hud;
       const { match: m, menu: open } = live.current;
+      // L (or Esc while it is open): the in-match loadout menu, over the game; the mouse is freed meanwhile
+      if (!e.repeat && open === 'loadout' && (e.code === 'Escape' || e.code === 'KeyL')) {
+        e.preventDefault();
+        setMenu(null);
+        if (h?.alive) engine.current?.requestLock();
+        return;
+      }
+      if (e.code === 'KeyL' && !e.repeat && h?.everSpawned && resume.current.playing && !m && !open) {
+        if (!resume.current.selecting || h.alive) {
+          e.preventDefault();
+          setMenu('loadout');
+          document.exitPointerLock?.();
+          return;
+        }
+      }
       // Esc on the pause screen: back to the game (same as clicking)
       if (e.code === 'Escape' && !e.repeat && h?.alive && !h.locked && !m && !open) {
         engine.current?.requestLock();
@@ -278,13 +294,12 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
     };
   }, [onLeave, onRoom, you, room.mode, session.admin]);
 
-  const pick = (characterId: CharacterId, look: Look) => {
-    saveChar(characterId);
-    saveLook(characterId, look);
-    setCharId(characterId);
+  const pick = (look: Look) => {
+    saveClass(look);
+    setPlaying(look);
     setSelecting(false);
     engine.current?.requestLock(); // must happen inside the click
-    engine.current?.spawn(characterId, look); // spawns now, or when the countdown ends
+    engine.current?.spawn(look); // spawns now, or when the countdown ends
   };
   const keep = () => {
     setSelecting(false);
@@ -295,6 +310,19 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
     onLeave();
   };
   const switchTeam = (team: SideTeam) => socket.emit('team:set', { team });
+  // In-match loadout menu: the new class is kept (here and on the server) for the next respawn
+  const saveLoadout = (look: Look) => {
+    saveClass(look);
+    setPlaying(look);
+    const { primary, secondary, ability, accessory } = look;
+    socket.emit('player:class', { primary, secondary, ability, accessory });
+    setMenu(null);
+    if (hudStore.getState().hud?.alive) engine.current?.requestLock();
+  };
+  const closeLoadout = () => {
+    setMenu(null);
+    if (hudStore.getState().hud?.alive) engine.current?.requestLock();
+  };
   const vote = (i: number) => {
     socket.emit('vote', { i });
     setMatch((m) => (m ? { ...m, myVote: i } : m));
@@ -327,7 +355,7 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
       {dead && (
         <DeathScreen
           lastDeath={lastDeath}
-          current={charId}
+          current={playing}
           feed={feed}
           you={you}
           mode={room.mode}
@@ -339,7 +367,7 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
       {choosing && (
         <CharacterScreen
           info={info}
-          current={charId}
+          current={playing}
           mode={room.mode}
           onPick={pick}
           onKeep={keep}
@@ -390,6 +418,15 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
         />
       )}
 
+      {menu === 'loadout' && playing && (
+        <LoadoutMenu
+          current={playing}
+          mode={room.mode}
+          alive={!!g?.alive}
+          onSave={saveLoadout}
+          onClose={closeLoadout}
+        />
+      )}
       {menu === 'settings' && <Settings onClose={() => setMenu(null)} />}
       {menu === 'stats' && <StatsDialog onClose={() => setMenu(null)} />}
       {menu === 'admin' && (

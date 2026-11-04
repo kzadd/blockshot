@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { CHAR_BY_ID, type CharacterId } from '@blockshot/shared';
+import type { WeaponId } from '@blockshot/shared';
+import { fitGunGear, wearKevlar } from '../game/render/gear';
 import { buildCharacter, type CharacterModel } from '../game/render/models';
 import { loadGun } from '../game/render/gunAssets';
 import type { Look } from './looks';
@@ -16,11 +17,11 @@ const DRAG_SPEED = 0.012;
 const MAX_DT = 0.05;
 const GUN_SCALE = 1.05;
 const AIM_TILT = 0.12;
-/** Arma tab: both guns up close, one above the other. */
-const SHOWCASE_SCALE = 2.2;
+/** Acabado tab: both guns up close, one above the other (sized for the class screen's upright stage). */
+const SHOWCASE_SCALE = 1.6;
 const SHOWCASE_Y = [1.25, 0.55] as const;
 const SWAY = 0.45;
-/** Spin-in on a new character: speed of the 0→1 ramp (per second) and extra turn (rad). */
+/** Spin-in on a new kit (another ability): speed of the 0→1 ramp (per second) and extra turn (rad). */
 const POP_SPEED = 2.5;
 const POP_TURN = Math.PI * 0.6;
 const RING_OPACITY = 0.55;
@@ -106,20 +107,21 @@ declare global {
   }
 }
 
-// 3D studio: the character turning on a ring in its colour, soft key light and a rim in the same colour.
-// It can be turned by dragging. On the Arma tab it shows the two guns, one above the other, swaying side-on.
+// 3D studio: the player's body (its kit follows the class's ability) turning on a ring in its colour, soft key light and a rim in the same colour.
+// It can be turned by dragging. It holds `held` (the primary by default: the loadout picker passes the secondary or
+// the gun being hovered); on the Acabado tab (`showcase`) it shows the two guns, one above the other, side-on.
 export default function CharacterPreview({
-  charId,
   look,
+  held,
   showcase = false,
 }: {
-  charId: CharacterId;
   look: Look;
+  held?: WeaponId;
   showcase?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const view = useRef<View | null>(null);
-  const lastChar = useRef(charId);
+  const lastKit = useRef(look.ability);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -203,7 +205,7 @@ export default function CharacterPreview({
     renderer.setAnimationLoop(() => {
       const dt = Math.min(MAX_DT, clock.getDelta());
       if (drag === null && !frozen) angle += dt * ((Math.PI * 2) / TURN_SECONDS);
-      // On a new character: a quick spin-in and the ring swelling out
+      // On a new kit: a quick spin-in and the ring swelling out
       v.pop = Math.min(1, v.pop + dt * POP_SPEED);
       const e = 1 - (1 - v.pop) ** 3;
       holder.rotation.y = v.spin ? Math.PI + angle + (1 - e) * POP_TURN : Math.sin(angle * 0.6) * SWAY;
@@ -234,16 +236,16 @@ export default function CharacterPreview({
     };
   }, []);
 
-  // Changing character, look or tab rebuilds the content (guns load asynchronously; the newest build wins)
-  const { skin, color, camo, finish } = look;
+  // Changing the kit, look, held gun or tab rebuilds the content (guns load asynchronously; the newest build wins)
+  const { skin, color, camo, finish, primary, secondary, ability, accessory } = look;
+  const inHand = held ?? primary;
   useEffect(() => {
     const v = view.current;
     if (!v) return;
     const n = ++v.build;
-    const ch = CHAR_BY_ID[charId];
     const gunLook = { finish, color, camo };
-    const pop = lastChar.current !== charId;
-    lastChar.current = charId;
+    const pop = lastKit.current !== ability;
+    lastKit.current = ability;
     const done = (content: THREE.Object3D) => {
       if (view.current !== v || n !== v.build) return;
       v.holder.clear();
@@ -254,9 +256,10 @@ export default function CharacterPreview({
       if (pop) v.pop = 0;
     };
     if (showcase) {
-      void Promise.all([loadGun(ch.primary, gunLook), loadGun(ch.secondary, gunLook)]).then((guns) => {
+      void Promise.all([loadGun(primary, gunLook), loadGun(secondary, gunLook)]).then((guns) => {
         const g = new THREE.Group();
         guns.forEach((gun, i) => {
+          fitGunGear(gun, accessory);
           gun.scale.setScalar(SHOWCASE_SCALE);
           gun.position.set(0, SHOWCASE_Y[i]!, 0);
           gun.rotation.y = Math.PI / 2;
@@ -266,9 +269,11 @@ export default function CharacterPreview({
         done(g);
       });
     } else {
-      const model = buildCharacter(ch.id, skin, color, camo);
+      const model = buildCharacter(ability, skin, color, camo);
+      wearKevlar(model, accessory);
       castShadows(model.group); // before the gun is held: like the proposal, the gun casts no shadow
-      void loadGun(ch.primary, gunLook).then((gun) => {
+      void loadGun(inHand, gunLook).then((gun) => {
+        fitGunGear(gun, accessory);
         gun.scale.setScalar(GUN_SCALE);
         model.holdGun(gun);
         model.aim.rotation.x = AIM_TILT;
@@ -276,7 +281,7 @@ export default function CharacterPreview({
         done(model.group);
       });
     }
-  }, [charId, skin, color, camo, finish, showcase]);
+  }, [ability, skin, color, camo, finish, primary, secondary, inHand, showcase, accessory]);
 
   return <canvas id="studio" ref={canvasRef} />;
 }

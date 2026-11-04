@@ -119,6 +119,7 @@ export class InputController {
     if (e.code === 'Digit1') this.actions.switchSlot(0);
     if (e.code === 'Digit2') this.actions.switchSlot(1);
     if (e.code === 'Digit3') this.actions.switchSlot(2);
+    if (e.code === 'Digit4') this.actions.switchSlot(3);
     if (e.code === 'KeyQ') this.actions.switchPrevious();
     if (e.code === 'KeyR') this.actions.reload();
   }

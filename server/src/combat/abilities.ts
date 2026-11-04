@@ -3,7 +3,7 @@
 // call popSmoke when their fuse ends.
 import {
   ABILITIES,
-  CHAR_BY_ID,
+  MEDKIT_COMBAT_MS,
   MEDKIT_HP,
   MINE,
   MINE_WEAPON,
@@ -70,10 +70,10 @@ const add = (room: Room, d: Omit<Deployable, 'id'>): Deployable => {
   return full;
 };
 
-/** Ability key: does what the player's character can do, if it is ready. True when it was used. */
+/** Ability key: does what the player's class can do, if it is ready. True when it was used. */
 export function useAbility(room: Room, p: Player, o: Vec3, d: Vec3, now: number): boolean {
-  if (!p.alive || !p.characterId || room.matchOver || now < p.abilityAt) return false;
-  const ability = CHAR_BY_ID[p.characterId].ability;
+  const ability = p.cls?.ability;
+  if (!p.alive || !ability || room.matchOver || now < p.abilityAt) return false;
   switch (ability) {
     case 'smoke':
       throwSmoke(room, p, o, d, now);
@@ -100,6 +100,10 @@ export function useAbility(room: Room, p: Player, o: Vec3, d: Vec3, now: number)
     case 'medkit':
       if (p.hp >= p.maxHp) {
         room.channel.to(p.id, 'notice', ['Ya tienes la vida al máximo']);
+        return false;
+      }
+      if (now - p.lastDamage < MEDKIT_COMBAT_MS) {
+        room.channel.to(p.id, 'notice', ['No puedes curarte en pleno combate: ponte a cubierto']);
         return false;
       }
       p.hp = Math.min(p.maxHp, p.hp + MEDKIT_HP);

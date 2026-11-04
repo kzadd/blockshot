@@ -1,4 +1,4 @@
-// One ability per character (key E), with its own cooldown. They are tools, not kills: only the mine hurts,
+// One ability per class (key E), with its own cooldown. They are tools, not kills: only the mine hurts,
 // and it cannot kill a player at full health.
 import type { Weapon } from '../weapons/weapons';
 import { WEAPONS } from '../weapons/weapons';
@@ -28,7 +28,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
   shield: {
     id: 'shield',
     name: 'Escudo',
-    desc: 'Un escudo frontal para las balas que te llegan de delante durante unos segundos.',
+    desc: 'Un escudo frontal para las balas que te llegan de delante durante unos segundos. Disparar lo baja.',
     cooldownMs: 26000,
   },
   dash: {
@@ -46,7 +46,7 @@ export const ABILITIES: Record<AbilityId, Ability> = {
   medkit: {
     id: 'medkit',
     name: 'Botiquín',
-    desc: 'Te cura de golpe una buena parte de la vida. Úsalo a cubierto.',
+    desc: 'Te cura de golpe una buena parte de la vida. Solo a cubierto: no funciona si te han dado hace nada.',
     cooldownMs: 22000,
   },
   wall: {
@@ -57,12 +57,18 @@ export const ABILITIES: Record<AbilityId, Ability> = {
   },
 };
 
+/** Every ability, in the order the class creator lists them. */
+export const ABILITY_IDS = Object.keys(ABILITIES) as AbilityId[];
+
 /** Smoke canister: thrown like a grenade, it pops where it first lands (or after the fuse) into a cloud. */
 export const SMOKE = { fuseMs: 1100, radius: 4.5, durationMs: 9000 };
 /** Mine: armed after `armMs`, it goes off when a rival comes within `trigger` m. */
 export const MINE = { armMs: 1000, trigger: 1.8, radius: 4, maxDamage: 85, minDamage: 30, lifeMs: 90000 };
 export const MINE_WEAPON: Weapon = { ...WEAPONS.pistol, name: 'Mina', damage: MINE.maxDamage, headMult: 1 };
-/** Shield: blocks shots coming from the front half (within `arcCos` of the facing) for `durationMs`. */
+/**
+ * Shield: blocks shots coming from the front half (within `arcCos` of the facing) for `durationMs`. Firing lowers it
+ * (balance, 2026-11-04: with any class the shield was a free first 2.5 s of every duel, ~90 % wins in duel.sim).
+ */
 export const SHIELD = { durationMs: 2500, arcCos: 0.2 };
 /** Dash: `timeS` seconds at `speed` m/s along the move direction without falling (~7 m), then it leaves you
  * at `exit` m/s. Cooldown in s (it is part of the shared movement simulation, so the client predicts it). */
@@ -70,5 +76,10 @@ export const DASH = { speed: 30, timeS: 0.22, exit: 11, cooldownS: ABILITIES.das
 /** Radar: how long the rivals show on the minimap. Medkit: health it gives back. */
 export const RADAR_MS = 7000;
 export const MEDKIT_HP = 40;
+/**
+ * Medkit only out of the fight: not within this many ms of taking damage (balance, 2026-11-04: healing mid-duel
+ * made any class +12 points in duel.sim, the same as 40 extra hp).
+ */
+export const MEDKIT_COMBAT_MS = 3000;
 /** Cover wall: size (along, height, thickness), distance in front of the player and how long it stands. */
 export const WALL = { w: 2.6, h: 1.9, t: 0.4, dist: 1.7, durationMs: 10000 };

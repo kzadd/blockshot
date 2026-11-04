@@ -1,5 +1,5 @@
 // Line icons (Lucide paths, 1.75 stroke) used instead of emoji. Inline so no icon package is needed.
-import type { AbilityId, ModeId } from '@blockshot/shared';
+import type { AbilityId, AccessoryId, ModeId } from '@blockshot/shared';
 
 const PATHS = {
   wifi: ['M12 20h.01', 'M2 8.82a15 15 0 0 1 20 0', 'M5 12.859a10 10 0 0 1 14 0', 'M8.5 16.429a5 5 0 0 1 7 0'],
@@ -81,11 +81,38 @@ const PATHS = {
     'm7 17-3 3',
     'm3 19 2 2',
   ],
+  snow: ['M12 2v20', 'M3.3 7l17.4 10', 'M3.3 17 20.7 7', 'm9 4 3 2 3-2', 'm9 20 3-2 3 2'],
   chart: ['M3 3v16a2 2 0 0 0 2 2h16', 'M18 17V9', 'M13 17V5', 'M8 17v-3'],
   video: [
     'm16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5',
     'M4 6h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z',
   ],
+  // Accessories (drawn for Blockshot in the same line style)
+  vest: ['M8 3 4 6v14h16V6l-4-3', 'M8 3a4 4 0 0 0 8 0', 'M12 8v12', 'M7 12h3', 'M14 12h3'],
+  silencer: ['M2 10h5v4H2z', 'M7 8.5h15v7H7z', 'M11 8.5v7', 'M15 8.5v7'],
+  laser: [
+    'M2 12h12',
+    'M17 12a2 2 0 1 0 4 0a2 2 0 1 0-4 0',
+    'M19 6v2',
+    'M19 16v2',
+    'M14.8 8.5l1.4 1.4',
+    'M14.8 15.5l1.4-1.4',
+  ],
+  ammo: ['M5 9a2 2 0 0 1 4 0v11H5z', 'M15 9a2 2 0 0 1 4 0v11h-4z', 'M5 13h4', 'M15 13h4', 'M12 4v16'],
+  goggles: [
+    'M2 10a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a3 3 0 0 1-3 3h-3l-2-2h-2l-2 2H5a3 3 0 0 1-3-3z',
+    'M6 11h3',
+    'M15 11h3',
+  ],
+  helmet: ['M4 15a8 8 0 0 1 16 0', 'M2 15h20v3H2z', 'M12 7v4'],
+  bandage: [
+    'M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z',
+    'M8 6v12',
+    'M16 6v12',
+    'M11 10h.01',
+    'M13 14h.01',
+  ],
+  none: ['M2 12a10 10 0 1 0 20 0a10 10 0 1 0-20 0', 'm5 5 14 14'],
   bot: [
     'M12 8V4H8',
     'M6 8h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2z',
@@ -108,6 +135,17 @@ export const ABILITY_ICON: Record<AbilityId, IconName> = {
   medkit: 'plus',
 };
 
+export const ACCESSORY_ICON: Record<AccessoryId, IconName> = {
+  none: 'none',
+  kevlar: 'vest',
+  helmet: 'helmet',
+  silencer: 'silencer',
+  laser: 'laser',
+  ammo: 'ammo',
+  goggles: 'goggles',
+  bandage: 'bandage',
+};
+
 export const MODE_ICON: Record<ModeId, IconName> = {
   ffa: 'crosshair',
   teams: 'users',
@@ -117,6 +155,11 @@ export const MODE_ICON: Record<ModeId, IconName> = {
   infect: 'skull',
   dom: 'target',
   rounds: 'swords',
+  race: 'flag',
+  lms: 'user',
+  insta: 'zap',
+  freeze: 'snow',
+  bomb: 'bomb',
 };
 
 export function Icon({ name, size = 16, className }: { name: IconName; size?: number; className?: string }) {

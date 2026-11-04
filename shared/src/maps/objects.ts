@@ -15,6 +15,11 @@ export const BARREL_WEAPON: Weapon = { ...GRENADE_WEAPON, name: 'Barril' };
 /** Wooden crate that breaks after enough damage and is rebuilt later. */
 /** Explosions hit wood harder than bullets (`blast` × their damage). */
 export const CRATE = { hp: 150, respawnMs: 40000, blast: 2 };
+/** Power weapons: the first appears this long into a match, the next one this long after it is taken (ms);
+ * how close you must walk to take it. */
+export const POWER = { firstMs: 30000, everyMs: 60000, reach: 1.3 };
+/** Dropping floor tiles: how long one shakes once stepped on, and how long it stays gone (ms). */
+export const TILE = { shakeMs: 550, goneMs: 4000 };
 /** Ladders: climbing speed and the reach of the ladder in front of its wall (m). */
 export const LADDER = { speed: 4.2, reach: 0.5, width: 0.9 };
 /** Ziplines: riding speed, how close the hands must be to grab the cable and how far below it you hang (m). */
@@ -24,6 +29,7 @@ export const ZIPLINE = { speed: 13, grab: 0.9, hang: 2.05, letGoS: 0.5 };
 export interface ObjectsDown {
   barrels: ReadonlySet<number>;
   crates: ReadonlySet<number>;
+  tiles?: ReadonlySet<number>;
 }
 
 const box = (b: MapBox): Collider => ({
@@ -33,11 +39,15 @@ const box = (b: MapBox): Collider => ({
 });
 
 /** Map boxes plus the barrels and crates standing now: what movement, bullets and grenades collide with. */
-export function liveColliders(map: Pick<GameMap, 'boxes' | 'barrels' | 'crates'>, down?: ObjectsDown): Collider[] {
+export function liveColliders(
+  map: Pick<GameMap, 'boxes' | 'barrels' | 'crates' | 'tiles'>,
+  down?: ObjectsDown,
+): Collider[] {
   return [
     ...getColliders(map),
     ...map.barrels.filter((_, i) => !down?.barrels.has(i)).map(box),
     ...map.crates.filter((_, i) => !down?.crates.has(i)).map(box),
+    ...map.tiles.filter((_, i) => !down?.tiles?.has(i)).map(box),
   ];
 }
 

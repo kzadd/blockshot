@@ -20,15 +20,22 @@ export interface HitTarget {
   alive: boolean;
 }
 
-export type ShotHit = { type: 'wall' } | { type: 'player'; id: string; head: boolean };
+/** Where a bullet hit a player: the head sphere, the torso, or the legs (`limb`, the lower part of the body box). */
+export type HitZone = 'head' | 'torso' | 'limb';
 
-/** Hitbox sizes (metres). Sliding or crouching lowers both boxes. */
+export type ShotHit = { type: 'wall' } | { type: 'player'; id: string; head: boolean; zone: HitZone };
+
+/**
+ * Hitbox sizes (metres). Sliding or crouching lowers both boxes. The body box is split at `legs` of its height
+ * (2026-11-04): a bullet entering below that is a leg hit.
+ */
 export const HITBOX = {
   halfWidth: 0.38,
   bodyHeight: 1.45,
   headHeight: 1.64,
   headRadius: 0.27,
   lowered: 0.5,
+  legs: 0.48,
 } as const;
 
 const EPSILON = 1e-9;
@@ -74,6 +81,8 @@ export interface Hitboxes {
   bmax: Vec3;
   head: Vec3;
   hr: number;
+  /** height where the legs end and the torso starts (world y) */
+  hip: number;
 }
 
 /** Player hitboxes (p.x, p.y, p.z = feet). */
@@ -85,6 +94,7 @@ export function hitboxes(p: Pick<HitTarget, 'x' | 'y' | 'z' | 'sl' | 'cr'>): Hit
     bmax: [p.x + w, p.y + HITBOX.bodyHeight - s, p.z + w],
     head: [p.x, p.y + HITBOX.headHeight - s, p.z],
     hr: HITBOX.headRadius,
+    hip: p.y + (HITBOX.bodyHeight - s) * HITBOX.legs,
   };
 }
 
@@ -117,12 +127,13 @@ export function castShot(
     const th = raySphere(o, d, hb.head, hb.hr);
     if (th < t) {
       t = th;
-      hit = { type: 'player', id: p.id, head: true };
+      hit = { type: 'player', id: p.id, head: true, zone: 'head' };
     }
     const tb = rayAABB(o, d, hb.bmin, hb.bmax);
     if (tb < t) {
       t = tb;
-      hit = { type: 'player', id: p.id, head: false };
+      // The zone is where the bullet goes into the body box
+      hit = { type: 'player', id: p.id, head: false, zone: o[1] + d[1] * tb < hb.hip ? 'limb' : 'torso' };
     }
   }
   return { t, hit };

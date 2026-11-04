@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import {
   ABILITIES,
-  CHAR_BY_ID,
+  ACCESSORIES,
   SHIELD,
   MEDALS,
+  SITE_NAMES,
   ZONE_NAMES,
   STREAK_REWARDS,
   WEAPONS,
   gunLadder,
   isTeamMode,
   teamName,
+  type BombSnapshot,
   type FlagSnapshot,
   type GameMap,
   type KillEvent,
@@ -18,7 +20,7 @@ import {
 } from '@blockshot/shared';
 import Crosshair from '../../settings/Crosshair';
 import { useSettings } from '../../settings/settingsStore';
-import { ABILITY_ICON, Icon } from '../../ui/icons';
+import { ABILITY_ICON, ACCESSORY_ICON, Icon } from '../../ui/icons';
 import { MODE_UI } from '../modeUi';
 import type { RoomView } from '../roomView';
 import type { HudPlayer } from './hudState';
@@ -191,7 +193,7 @@ function Health() {
   const h = useHud((s) => ({
     hp: s.hp,
     maxHp: s.maxHp,
-    characterId: s.characterId,
+    abilityId: s.ability?.id,
     armor: s.armor,
     stamina: s.stamina,
     staminaLow: s.staminaLow,
@@ -202,15 +204,14 @@ function Health() {
   const pct = Math.max(0, h.hp / h.maxHp);
   const low = pct <= LOW_HP;
   const tone = low ? 'low' : pct <= HALF_HP ? 'mid' : '';
-  const char = h.characterId ? CHAR_BY_ID[h.characterId] : undefined;
+  // The class's ability names the health block (what used to be the character's name)
+  const ability = h.abilityId ? ABILITIES[h.abilityId] : undefined;
   return (
     <div className={`hud-block hp ${tone}`}>
       <b className="hp-num">{h.hp}</b>
       <div className="hp-side">
         <div className="hp-labels">
-          <span className="hp-class" style={{ '--c': char?.color }}>
-            {char?.name}
-          </span>
+          <span className="hp-class">{ability?.name}</span>
           {h.armor > 0 ? <span className="armor-num">Blindaje {h.armor}</span> : <span className="hp-max">Vida</span>}
         </div>
         <div className="relative">
@@ -272,6 +273,19 @@ function AbilityChip() {
   );
 }
 
+/** The class's accessory, next to the ability (nothing without one). */
+function AccessoryChip() {
+  const id = useHud((s) => s.accessory);
+  if (!id || id === 'none') return null;
+  const a = ACCESSORIES[id];
+  return (
+    <span className="acc" title={`${a.name}: ${a.line}`}>
+      <Icon name={ACCESSORY_ICON[id]} size={14} />
+      {a.name}
+    </span>
+  );
+}
+
 function Ammo() {
   const h = useHud((s) => ({
     weaponName: s.weaponName,
@@ -325,6 +339,7 @@ function Ammo() {
             <em>G</em>
             <Icon name="bomb" size={14} />
           </span>
+          <AccessoryChip />
           <AbilityChip />
         </div>
       )}
@@ -350,10 +365,17 @@ function TopCenter({ mode, scoreLimit, you }: { mode: ModeId; scoreLimit: number
     flags: s.flags,
     zones: s.zones,
     round: s.round,
+    bomb: s.bomb,
   }));
   if (!h) return null;
   const players = h.players;
   const top = MODE_UI[mode].top;
+  const round = h.round && (
+    <span className="top-sub round-st">
+      {roundStatus(h.round)}
+      {h.bomb && ` · ${bombStatus(h.bomb, players, you)}`}
+    </span>
+  );
   if (top === 'infect') {
     // Infected: how many are left on each side and the time left (or until the first infected)
     const count = (t: Team) => players.filter((p) => p.tm === t).length;
@@ -422,7 +444,7 @@ function TopCenter({ mode, scoreLimit, you }: { mode: ModeId; scoreLimit: number
             ))}
           </div>
         )}
-        {h.round && <span className="top-sub round-st">{roundStatus(h.round)}</span>}
+        {round}
       </>
     );
   }
@@ -449,8 +471,9 @@ function TopCenter({ mode, scoreLimit, you }: { mode: ModeId; scoreLimit: number
       </div>
     );
   }
-  // Leader pill (free for all)
-  const sorted = [...players].sort((a, b) => b.k - a.k || a.d - b.d);
+  // Leader pill (free for all): kills, or the mode's own points (rounds won, races)
+  const score = (p: HudPlayer) => (MODE_UI[mode].points ? p.cp : p.k);
+  const sorted = [...players].sort((a, b) => score(b) - score(a) || a.d - b.d);
   const first = sorted[0];
   if (!first) return null;
   const pos = sorted.findIndex((p) => p.id === you) + 1;
@@ -458,22 +481,29 @@ function TopCenter({ mode, scoreLimit, you }: { mode: ModeId; scoreLimit: number
   const second = sorted[1];
   // When you lead, the right side shows who follows you (nothing when you are alone)
   const right =
-    pos === 1 ? (second ? { who: `2º ${second.n}`, k: second.k } : null) : { who: `Tú ${pos}º`, k: me?.k ?? 0 };
+    pos === 1
+      ? second
+        ? { who: `2º ${second.n}`, k: score(second) }
+        : null
+      : { who: `Tú ${pos}º`, k: me ? score(me) : 0 };
   return (
-    <div className="hud-top leader">
-      <span className="first">1º {pos === 1 ? 'Tú' : first.n}</span>
-      <span className="pill">{first.k}</span>
-      <span className="ts-limit">
-        <small>Meta</small>
-        {scoreLimit}
-      </span>
-      {right && (
-        <>
-          <span className="me">{right.who}</span>
-          <span className="pill">{right.k}</span>
-        </>
-      )}
-    </div>
+    <>
+      <div className="hud-top leader">
+        <span className="first">1º {pos === 1 ? 'Tú' : first.n}</span>
+        <span className="pill">{score(first)}</span>
+        <span className="ts-limit">
+          <small>Meta</small>
+          {scoreLimit}
+        </span>
+        {right && (
+          <>
+            <span className="me">{right.who}</span>
+            <span className="pill">{right.k}</span>
+          </>
+        )}
+      </div>
+      {round}
+    </>
   );
 }
 
@@ -482,6 +512,15 @@ function roundStatus(r: { p: number; n: number; t: number }): string {
   if (r.p === 0) return 'Esperando a un rival';
   if (r.p === 2) return `Ronda ${r.n + 1} en ${Math.ceil(r.t / MS_PER_S)} s`;
   return `Ronda ${r.n} · ${clock(r.t)}`;
+}
+
+/** Bomb: who carries it, planting and defusing progress, and the fuse once planted. */
+function bombStatus(b: BombSnapshot, players: HudPlayer[], you: string): string {
+  const site = SITE_NAMES[b.s] ?? '';
+  if (b.st === 2) return `Bomba en ${site}: ${Math.ceil(b.t / MS_PER_S)} s${b.dp ? ` · desactivando ${b.dp} %` : ''}`;
+  if (b.st === 1) return 'Bomba en el suelo';
+  const who = b.c === you ? 'La llevas tú' : `La lleva ${players.find((p) => p.id === b.c)?.n ?? '…'}`;
+  return b.pp ? `${who} · plantando en ${site} ${b.pp} %` : `${who}`;
 }
 
 /** How strongly the screen blood shows right after a hit (× the damage flash). */

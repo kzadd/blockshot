@@ -2,7 +2,15 @@
 // with bob, kick, reload dip, weapon swap, sprint lean, slide tilt and the knife slash.
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { WEAPON_HANDLING, type CamoId, type FinishId, type Weapon, type WeaponId } from '@blockshot/shared';
+import {
+  WEAPON_HANDLING,
+  type AccessoryId,
+  type CamoId,
+  type FinishId,
+  type Weapon,
+  type WeaponId,
+} from '@blockshot/shared';
+import { fitGunGear } from '../render/gear';
 import { loadGun } from '../render/gunAssets';
 import { prop } from '../render/props';
 import {
@@ -53,6 +61,18 @@ const AIM_Z: Partial<Record<WeaponId, number>> = {
   launcher: -0.3,
   mpistol: -0.55,
   sawedoff: -0.36,
+  heavyrifle: -0.16,
+  lightrifle: -0.16,
+  carbine: -0.14,
+  pdw: -0.13,
+  compact: -0.4,
+  heavypistol: -0.6,
+  grenadelauncher: -0.3,
+  lightlmg: -0.18,
+  ump45: -0.13,
+  frf1: -0.14,
+  colt: -0.6,
+  benelli: -0.24,
 };
 /** Hip position tweaks per gun (x, y, z, pitch): the knife blade up (every gun shares the handguns' framing: the
  * right fist on the grip, the left hand under the barrel, its forearm to the bottom-left). */
@@ -201,8 +221,16 @@ export class ViewModel {
     return this.holder.visible;
   }
 
-  setGun(id: WeaponId, color: string, skin: string, camo: CamoId = 'liso', finish: FinishId = 'estandar'): void {
+  setGun(
+    id: WeaponId,
+    color: string,
+    skin: string,
+    camo: CamoId = 'liso',
+    finish: FinishId = 'estandar',
+    accessory: AccessoryId | null = null,
+  ): void {
     const hold = (gun: GunModel) => {
+      fitGunGear(gun, accessory);
       this.holder.clear();
       this.gun = gun;
       // The knife turns in the hand so the flat of the blade faces the camera

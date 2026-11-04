@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DOM, ROUNDS, SERVER_TICK_MS, WEAPONS, dominationZones } from '@blockshot/shared';
 import { applyDamage } from '../combat/damage';
 import { buildSnapshot } from '../game/tick';
+import { adminKill } from '../match/admin';
 import type { Player } from '../players/player';
 import { makeRoom, type FakeRoom } from '../testing/fakeRoom';
 
@@ -68,6 +69,16 @@ describe('rounds', () => {
     play(r, ROUNDS.breakMs + 100);
     kill(r, red, blue);
     expect(r.channel.of('match:end')[0]).toMatchObject({ winner: 'Equipo Rojo', team: 1 });
+  });
+
+  it("the admin's «Matar» wiping a team out ends the round (nobody scores the kill)", () => {
+    const r = makeRoom('rounds', 3);
+    r.join('Rojo');
+    const blue = r.join('Azul');
+    play(r, ROUNDS.breakMs + 100);
+    adminKill(r.room, blue);
+    expect(r.room.teamScore[1]).toBe(1);
+    expect(r.channel.notices()).toContain('Equipo Rojo gana la ronda 1');
   });
 
   it('when time runs out the team with more players alive wins the round', () => {

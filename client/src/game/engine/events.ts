@@ -9,7 +9,8 @@ export interface GameEventMap {
   slide: undefined;
   step: { volume: number };
   pad: undefined;
-  shot: { weapon: WeaponId | null; volume: number };
+  /** `muffled`: a silenced shot (quieter and shorter) */
+  shot: { weapon: WeaponId | null; volume: number; muffled?: boolean };
   reload: undefined;
   hit: { head: boolean; kill: boolean };
   hurt: undefined;

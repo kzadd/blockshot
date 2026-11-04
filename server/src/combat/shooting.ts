@@ -12,17 +12,20 @@ import {
   clamp,
   damageAt,
   round2,
+  silenced,
+  unlimitedAmmo,
+  zoneDamage,
   type HitTarget,
   type ShootInput,
   type Vec3,
 } from '@blockshot/shared';
 import { poseAt } from '../players/history';
-import { weaponIdOf, weaponOf } from '../players/loadout';
+import { dropPower, weaponIdOf, weaponOf } from '../players/loadout';
 import type { Player } from '../players/player';
 import { sameTeam } from '../players/teams';
 import type { Room } from '../rooms/room';
 import { shieldBlocks, shootMines } from './abilities';
-import { launchRound } from './grenades';
+import { launchRound, lobRound } from './grenades';
 import { hitObjectAt } from './worldObjects';
 import { applyDamage } from './damage';
 import { behaviorOf } from './weaponBehavior';
@@ -86,17 +89,19 @@ export function handleShoot(room: Room, p: Player, msg: ShootInput): void {
   if (!dirs) return;
 
   const behavior = behaviorOf(w);
-  if (behavior.usesAmmo) a.mag--;
+  if (behavior.usesAmmo && !unlimitedAmmo(room.modeId)) a.mag--;
   p.lastShot[p.slot] = now;
   p.protUntil = 0; // shooting removes spawn protection
+  p.shieldUntil = 0; // and lowers the shield (abilities.ts SHIELD)
 
-  // Grenade launcher: the round flies (grenades.ts) and does the damage when it blows up
+  // Bazooka and grenade launcher: the round flies (grenades.ts) and does the damage when it blows up
   if (w.projectile) {
     p.shots++;
-    launchRound(room, p, o, dirs[0]!, now);
+    (w.lob ? lobRound : launchRound)(room, p, o, dirs[0]!, now);
     room.channel.broadcast('shot', [{ id: p.id, w: weaponIdOf(p), e: [] }], p.id);
     return;
   }
+  const muffled = silenced(weaponIdOf(p)!, p.cls?.accessory);
 
   // Lag compensation: rivals are placed where the shooter saw them when firing
   const past = now - clamp(msg.lag ?? 0, 0, LAG_COMP_MAX_MS);
@@ -114,14 +119,15 @@ export function handleShoot(room: Room, p: Player, msg: ShootInput): void {
       hitObjectAt(room, p, [o[0] + d[0] * t, o[1] + d[1] * t, o[2] + d[2] * t], damageAt(w, t), now);
     if (hit?.type !== 'player') continue;
     const e = damage.get(hit.id) ?? { dmg: 0, head: false, at: [o[0] + d[0] * t, o[1] + d[1] * t, o[2] + d[2] * t] };
-    e.dmg += damageAt(w, t) * (hit.head ? w.headMult : 1);
+    // Each bullet by where it went in: head, torso or legs (and the victim's Kevlar)
+    e.dmg += zoneDamage(damageAt(w, t), w, hit.zone, room.players.get(hit.id)?.cls?.accessory);
     e.head ||= hit.head;
     damage.set(hit.id, e);
   }
   p.shots++;
   if (damage.size) p.hits++;
   for (const { head } of damage.values()) if (head) p.heads++;
-  room.channel.broadcast('shot', [{ id: p.id, w: weaponIdOf(p), e: ends }], p.id);
+  room.channel.broadcast('shot', [{ id: p.id, w: weaponIdOf(p), e: ends, ...(muffled && { s: 1 as const }) }], p.id);
   for (const [id, { dmg, head, at }] of damage) {
     const victim = room.players.get(id);
     // Tanque's shield stops what comes from the front
@@ -131,12 +137,15 @@ export function handleShoot(room: Room, p: Player, msg: ShootInput): void {
     }
     if (victim) applyDamage(room, p, victim, behavior.damage(w, p, victim, dmg), head, w, at);
   }
+  // A power weapon goes once its only magazine is spent
+  if (w.power && a.mag <= 0) dropPower(p);
 }
 
 export function handleReload(p: Player): void {
   const w = weaponOf(p);
   const a = p.ammo[p.slot];
-  if (w && a && behaviorOf(w).usesAmmo && !a.reloadEnd && a.mag < w.mag) a.reloadEnd = Date.now() + w.reload;
+  if (w && a && !w.power && behaviorOf(w).usesAmmo && !a.reloadEnd && a.mag < w.mag)
+    a.reloadEnd = Date.now() + w.reload;
 }
 
 export function handleSwitch(p: Player, slot: number): void {

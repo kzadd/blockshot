@@ -5,16 +5,24 @@ import {
   BARREL,
   BARREL_WEAPON,
   CRATE,
+  HAZARD,
   PICKUP,
   PLAYER,
+  POWER,
+  POWER_WEAPONS,
+  TILE,
+  WEAPONS,
   castShot,
   clamp,
+  hazardHit,
   liveColliders,
   round2,
   type MapBox,
   type ObjectsSnapshot,
   type Vec3,
+  type WeaponId,
 } from '@blockshot/shared';
+import { givePower } from '../players/loadout';
 import type { Player } from '../players/player';
 import { sameTeam } from '../players/teams';
 import type { Room } from '../rooms/room';
@@ -29,6 +37,15 @@ export interface WorldObjects {
   crateBack: number[];
   /** ms when a taken pickup is back (0 = there) */
   pickupBack: number[];
+  /** the power weapon lying on the map (spot index and weapon), when the next one appears and whose turn it is */
+  power: { spot: number; id: WeaponId } | null;
+  powerAt: number;
+  powerTurn: number;
+  /** dropping tiles: ms when a stepped-on tile drops (0 = not stepped on) and when a dropped one is back (0 = up) */
+  tileDrop: number[];
+  tileBack: number[];
+  /** when each player was last knocked by a moving obstacle (ms) */
+  knockedAt: Map<string, number>;
 }
 
 const BODY_LOW = 0.2;
@@ -47,6 +64,12 @@ export function resetWorld(room: Room): void {
     barrelBack: m.barrels.map(() => 0),
     crateBack: m.crates.map(() => 0),
     pickupBack: m.pickups.map(() => 0),
+    power: null,
+    powerAt: Date.now() + POWER.firstMs,
+    powerTurn: 0,
+    tileDrop: m.tiles.map(() => 0),
+    tileBack: m.tiles.map(() => 0),
+    knockedAt: new Map(),
   };
   rebuildColliders(room);
 }
@@ -57,7 +80,10 @@ const downSet = (back: number[]) => new Set(back.flatMap((t, i) => (t ? [i] : []
 export function rebuildColliders(room: Room): void {
   const w = room.world;
   room.colliders = [
-    ...liveColliders(room.map, w && { barrels: downSet(w.barrelBack), crates: downSet(w.crateBack) }),
+    ...liveColliders(
+      room.map,
+      w && { barrels: downSet(w.barrelBack), crates: downSet(w.crateBack), tiles: downSet(w.tileBack) },
+    ),
     ...room.deployables.filter((d) => d.kind === 'wall').map(wallBox),
   ];
 }
@@ -157,6 +183,9 @@ const bodyIn = (room: Room, b: MapBox) => {
 
 /** Pickups taken by whoever walks over them; fallen barrels and crates stand again once nobody is in the way. */
 export function tickWorld(room: Room, now: number): void {
+  tickTiles(room, now);
+  tickHazards(room, now);
+  tickPower(room, now);
   const w = room.world;
   let changed = false;
   const stand = (back: number[], boxes: MapBox[], hp: number[], full: number) => {
@@ -191,9 +220,100 @@ export function tickWorld(room: Room, now: number): void {
   });
 }
 
+/** Power weapons: one appears on a spot of the map now and then (announced to everybody); whoever walks over it
+ * takes it into a slot of its own, and the next one comes a while later. */
+function tickPower(room: Room, now: number): void {
+  const w = room.world;
+  const spots = room.map.powerSpots;
+  if (!spots.length || room.matchOver || room.mode.powerWeapons === false) return;
+  if (!w.power) {
+    if (now < w.powerAt) return;
+    const id = POWER_WEAPONS[w.powerTurn++ % POWER_WEAPONS.length]!;
+    w.power = { spot: Math.floor(Math.random() * spots.length), id };
+    room.channel.broadcast('notice', [`¡Ha aparecido un arma de poder: ${WEAPONS[id].name}! (mira el minimapa)`]);
+    return;
+  }
+  const at = spots[w.power.spot]!;
+  for (const p of room.players.values()) {
+    if (!p.alive || Math.hypot(p.x - at[0], p.z - at[2]) > POWER.reach || Math.abs(p.y - at[1]) > PICKUP_REACH_Y)
+      continue;
+    givePower(p, w.power.id);
+    room.channel.broadcast('notice', [`${p.name} tiene la ${WEAPONS[w.power.id].name}`]);
+    room.channel.to(p.id, 'pickup', ['power']);
+    w.power = null;
+    w.powerAt = now + POWER.everyMs;
+    return;
+  }
+}
+
+export const powerSnapshot = (room: Room): [number, WeaponId] | null =>
+  room.world.power ? [room.world.power.spot, room.world.power.id] : null;
+
+/** Dropping tiles: one a player stands on shakes, then drops (out of the colliders) and comes back later. */
+function tickTiles(room: Room, now: number): void {
+  const w = room.world;
+  const tiles = room.map.tiles;
+  if (!tiles.length) return;
+  let changed = false;
+  for (let i = 0; i < tiles.length; i++) {
+    const t = tiles[i]!;
+    if (w.tileBack[i]) {
+      if (now >= w.tileBack[i]! && !bodyIn(room, t)) {
+        w.tileBack[i] = 0;
+        changed = true;
+      }
+      continue;
+    }
+    if (w.tileDrop[i]) {
+      if (now < w.tileDrop[i]!) continue;
+      w.tileDrop[i] = 0;
+      w.tileBack[i] = now + TILE.goneMs;
+      changed = true;
+      continue;
+    }
+    const top = t.y + t.h;
+    for (const p of room.players.values()) {
+      if (
+        p.alive &&
+        p.move.grounded &&
+        Math.abs(p.y - top) < 0.05 &&
+        Math.abs(p.x - t.x) < t.w / 2 &&
+        Math.abs(p.z - t.z) < t.d / 2
+      ) {
+        w.tileDrop[i] = now + TILE.shakeMs;
+        break;
+      }
+    }
+  }
+  if (changed) rebuildColliders(room);
+}
+
+/** Moving obstacles knock whoever they touch (away along their motion, and up a little). */
+function tickHazards(room: Room, now: number): void {
+  const hz = room.map.hazards;
+  if (!hz.length) return;
+  const w = room.world;
+  for (const p of room.players.values()) {
+    if (!p.alive || now - (w.knockedAt.get(p.id) ?? -1e9) < HAZARD.againMs) continue;
+    for (const h of hz) {
+      const dir = hazardHit(h, now, p.x, p.y, p.z, PLAYER.radius, p.move.height);
+      if (!dir) continue;
+      p.move.vx = dir[0] * HAZARD.knock;
+      p.move.vz = dir[1] * HAZARD.knock;
+      p.move.vy = HAZARD.lift;
+      p.move.grounded = false;
+      p.move.sliding = false;
+      p.move.zip = -1;
+      w.knockedAt.set(p.id, now);
+      room.channel.to(p.id, 'knocked', [{ x: dir[0], z: dir[1] }]);
+      break;
+    }
+  }
+}
+
 /** Which barrels and crates are down and which pickups are taken (indices), for the clients. */
 export const objectsSnapshot = (room: Room): ObjectsSnapshot => {
   const w = room.world;
   const down = (back: number[]) => back.flatMap((t, i) => (t ? [i] : []));
-  return [down(w.barrelBack), down(w.crateBack), down(w.pickupBack)];
+  return [down(w.barrelBack), down(w.crateBack), down(w.pickupBack), down(w.tileBack), down(w.tileDrop)];
 };

@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import {
   ABILITIES,
+  ACCESSORIES,
+  BODY,
   CAMOS,
-  CHARACTERS,
-  CHAR_BY_ID,
   FINISHES,
   MAPS,
   MODES,
@@ -12,10 +12,12 @@ import {
   TEAMS,
   WEAPONS,
   canSwitchTeam,
+  fitAccessory,
   isTeamMode,
+  speedWith,
+  weightName,
   type AbilityId,
   type CamoId,
-  type CharacterId,
   type FinishId,
   type ModeId,
   type SideTeam,
@@ -29,31 +31,27 @@ import { SIDES, teamVar } from '../game/hud/teamStyle';
 import { camoMap } from '../game/render/models';
 import { blurredMap } from '../lobby/mapImage';
 import CharacterPreview from './CharacterPreview';
-import { lookOf, type Look } from './looks';
+import { AbilityGrid, AbilityIcon, AccessoryGrid, AccessoryIcon } from './ClassParts';
+import Loadout, { GunPic, SLOTS, familyOf, reach, type Slot } from './Loadout';
+import { loadClass, saveClass, type Look } from './looks';
 import '../styles/proposal.css';
 import '../styles/pz-extra.css';
 
-// The character screen of the approved proposal (.impeccable/mocks/propuesta: #v-personaje, renderChars and
-// skinRow in proto.js), same DOM and classes so proposal.css draws it unchanged. In a room, the proposal's
-// top bar becomes the room's bar (name, map and mode, team, leave).
+// The class screen («Mi clase»), built on the approved proposal's character screen (.impeccable/mocks/propuesta:
+// #v-personaje and skinRow in proto.js), same DOM and classes so proposal.css draws it. There are no characters:
+// the player builds one class (primary, secondary, ability, accessory) and dresses it. Three columns: on the left
+// what to change, in two levels («Equipo» and «Aspecto», each with its tabs); the model in the middle, holding the
+// gun of the tab (or the one hovered); on the right the resulting class and «Jugar». In a room, the proposal's top
+// bar becomes the room's bar (name, map and mode, team, leave).
 
-/** Ramp scales of the character sheet (10 cells). */
-const MAX_HP = 140;
+/** Ramp scales of the class sheet (10 cells). */
 const SPEED_MIN = 5.5;
 const SPEED_RANGE = 3.1;
-const MAX_RANGE = 10;
-/** Reach of each primary on a 1–10 scale (from the approved proposal). */
-const RANGE: Partial<Record<WeaponId, number>> = {
-  rifle: 6,
-  sniper: 10,
-  shotgun: 2,
-  smg: 4,
-  lmg: 6,
-  dmr: 8,
-  launcher: 5,
-};
-/** The ability's recharge bar is full at this many ms. */
-const MAX_COOLDOWN_MS = 30000;
+/**
+ * «Alcance» is the full-damage distance in metres, as on the weapon tiles; the ramp follows its square root up to
+ * this many metres (so 8 m of a shotgun and 30 m of a rifle still read apart, and every sniper fills it).
+ */
+const RANGE_FULL_M = 120;
 /** A team picked on the character screen shows at once; if the server never confirms, it goes back after this. */
 const PENDING_TEAM_MS = 1500;
 
@@ -156,38 +154,6 @@ function SkinFace({ skin, color }: { skin: SkinId; color: string }) {
   );
 }
 
-// Line icons of the abilities (the proposal's ABILITY_ICON)
-const ABILITY_SVG: Record<AbilityId, ReactNode> = {
-  smoke: (
-    <>
-      <path d="M6 18a4 4 0 0 1 0-8 5 5 0 0 1 9.6-1.5A4 4 0 1 1 18 18z" />
-      <path d="M8 21h8" />
-    </>
-  ),
-  mine: (
-    <>
-      <circle cx="12" cy="13" r="5" />
-      <path d="M12 3v3M4 13H1M23 13h-3M6.3 7.3 4.2 5.2M17.7 7.3l2.1-2.1" />
-    </>
-  ),
-  shield: <path d="M12 2 4 5v6c0 5 3.5 9 8 11 4.5-2 8-6 8-11V5z" />,
-  dash: <path d="M13 2 4 14h7l-1 8 9-12h-7z" />,
-  wall: <path d="M3 6h18v12H3zM3 12h18M9 6v6M15 12v6" />,
-  radar: (
-    <>
-      <circle cx="12" cy="12" r="9" />
-      <circle cx="12" cy="12" r="4.5" />
-      <path d="M12 12 18 6" />
-    </>
-  ),
-  medkit: (
-    <>
-      <rect x="3" y="6" width="18" height="14" rx="2" />
-      <path d="M9 6V4h6v2M12 10v6M9 13h6" />
-    </>
-  ),
-};
-
 // Gun finishes as CSS swatches; camuflaje and neón depend on the look and are drawn in finishStyle
 const FINISH_SW: Partial<Record<FinishId, string>> = {
   estandar: 'linear-gradient(135deg,#2b2f36 50%,#6b5040 50%)',
@@ -247,32 +213,6 @@ function Ramp({ value, max }: { value: number; max: number }) {
   );
 }
 
-function GunCard({ id, slot }: { id: WeaponId; slot: string }) {
-  const w = WEAPONS[id];
-  return (
-    <div className="gun">
-      <div className="gun-head">
-        <b>{w.name}</b>
-        <span className="meta">{slot}</span>
-      </div>
-      <dl>
-        <div>
-          <dt>Daño</dt>
-          <dd>{w.pellets > 1 ? `${w.damage}×${w.pellets}` : w.damage}</dd>
-        </div>
-        <div>
-          <dt>Disparos/s</dt>
-          <dd>{(1000 / w.fireRate).toFixed(1)}</dd>
-        </div>
-        <div>
-          <dt>Cargador</dt>
-          <dd>{w.mag}</dd>
-        </div>
-      </dl>
-    </div>
-  );
-}
-
 // Team modes: pick a team (with how many players each has), in the room bar
 interface TeamPickerProps {
   myTeam: Team;
@@ -315,16 +255,48 @@ function TeamPicker({ myTeam, players = [], onTeam }: TeamPickerProps) {
   );
 }
 
-type SkinTab = 'cara' | 'camo' | 'arma';
-const SKIN_TABS: [SkinTab, string, number][] = [
-  ['cara', 'Cara', SKINS.length],
-  ['camo', 'Camuflaje', CAMOS.length],
-  ['arma', 'Arma', FINISHES.length],
+// Two levels on the left: «Equipo» (what changes how you play: the two guns, the ability, the accessory) and
+// «Aspecto» (how you look: face, outfit colour, camouflage, the guns' finish), each with its own tabs
+type Group = 'equipo' | 'aspecto';
+type Tab = 'primary' | 'secondary' | 'ability' | 'accessory' | 'face' | 'color' | 'camo' | 'finish';
+const GROUPS: { id: Group; name: string; hint: string; tabs: [Tab, string][] }[] = [
+  {
+    id: 'equipo',
+    name: 'Equipo',
+    hint: 'Cómo juegas',
+    tabs: [
+      ['primary', 'Principal'],
+      ['secondary', 'Secundaria'],
+      ['ability', 'Habilidad'],
+      ['accessory', 'Accesorio'],
+    ],
+  },
+  {
+    id: 'aspecto',
+    name: 'Aspecto',
+    hint: 'Cómo te ven',
+    tabs: [
+      ['face', 'Cara'],
+      ['color', 'Color'],
+      ['camo', 'Camuflaje'],
+      ['finish', 'Acabado'],
+    ],
+  },
 ];
+const groupOf = (t: Tab): Group => (GROUPS[0]!.tabs.some(([id]) => id === t) ? 'equipo' : 'aspecto');
+const isSlot = (t: Tab): t is Slot => t === 'primary' || t === 'secondary';
+/** Modes that hand out their own weapons (shared loadoutOf): the pick still saves, for the next room. */
+export const FIXED_LOADOUT: Partial<Record<ModeId, string>> = {
+  gungame: 'En Escalada de armas el modo reparte las armas: tu elección vale para otras partidas.',
+  race: 'En Carrera de saltos solo se lleva la secundaria y el cuchillo.',
+  insta: 'En Disparo único todos llevan railgun: tu elección vale para otras partidas.',
+};
 
 interface CharacterSelectProps {
-  current: CharacterId | null;
-  onPick: (id: CharacterId, look: Look) => void;
+  /** the class in play (null before the first spawn) */
+  current: Look | null;
+  /** «Jugar» */
+  onPick: (look: Look) => void;
   info: RoomView;
   mode: ModeId;
   respawnIn?: number;
@@ -349,43 +321,125 @@ export default function CharacterSelect({
   players,
   onTeam,
 }: CharacterSelectProps) {
-  const [sel, setSel] = useState<CharacterId>(current ?? CHARACTERS[0]!.id);
-  const [looks, setLooks] = useState(
-    () => Object.fromEntries(CHARACTERS.map((ch) => [ch.id, lookOf(ch.id)])) as Record<CharacterId, Look>,
-  );
-  const [tab, setTab] = useState<SkinTab>('cara');
-  // The entry flash and fade-in only play after picking another character, not on opening the screen
+  const [look, setLook] = useState<Look>(() => current ?? loadClass());
+  const [tab, setTab] = useState<Tab>('primary');
+  // The last tab of each group, so switching group comes back where it was
+  const [lastTab, setLastTab] = useState<Record<Group, Tab>>({ equipo: 'primary', aspecto: 'face' });
+  // Which gun the model holds, and a gun being hovered (held meanwhile)
+  const [held, setHeld] = useState<Slot>('primary');
+  const [peek, setPeek] = useState<WeaponId | null>(null);
+  // The entry flash and spin-in only play after changing the ability (it changes the kit), not on opening
   const [picked, setPicked] = useState(false);
-  const c = CHAR_BY_ID[sel];
-  const look = looks[sel];
-  const edit = (patch: Partial<Look>) => setLooks((all) => ({ ...all, [sel]: { ...all[sel], ...patch } }));
-  const choose = (id: CharacterId) => {
-    setSel(id);
+  // A weapon that does not take the accessory (a shotgun with the silencer) takes it off: the tile says why
+  const edit = (patch: Partial<Look>) =>
+    setLook((l) => {
+      const n = { ...l, ...patch };
+      return { ...n, accessory: fitAccessory(n.accessory, n.primary, n.secondary) };
+    });
+  const pickAbility = (id: AbilityId) => {
+    if (id === look.ability) return;
+    edit({ ability: id });
     setPicked(true);
+  };
+  const play = (l: Look) => {
+    saveClass(l);
+    onPick(l);
   };
   const bgMap = useBlurredMap(info.map);
   // Team modes wear the team colour in the match, so the outfit colour is only picked in free for all
   const teamMode = isTeamMode(mode);
-  const live = useRef({ sel, look });
-  live.current = { sel, look };
+  const live = useRef(look);
+  live.current = look;
+  // Opening a gun's tab puts that gun in the model's hands
+  const go = (t: Tab) => {
+    setTab(t);
+    setPeek(null);
+    setLastTab((l) => ({ ...l, [groupOf(t)]: t }));
+    if (isSlot(t)) setHeld(t);
+  };
+  const hold = (s: Slot) => {
+    setHeld(s);
+    if (isSlot(tab)) go(s);
+  };
 
-  // Atajos: 1–7 elige personaje, Enter juega
+  // Atajo: Enter juega
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      const pick = CHARACTERS[Number(e.key) - 1];
-      if (pick) {
-        setSel(pick.id);
-        setPicked(true);
+      if (e.key === 'Enter') {
+        saveClass(live.current);
+        onPick(live.current);
       }
-      if (e.key === 'Enter') onPick(live.current.sel, live.current.look);
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   }, [onPick]);
 
-  const ab = ABILITIES[c.ability];
-  const range = RANGE[c.primary] ?? 5;
+  const ab = ABILITIES[look.ability];
+  const primary = WEAPONS[look.primary];
+  const inHand = look[held];
+  const speed = speedWith(inHand, look.accessory);
+  const range = reach(primary);
+  const acc = ACCESSORIES[look.accessory];
+  const group = groupOf(tab);
+  const nameOf = <T extends { name: string }>(list: readonly T[], ok: (o: T) => boolean) => list.find(ok)?.name ?? '';
+  const colorName = nameOf(OUTFIT_COLORS, (o) => o.hex === look.color);
+  // What each tab holds now: under its name in the tab, and in the class sheet
+  const value: Record<Tab, string> = {
+    primary: primary.name,
+    secondary: WEAPONS[look.secondary].name,
+    ability: ab.name,
+    accessory: acc.name,
+    face: nameOf(SKINS, (k) => k.id === look.skin),
+    color: colorName,
+    camo: nameOf(CAMOS, (k) => k.id === look.camo),
+    finish: nameOf(FINISHES, (k) => k.id === look.finish),
+  };
+  const tabs = GROUPS.find((g) => g.id === group)!.tabs.filter(([id]) => id !== 'color' || !teamMode);
+
+  // The sheet's rows: the class as it goes out, each one opening its tab
+  const kit: { tab: Tab; label: string; sub: string; pic: ReactNode; title?: string }[] = [
+    {
+      tab: 'primary',
+      label: '1 · Principal',
+      sub: `${familyOf(look.primary)} · ${weightName(primary).toLowerCase()}`,
+      pic: <GunPic id={look.primary} look={look} />,
+    },
+    {
+      tab: 'secondary',
+      label: '2 · Secundaria',
+      sub: 'Pistola',
+      pic: <GunPic id={look.secondary} look={look} />,
+    },
+    {
+      tab: 'ability',
+      label: 'E · Habilidad',
+      sub: `Recarga ${ab.cooldownMs / 1000} s`,
+      pic: (
+        <span className="ic">
+          <AbilityIcon id={look.ability} />
+        </span>
+      ),
+      title: ab.desc,
+    },
+    {
+      tab: 'accessory',
+      label: 'Accesorio',
+      sub: look.accessory === 'none' ? 'Sin ventajas ni pegas' : acc.cost,
+      pic: (
+        <span className="ic">
+          <AccessoryIcon id={look.accessory} />
+        </span>
+      ),
+      title: acc.desc,
+    },
+  ];
+  const looks: { tab: Tab; style: CSSProperties; face?: boolean }[] = [
+    { tab: 'face', style: {}, face: true },
+    ...(teamMode ? [] : [{ tab: 'color' as Tab, style: { background: look.color } }]),
+    { tab: 'camo', style: camoStyle(look.color, look.camo) },
+    { tab: 'finish', style: finishStyle(look.finish, look) },
+  ];
 
   return (
     <div className="pz cs-window" style={{ '--bgmap': bgMap }}>
@@ -412,7 +466,7 @@ export default function CharacterSelect({
           <div className="room-acts">
             {onKeep && current && (
               <button className="btn" onClick={onKeep}>
-                Seguir con {CHAR_BY_ID[current].name}
+                Seguir con la clase actual
               </button>
             )}
             <button className="btn" onClick={onLeave}>
@@ -421,151 +475,191 @@ export default function CharacterSelect({
           </div>
         </header>
 
-        <main className="screen chars" style={{ '--cc': look.color }}>
-          <ol className="roster">
-            {CHARACTERS.map((ch, i) => (
-              <li key={ch.id}>
+        <main className="screen chars cls cb-screen" style={{ '--cc': look.color }}>
+          <section className="panel cb-build" aria-label="Construir la clase">
+            <div className="cb-groups" role="group" aria-label="Qué cambiar">
+              {GROUPS.map((g) => (
                 <button
-                  className={ch.id === sel ? 'on' : ''}
-                  aria-pressed={ch.id === sel}
-                  onClick={() => choose(ch.id)}
-                  onDoubleClick={() => onPick(ch.id, looks[ch.id])}
+                  key={g.id}
+                  className={group === g.id ? 'on' : ''}
+                  aria-pressed={group === g.id}
+                  onClick={() => go(lastTab[g.id])}
                 >
-                  <i style={{ background: ch.id === sel ? look.color : ch.color }} />
-                  <span>
-                    <b>{ch.name}</b>
-                    <small>{ch.role}</small>
-                  </span>
-                  <kbd>{i + 1}</kbd>
+                  {g.name}
+                  <small>{g.hint}</small>
                 </button>
-              </li>
-            ))}
-          </ol>
-          <section className="stage">
+              ))}
+            </div>
+            <div className="cb-tabs" role="group" aria-label={group === 'equipo' ? 'Equipo' : 'Aspecto'}>
+              {tabs.map(([id, name]) => (
+                <button key={id} className={tab === id ? 'on' : ''} aria-pressed={tab === id} onClick={() => go(id)}>
+                  {name}
+                  <small>{value[id]}</small>
+                </button>
+              ))}
+            </div>
+            <div className="cb-body">
+              {isSlot(tab) && (
+                <Loadout
+                  look={look}
+                  slot={tab}
+                  note={FIXED_LOADOUT[mode]}
+                  onPeek={setPeek}
+                  onPick={(slot, id) => edit({ [slot]: id })}
+                />
+              )}
+              {tab === 'ability' && <AbilityGrid value={look.ability} onPick={pickAbility} />}
+              {tab === 'accessory' && <AccessoryGrid look={look} onPick={(id) => edit({ accessory: id })} />}
+              {group === 'aspecto' && (
+                <div className="cb-tiles" role="group" aria-label={tabs.find(([id]) => id === tab)?.[1]}>
+                  {tab === 'face' &&
+                    SKINS.map((k) => (
+                      <button
+                        key={k.id}
+                        className={`cb-tile ${look.skin === k.id ? 'on' : ''}`}
+                        aria-pressed={look.skin === k.id}
+                        onClick={() => edit({ skin: k.id })}
+                      >
+                        <span className="cb-sw face">
+                          <SkinFace skin={k.id} color={look.color} />
+                        </span>
+                        {k.name}
+                      </button>
+                    ))}
+                  {tab === 'color' &&
+                    OUTFIT_COLORS.map((o) => (
+                      <button
+                        key={o.hex}
+                        className={`cb-tile ${look.color === o.hex ? 'on' : ''}`}
+                        aria-pressed={look.color === o.hex}
+                        onClick={() => edit({ color: o.hex })}
+                      >
+                        <span className="cb-sw" style={{ background: o.hex }} />
+                        {o.name}
+                      </button>
+                    ))}
+                  {tab === 'camo' &&
+                    CAMOS.map((k) => (
+                      <button
+                        key={k.id}
+                        className={`cb-tile ${look.camo === k.id ? 'on' : ''}`}
+                        aria-pressed={look.camo === k.id}
+                        onClick={() => edit({ camo: k.id })}
+                      >
+                        <span className="cb-sw" style={camoStyle(look.color, k.id)} />
+                        {k.name}
+                      </button>
+                    ))}
+                  {tab === 'finish' &&
+                    FINISHES.map((k) => (
+                      <button
+                        key={k.id}
+                        className={`cb-tile ${look.finish === k.id ? 'on' : ''}`}
+                        aria-pressed={look.finish === k.id}
+                        onClick={() => edit({ finish: k.id })}
+                      >
+                        <span className="cb-sw" style={finishStyle(k.id, look)} />
+                        {k.name}
+                      </button>
+                    ))}
+                </div>
+              )}
+              {group === 'aspecto' && teamMode && (
+                <p className="cb-note">En los modos por equipos el traje lleva el color de tu equipo.</p>
+              )}
+            </div>
+          </section>
+
+          <section className="stage cb-stage" aria-label="Tu personaje">
             <div className="view">
-              <div key={sel} className={`stage-bg ${picked ? 'flash' : ''}`} />
-              <CharacterPreview charId={sel} look={look} showcase={tab === 'arma'} />
+              <div key={look.ability} className={`stage-bg ${picked ? 'flash' : ''}`} />
+              <CharacterPreview look={look} held={(isSlot(tab) && peek) || inHand} showcase={tab === 'finish'} />
               <div className="stage-top">
                 <span className="hint">Arrastra para girar</span>
               </div>
-              {!teamMode && (
-                <div className="colors" role="group" aria-label="Color del traje">
-                  {OUTFIT_COLORS.map((o) => (
+              {tab !== 'finish' && (
+                <div className="seg sm held-seg" role="group" aria-label="Arma en la mano">
+                  {SLOTS.map(({ slot, key }) => (
                     <button
-                      key={o.hex}
-                      className={look.color === o.hex ? 'on' : ''}
-                      title={o.name}
-                      aria-label={o.name}
-                      aria-pressed={look.color === o.hex}
-                      onClick={() => edit({ color: o.hex })}
-                      style={{ background: o.hex }}
-                    />
+                      key={slot}
+                      className={held === slot ? 'on' : ''}
+                      aria-pressed={held === slot}
+                      onClick={() => hold(slot)}
+                    >
+                      <kbd>{key}</kbd>
+                      {WEAPONS[look[slot]].name}
+                    </button>
                   ))}
                 </div>
               )}
             </div>
-            <div className="skin-row">
-              <div className="st-tabs">
-                {SKIN_TABS.map(([id, name, n]) => (
+          </section>
+
+          <aside className="panel info cb-sum">
+            <div key={look.ability} className={`cb-sum-in ${picked ? 'anim' : ''}`}>
+              <h1>Mi clase</h1>
+              <div className="stat">
+                <span>Vida</span>
+                <Ramp value={BODY.hp} max={BODY.hp} />
+                <b>{BODY.hp}</b>
+              </div>
+              <div
+                className="stat"
+                title={`Con ${WEAPONS[inHand].name} en la mano${look.accessory === 'kevlar' ? ' y el Kevlar' : ''}`}
+              >
+                <span>Velocidad</span>
+                <Ramp value={speed - SPEED_MIN} max={SPEED_RANGE} />
+                <b>{speed.toFixed(1)}</b>
+              </div>
+              <div className="stat" title={`${primary.name}: daño completo hasta ${range} m`}>
+                <span>Alcance</span>
+                <Ramp value={Math.sqrt(Math.min(range, RANGE_FULL_M))} max={Math.sqrt(RANGE_FULL_M)} />
+                <b>{range} m</b>
+              </div>
+              <span className="lbl">Equipo</span>
+              <ul className="cb-kit">
+                {kit.map((k) => (
+                  <li key={k.tab}>
+                    <button
+                      className={`cb-row ${tab === k.tab ? 'on' : ''}`}
+                      aria-pressed={tab === k.tab}
+                      title={k.title}
+                      onClick={() => go(k.tab)}
+                    >
+                      {k.pic}
+                      <span className="lbl">{k.label}</span>
+                      <b>{value[k.tab]}</b>
+                      <small>{k.sub}</small>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <p className="cb-melee">
+                <span className="lbl">Cuerpo a cuerpo</span>
+                Cuchillo
+              </p>
+              <span className="lbl">Aspecto</span>
+              <div className="cb-looks" role="group" aria-label="Aspecto">
+                {looks.map((l) => (
                   <button
-                    key={id}
-                    className={tab === id ? 'on' : ''}
-                    aria-pressed={tab === id}
-                    onClick={() => setTab(id)}
+                    key={l.tab}
+                    className={tab === l.tab ? 'on' : ''}
+                    aria-pressed={tab === l.tab}
+                    title={`${GROUPS[1]!.tabs.find(([id]) => id === l.tab)?.[1]}: ${value[l.tab]}`}
+                    aria-label={`${GROUPS[1]!.tabs.find(([id]) => id === l.tab)?.[1]}: ${value[l.tab]}`}
+                    onClick={() => go(l.tab)}
                   >
-                    {name}
-                    <small>{n}</small>
+                    <span className="cb-sw" style={l.style}>
+                      {l.face && <SkinFace skin={look.skin} color={look.color} />}
+                    </span>
                   </button>
                 ))}
               </div>
-              <div className={`st-grid ${tab === 'cara' ? 'two-rows' : ''}`}>
-                {tab === 'cara' &&
-                  SKINS.map((k) => (
-                    <button
-                      key={k.id}
-                      className={`skin ${look.skin === k.id ? 'on' : ''}`}
-                      aria-pressed={look.skin === k.id}
-                      onClick={() => edit({ skin: k.id })}
-                    >
-                      <SkinFace skin={k.id} color={look.color} />
-                      {k.name}
-                    </button>
-                  ))}
-                {tab === 'camo' &&
-                  CAMOS.map((k) => (
-                    <button
-                      key={k.id}
-                      className={`skin ${look.camo === k.id ? 'on' : ''}`}
-                      aria-pressed={look.camo === k.id}
-                      onClick={() => edit({ camo: k.id })}
-                    >
-                      <i className="sw" style={camoStyle(look.color, k.id)} />
-                      {k.name}
-                    </button>
-                  ))}
-                {tab === 'arma' &&
-                  FINISHES.map((k) => (
-                    <button
-                      key={k.id}
-                      className={`skin ${look.finish === k.id ? 'on' : ''}`}
-                      aria-pressed={look.finish === k.id}
-                      onClick={() => edit({ finish: k.id })}
-                    >
-                      <i className="sw" style={finishStyle(k.id, look)} />
-                      {k.name}
-                    </button>
-                  ))}
-              </div>
-            </div>
-          </section>
-          <aside className="panel info">
-            <div
-              key={sel}
-              className={picked ? 'anim' : ''}
-              style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
-            >
-              <span className="role">{c.role}</span>
-              <h1>{c.name}</h1>
-              <p className="desc">{c.desc}</p>
-              <div className="stat">
-                <span>Vida</span>
-                <Ramp value={c.hp} max={MAX_HP} />
-                <b>{c.hp}</b>
-              </div>
-              <div className="stat">
-                <span>Velocidad</span>
-                <Ramp value={c.speed - SPEED_MIN} max={SPEED_RANGE} />
-                <b>{c.speed.toFixed(1)}</b>
-              </div>
-              <div className="stat">
-                <span>Alcance</span>
-                <Ramp value={range} max={MAX_RANGE} />
-                <b>{range}</b>
-              </div>
-              <GunCard id={c.primary} slot="Principal · 1" />
-              <GunCard id={c.secondary} slot="Secundaria · 2" />
-              <div className="ability">
-                <div className="ab-head">
-                  <span className="ic">
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      {ABILITY_SVG[c.ability]}
-                    </svg>
-                  </span>
-                  <div>
-                    <span className="lbl">Habilidad</span>
-                    <b>{ab.name}</b>
-                  </div>
-                  <kbd className="k">E</kbd>
-                </div>
-                <p className="meta">{ab.desc}</p>
-                <div className="ab-cd">
-                  <span>Recarga</span>
-                  <i style={{ '--cd': `${(ab.cooldownMs / MAX_COOLDOWN_MS) * 100}%` }} />
-                  <b>{ab.cooldownMs / 1000} s</b>
-                </div>
-              </div>
-              <button className="btn primary" onClick={() => onPick(sel, look)}>
-                Jugar como {c.name}
+              <button className="btn primary" aria-keyshortcuts="Enter" onClick={() => play(look)}>
+                Jugar
+                <kbd className="k" aria-hidden="true">
+                  Enter
+                </kbd>
               </button>
             </div>
           </aside>

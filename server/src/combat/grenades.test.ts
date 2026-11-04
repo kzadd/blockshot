@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { FIXED_DT, GRENADE, PLAYER, type Vec3 } from '@blockshot/shared';
+import { FIXED_DT, GL_ROUND, GRENADE, PLAYER, WEAPONS, type Vec3 } from '@blockshot/shared';
+import { spawnPlayer } from '../players/spawn';
 import { makeRoom } from '../testing/fakeRoom';
-import { blastDamage, throwGrenade, tickGrenades } from './grenades';
+import { blastDamage, lobRound, throwGrenade, tickGrenades } from './grenades';
+import { handleShoot } from './shooting';
 
 beforeEach(() => vi.useFakeTimers({ now: 1_000_000 }));
 afterEach(() => vi.useRealTimers());
@@ -56,5 +58,65 @@ describe('grenades', () => {
     expect(r.channel.of('boom')).toHaveLength(1);
     expect(rival.hp).toBe(rival.maxHp);
     expect(mate.hp).toBe(mate.maxHp);
+  });
+
+  describe('grenade launcher', () => {
+    it('lobs a round that bounces on the floor and blows up on its short fuse', () => {
+      const r = makeRoom('ffa');
+      r.room.colliders = [floor];
+      const a = r.join('A', 0, 0);
+      const near = r.join('Near', 2, -4);
+      const far = r.join('Far', 0, -20);
+      lobRound(r.room, a, [0, 1, -4], [0, -1, 0], Date.now());
+      const ys: number[] = [];
+      for (let t = 0; t < GL_ROUND.fuseMs - 100; t += FIXED_DT * 1000) {
+        vi.advanceTimersByTime(FIXED_DT * 1000);
+        tickGrenades(r.room, FIXED_DT, Date.now());
+        ys.push(r.room.grenades[0]!.pos[1]);
+      }
+      // It came down, hit the floor and went back up (a bounce), and never went through the floor
+      const up = ys.findIndex((y, i) => i > 0 && y > ys[i - 1]!);
+      expect(up).toBeGreaterThan(0);
+      expect(Math.max(...ys.slice(up))).toBeGreaterThan(ys[up - 1]! + 0.3);
+      expect(Math.min(...ys)).toBeGreaterThan(0);
+      expect(r.channel.of('boom')).toHaveLength(0);
+      run(r, 200);
+      expect(r.room.grenades).toHaveLength(0);
+      expect(r.channel.of('boom')).toHaveLength(1);
+      expect(near.hp).toBeLessThan(near.maxHp);
+      expect(far.hp).toBe(far.maxHp);
+      expect(a.hp).toBe(a.maxHp);
+    });
+
+    it('blows up on touching a rival; a direct hit alone does not kill a Soldado, two do', () => {
+      const r = makeRoom('ffa');
+      r.room.colliders = [floor];
+      const a = r.join('A', 0, 0);
+      const rival = r.join('B', 0, -3);
+      lobRound(r.room, a, [0, PLAYER.eye, 0], [0, 0, -1], Date.now());
+      run(r, 300);
+      expect(r.channel.of('boom')).toHaveLength(1);
+      expect(rival.alive).toBe(true);
+      expect(rival.hp).toBeLessThan(rival.maxHp - GL_ROUND.minDamage * 2);
+      lobRound(r.room, a, [0, PLAYER.eye, 0], [0, 0, -1], Date.now());
+      run(r, 300);
+      expect(rival.alive).toBe(false);
+      expect(r.channel.of('kill')[0]).toMatchObject({ killer: a.id, victim: rival.id, weapon: 'HK69' });
+    });
+
+    it('is fired by the weapon: spends a round and launches a bouncing grenade', () => {
+      const r = makeRoom('ffa');
+      r.room.colliders = [floor];
+      const a = r.join('A', 0, 0, { ability: 'medkit' });
+      a.alive = false;
+      spawnPlayer(r.room, a, { primary: 'grenadelauncher' });
+      r.place(a, 0, 0);
+      a.protUntil = 0;
+      expect(a.loadout[0]).toBe('grenadelauncher');
+      handleShoot(r.room, a, { o: [0, PLAYER.eye, 0], d: [[0, 0, -1]], lag: 0 });
+      expect(a.ammo[0]!.mag).toBe(WEAPONS.grenadelauncher.mag - 1);
+      expect(r.room.grenades).toHaveLength(1);
+      expect(r.room.grenades[0]).toMatchObject({ lob: true, owner: a.id });
+    });
   });
 });

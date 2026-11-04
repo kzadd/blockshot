@@ -14,6 +14,10 @@ export interface MinimapView {
   zones: { x: number; z: number; owner: number; letter: string }[];
   /** health and armour lying on the floor now */
   pickups: { x: number; z: number; k: 'hp' | 'armor' }[];
+  /** the power weapon lying on the map */
+  power: { x: number; z: number } | null;
+  /** Bomb mode: the bomb (carried, dropped or planted) */
+  bomb: { x: number; z: number } | null;
 }
 export interface MinimapSource {
   minimap(now: number): MinimapView;
@@ -133,6 +137,25 @@ export default function Minimap({
         } else g.fillRect(x - 3.5, y - 3.5, 7, 7);
       }
 
+      // Power weapon: an orange star-like diamond with a ring
+      if (view.power) {
+        const x = toPx(view.power.x);
+        const y = toPx(view.power.z);
+        g.beginPath();
+        g.arc(x, y, 9, 0, Math.PI * 2);
+        g.strokeStyle = '#ff7a1a';
+        g.lineWidth = 2;
+        g.stroke();
+        g.beginPath();
+        g.moveTo(x, y - 6);
+        g.lineTo(x + 5, y);
+        g.lineTo(x, y + 6);
+        g.lineTo(x - 5, y);
+        g.closePath();
+        g.fillStyle = '#ff7a1a';
+        g.fill();
+      }
+
       // Domination: zone letters in their owner's colour
       for (const zn of view.zones) {
         const x = toPx(zn.x);
@@ -149,6 +172,20 @@ export default function Minimap({
         g.textAlign = 'center';
         g.textBaseline = 'middle';
         g.fillText(zn.letter, x, y + 1);
+      }
+
+      // Bomb: a black disc with a red core, always visible
+      if (view.bomb) {
+        const x = toPx(view.bomb.x);
+        const y = toPx(view.bomb.z);
+        g.beginPath();
+        g.arc(x, y, 5.5, 0, Math.PI * 2);
+        g.fillStyle = INK;
+        g.fill();
+        g.beginPath();
+        g.arc(x, y, 3, 0, Math.PI * 2);
+        g.fillStyle = '#ff3b30';
+        g.fill();
       }
 
       // Capture the flag: flags always visible (they follow their carrier)

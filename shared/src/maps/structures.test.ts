@@ -66,7 +66,8 @@ describe('buildings', () => {
   it('walks up the outside stairs onto the roof', () => {
     const ctx = build(SPEC);
     const st = createMoveState(5.65, 0, -7);
-    walk(st, ctx, YAW.pz, 4, (s) => s.z > 2.6);
+    // (let go early: Quake 3 friction coasts about a metre after releasing the keys)
+    walk(st, ctx, YAW.pz, 4, (s) => s.z > 1.6);
     for (let i = 0; i < 60; i++)
       stepMovement(st, { seq: i, f: 0, s: 0, yaw: 0, pitch: 0, b: 0, slot: 0 }, FIXED_DT, ctx);
     expect(st.y).toBeCloseTo(2 * STORY, 1);

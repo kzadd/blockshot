@@ -324,9 +324,17 @@ export class Effects {
    * A bullet: a streak that travels from `from` to `to`, then the impact (hole, dust and sparks on a wall
    * facing `normal`, a red puff on a player). `pellet` = one of many (shotgun), drawn lighter.
    */
-  bullet(from: THREE.Vector3, to: THREE.Vector3, hit: BulletHit, normal: THREE.Vector3 | null, pellet = false): void {
+  /** `silent`: a silenced shot, only its impact (no tracer to give the shooter away). */
+  bullet(
+    from: THREE.Vector3,
+    to: THREE.Vector3,
+    hit: BulletHit,
+    normal: THREE.Vector3 | null,
+    pellet = false,
+    silent = false,
+  ): void {
     const len = from.distanceTo(to);
-    if (len < TRACER_MIN_LENGTH) {
+    if (len < TRACER_MIN_LENGTH || silent) {
       this.hitAt(to, hit, normal, pellet, new THREE.Vector3().subVectors(to, from).normalize());
       return;
     }

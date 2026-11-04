@@ -35,13 +35,27 @@ export const JoinRoomSchema = v.object({
 export const PingSchema = v.object({ rtt: v.optional(finite) });
 
 export const SpawnSchema = v.object({
-  characterId: text,
+  /** older clients still send a character: ignored (the class below is all there is) */
+  characterId: v.optional(text),
   skin: v.optional(text),
   /** outfit colour: one of OUTFIT_COLORS */
   color: v.optional(v.picklist(OUTFIT_COLOR_HEXES)),
   /** uniform camouflage and guns' finish: cosmetic picks (shared/characters/looks) */
   camo: v.optional(v.picklist(CAMOS.map((c) => c.id))),
   finish: v.optional(v.picklist(FINISHES.map((f) => f.id))),
+  /** the class: checked part by part by the server (classOf), anything missing or unknown → the default's */
+  primary: v.optional(text),
+  secondary: v.optional(text),
+  ability: v.optional(text),
+  accessory: v.optional(text),
+});
+
+/** The in-match loadout menu: the class for the next respawn (checked part by part at that spawn, like SpawnSchema). */
+export const ClassSchema = v.object({
+  primary: v.optional(text),
+  secondary: v.optional(text),
+  ability: v.optional(text),
+  accessory: v.optional(text),
 });
 
 export const TeamSetSchema = v.object({ team: finite });

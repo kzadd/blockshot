@@ -1,15 +1,23 @@
-// Mode objects drawn in the world: Capture the flag flags and bases, Kill confirmed tags, Domination zones.
+// Mode objects drawn in the world: Capture the flag flags and bases, Kill confirmed tags, Domination zones and
+// Bomb sites, the bomb, and Freeze tag statues (ice blocks).
 import * as THREE from 'three';
 import {
+  BOMB,
   DOM,
   FLAG,
+  FREEZE,
+  SITE_NAMES,
   ZONE_NAMES,
+  bombSites,
   dominationZones,
+  type BombSnapshot,
   type DomSnapshot,
   type FlagSnapshot,
   type GameMap,
+  type IceSnapshot,
   type ModeId,
   type SideTeam,
+  type Team,
   type TagSnapshot,
 } from '@blockshot/shared';
 import { teamColor } from '../../settings/palette';
@@ -31,6 +39,21 @@ const INK = '#1b2a4a';
 const NEUTRAL = '#ece3cf';
 const ZONE_PAD_OPACITY = 0.28;
 const ZONE_RING_WIDTH = 0.25;
+const ICE = '#a8e4ff';
+const ICE_OPACITY = 0.45;
+const ICE_SIZE: [number, number, number] = [1.1, 2, 1.1];
+const THAW_RING_WIDTH = 0.18;
+const BOMB_BLINK_SPEED = 0.012;
+const BOMB_CARRIED_LIFT = 1.1;
+const iceGeo = new THREE.BoxGeometry(...ICE_SIZE);
+const bombGeo = new THREE.BoxGeometry(0.45, 0.28, 0.32);
+
+/** Zones drawn on the floor for the mode: Domination zones or Bomb sites (null: none). */
+function zonesOf(mode: ModeId, map: GameMap) {
+  if (mode === 'dom') return { centres: dominationZones(map), radius: DOM.radius, names: ZONE_NAMES };
+  if (mode === 'bomb') return { centres: bombSites(map), radius: BOMB.siteRadius, names: SITE_NAMES };
+  return null;
+}
 
 // Flag icon that is visible through walls
 function flagMarker(color: string): THREE.Sprite {
@@ -109,6 +132,13 @@ interface FlagObject {
   pad: THREE.Mesh;
 }
 
+interface IceObject {
+  block: THREE.Mesh;
+  ring: THREE.Mesh;
+  /** thaw progress drawn now (the ring is rebuilt only when it changes) */
+  pct: number;
+}
+
 interface TagObject {
   mesh: THREE.Mesh;
   y: number;
@@ -127,6 +157,10 @@ export class Objectives {
   readonly tags = new Map<number, TagObject>();
   zones: DomSnapshot[] | null = null;
   private zoneObjs: ZoneObject[] | null = null;
+  bomb: BombSnapshot | null = null;
+  private bombObj: THREE.Mesh | null = null;
+  private readonly ice = new Map<string, IceObject>();
+  private iceList: readonly IceSnapshot[] = [];
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -136,14 +170,16 @@ export class Objectives {
     this.buildFlags();
   }
 
-  /** Domination: a disc and a ring on the floor per zone, and its letter above (rebuilt with the palette). */
+  /** Domination zones and Bomb sites: a disc and a ring on the floor each, and the letter above (rebuilt with the palette). */
   private buildZones(): void {
     for (const o of this.zoneObjs ?? []) this.scene.remove(o.pad, o.ring, o.marker.sprite);
     this.zoneObjs = null;
-    if (this.mode !== 'dom') return;
-    this.zoneObjs = dominationZones(this.map).map(([x, y, z]) => {
+    const zones = zonesOf(this.mode, this.map);
+    if (!zones) return;
+    const { radius } = zones;
+    this.zoneObjs = zones.centres.map(([x, y, z]) => {
       const pad = new THREE.Mesh(
-        new THREE.CircleGeometry(DOM.radius, 40),
+        new THREE.CircleGeometry(radius, 40),
         new THREE.MeshBasicMaterial({
           color: NEUTRAL,
           transparent: true,
@@ -154,7 +190,7 @@ export class Objectives {
       pad.rotation.x = -Math.PI / 2;
       pad.position.set(x, y + 0.03, z);
       const ring = new THREE.Mesh(
-        new THREE.RingGeometry(DOM.radius - ZONE_RING_WIDTH, DOM.radius, 48),
+        new THREE.RingGeometry(radius - ZONE_RING_WIDTH, radius, 48),
         new THREE.MeshBasicMaterial({ color: NEUTRAL }),
       );
       ring.rotation.x = -Math.PI / 2;
@@ -228,17 +264,100 @@ export class Objectives {
     }
   }
 
-  update(dt: number, now: number, src: ObjectiveSources): void {
-    this.zoneObjs?.forEach((o, i) => {
+  /** Freeze tag: an ice block round each frozen player and a ring on the floor that fills as he is thawed. */
+  syncIce(list: readonly IceSnapshot[] | null): void {
+    this.iceList = list ?? [];
+    const seen = new Set<string>();
+    for (const [id, x, y, z, , pct] of this.iceList) {
+      seen.add(id);
+      let o = this.ice.get(id);
+      if (!o) {
+        const block = new THREE.Mesh(
+          iceGeo,
+          new THREE.MeshLambertMaterial({
+            color: ICE,
+            emissive: ICE,
+            emissiveIntensity: 0.3,
+            transparent: true,
+            opacity: ICE_OPACITY,
+            depthWrite: false,
+          }),
+        );
+        const ring = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ color: ICE }));
+        ring.rotation.x = -Math.PI / 2;
+        this.scene.add(block, ring);
+        o = { block, ring, pct: 0 };
+        this.ice.set(id, o);
+      }
+      o.block.position.set(x, y + ICE_SIZE[1] / 2, z);
+      o.ring.position.set(x, y + 0.05, z);
+      if (pct !== o.pct) {
+        o.pct = pct;
+        o.ring.geometry.dispose();
+        o.ring.geometry = pct
+          ? new THREE.RingGeometry(FREEZE.radius - THAW_RING_WIDTH, FREEZE.radius, 40, 1, 0, (pct / 100) * Math.PI * 2)
+          : new THREE.BufferGeometry();
+      }
+    }
+    for (const [id, o] of this.ice) {
+      if (seen.has(id)) continue;
+      this.scene.remove(o.block, o.ring);
+      (o.block.material as THREE.Material).dispose();
+      (o.ring.material as THREE.Material).dispose();
+      o.ring.geometry.dispose();
+      this.ice.delete(id);
+    }
+  }
+
+  /** Owner and "contested" of a zone; a Bomb site turns red with the bomb planted, and pulses while planting or defusing. */
+  private zoneState(i: number): [Team, number] {
+    if (this.mode !== 'bomb') {
       const [owner, , contested] = this.zones?.[i] ?? [0, 0, 0];
+      return [owner, contested];
+    }
+    const b = this.bomb;
+    if (!b || b.s !== i) return [0, 0];
+    return b.st === 2 ? [1, b.dp ? 1 : 0] : [0, b.pp ? 1 : 0];
+  }
+
+  /** Bomb: a small box over its carrier's shoulder, on the floor, or planted (blinking). Yours is not drawn. */
+  private updateBomb(now: number, src: ObjectiveSources): void {
+    const b = this.bomb;
+    if (!b || b.c === src.myId) {
+      if (this.bombObj) this.bombObj.visible = false;
+      return;
+    }
+    if (!this.bombObj) {
+      this.bombObj = new THREE.Mesh(
+        bombGeo,
+        new THREE.MeshLambertMaterial({ color: '#2b2b2b', emissive: '#ff2a1a', emissiveIntensity: 0 }),
+      );
+      this.scene.add(this.bombObj);
+    }
+    const o = this.bombObj;
+    o.visible = true;
+    const carrier = b.c ? src.carrierPose(b.c) : null;
+    if (carrier) {
+      o.position.copy(carrier.position);
+      o.position.y += BOMB_CARRIED_LIFT;
+    } else o.position.set(b.x, b.y + 0.14, b.z);
+    (o.material as THREE.MeshLambertMaterial).emissiveIntensity =
+      b.st === 2 && Math.sin(now * BOMB_BLINK_SPEED) > 0 ? 1 : 0;
+  }
+
+  update(dt: number, now: number, src: ObjectiveSources): void {
+    const names = zonesOf(this.mode, this.map)?.names ?? ZONE_NAMES;
+    this.zoneObjs?.forEach((o, i) => {
+      const [owner, contested] = this.zoneState(i);
       const state = `${owner}${contested}`;
       if (state === o.state) return;
       o.state = state;
       const color = owner ? teamColor(owner, NEUTRAL) : NEUTRAL;
       (o.pad.material as THREE.MeshBasicMaterial).color.set(color);
       (o.ring.material as THREE.MeshBasicMaterial).color.set(color);
-      o.marker.paint(ZONE_NAMES[i]!, color, !!contested);
+      o.marker.paint(names[i]!, color, !!contested);
     });
+    this.updateBomb(now, src);
     for (const t of this.tags.values()) {
       t.mesh.rotation.y = now * TAG_SPIN;
       t.mesh.position.y = t.y + Math.sin(now * TAG_BOB_SPEED + t.mesh.id) * TAG_BOB;
@@ -271,8 +390,11 @@ export class Objectives {
     tags: { x: number; z: number; team: SideTeam }[];
     flags: { x: number; z: number; team: SideTeam }[];
     zones: { x: number; z: number; owner: number; letter: string }[];
+    bomb: { x: number; z: number } | null;
   } {
     const tags = [...this.tags.values()].map((t) => ({ x: t.mesh.position.x, z: t.mesh.position.z, team: t.team }));
+    // Frozen players show like tags, in their team's colour
+    for (const [, x, , z, team] of this.iceList) tags.push({ x, z, team });
     const flags: { x: number; z: number; team: SideTeam }[] = [];
     if (this.flags) {
       for (const t of SIDES) {
@@ -281,21 +403,23 @@ export class Objectives {
         flags.push({ x: p.x, z: p.z, team: t });
       }
     }
-    const zones =
-      this.mode === 'dom'
-        ? dominationZones(this.map).map(([x, , z], i) => ({
-            x,
-            z,
-            owner: this.zones?.[i]?.[0] ?? 0,
-            letter: ZONE_NAMES[i]!,
-          }))
-        : [];
-    return { tags, flags, zones };
+    const def = zonesOf(this.mode, this.map);
+    const zones = (def?.centres ?? []).map(([x, , z], i) => ({
+      x,
+      z,
+      owner: this.zoneState(i)[0],
+      letter: def!.names[i]!,
+    }));
+    const b = this.bomb;
+    const bomb = !b ? null : b.c === src.myId ? myPos : ((b.c ? src.carrierPose(b.c)?.position : null) ?? b);
+    return { tags, flags, zones, bomb: bomb ? { x: bomb.x, z: bomb.z } : null };
   }
 
   dispose(): void {
     for (const o of this.flagObjs ?? []) this.scene.remove(o.group, o.pad);
     for (const o of this.zoneObjs ?? []) this.scene.remove(o.pad, o.ring, o.marker.sprite);
+    if (this.bombObj) this.scene.remove(this.bombObj);
     this.syncTags(null);
+    this.syncIce(null);
   }
 }

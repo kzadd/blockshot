@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { BARREL, CRATE, PICKUP, type MapBox } from '@blockshot/shared';
+import { BARREL, CRATE, PICKUP, POWER, WEAPONS, type MapBox } from '@blockshot/shared';
+import { handleShoot } from './shooting';
 import { makeRoom } from '../testing/fakeRoom';
 import { hitObjectAt, resetWorld, tickWorld } from './worldObjects';
 
@@ -79,5 +80,31 @@ describe('map objects', () => {
     expect(full.hp).toBe(10);
     tickWorld(r.room, now + 2 + PICKUP.respawnMs);
     expect(full.hp).toBe(10 + PICKUP.hp);
+  });
+
+  it('a power weapon appears on its spot, goes to whoever walks over it and leaves once its magazine is spent', () => {
+    const r = roomWithObjects();
+    r.room.map = { ...r.room.map, powerSpots: [[0, 0, 30]] };
+    const start = Date.now();
+    resetWorld(r.room);
+    const a = r.join('Ana', 20, 30);
+    tickWorld(r.room, start + POWER.firstMs - 100);
+    expect(r.room.world.power).toBeNull();
+    tickWorld(r.room, start + POWER.firstMs + 1);
+    const id = r.room.world.power!.id;
+    expect(WEAPONS[id].power).toBe(true);
+    r.place(a, 0.5, 30);
+    tickWorld(r.room, start + POWER.firstMs + 2);
+    expect(r.room.world.power).toBeNull();
+    expect(a.power).toBe(id);
+    expect(a.loadout[a.slot]).toBe(id);
+    // Firing every bullet (as fast as the gun allows) spends it, and the first weapon comes back
+    for (let i = 0; i < WEAPONS[id].mag; i++) {
+      a.lastShot[a.slot] = 0;
+      handleShoot(r.room, a, { o: [a.x, a.y + 1.6, a.z], d: [[0, 0, -1]], lag: 0 });
+    }
+    expect(a.power).toBeNull();
+    expect(a.loadout).not.toContain(id);
+    expect(a.slot).toBe(0);
   });
 });

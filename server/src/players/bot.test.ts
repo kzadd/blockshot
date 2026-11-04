@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CHAR_BY_ID, PAD, SIM_STEPS_PER_TICK, WEAPONS } from '@blockshot/shared';
+import { PAD, SIM_STEPS_PER_TICK, WEAPONS } from '@blockshot/shared';
 import { applyDamage } from '../combat/damage';
 import { buildSnapshot } from '../game/tick';
 import { isLocalSocket } from '../network/gateway';
@@ -10,6 +10,9 @@ import { navGrid } from './nav';
 import { spawnPlayer } from './spawn';
 
 const STEP_MS = 1000 / 60;
+
+/** The Tanque's default loadout (a bot's earlier random pick would otherwise carry over). */
+const SHOTGUN = { primary: 'shotgun', secondary: 'revolver' };
 
 describe('practice bots', () => {
   beforeEach(() => vi.useFakeTimers({ now: 1_000_000 }));
@@ -27,14 +30,14 @@ describe('practice bots', () => {
   };
 
   it('spawns, finds a rival in sight and kills it', () => {
-    const f = makeRoom('ffa', undefined, 'polvo', 's');
+    const f = makeRoom('ffa', undefined, 'pueblo', 's');
     const me = f.join('Ana', 0, 0);
     expect(addBot(f.registry, f.room)).toBeNull();
     const bot = [...f.room.players.values()].find(isBot)!;
     run(f, STEP_MS);
     expect(bot.alive).toBe(true);
-    // A hitscan gun: the bot's random pick could be the Artillero, whose launcher shells this loop never flies
-    spawnPlayer(f.room, bot, CHAR_BY_ID.soldado, 'base');
+    // A hitscan gun: the bot's random class could carry a launcher, whose shells this loop never flies
+    spawnPlayer(f.room, bot, { primary: 'rifle', secondary: 'pistol', ability: 'smoke' });
     f.place(bot, 0, 8);
     bot.protUntil = 0;
     me.protUntil = Number.MAX_SAFE_INTEGER; // no damage yet: the bot must not fire before its reaction time
@@ -56,7 +59,7 @@ describe('practice bots', () => {
     const bot = [...f.room.players.values()].find(isBot)!;
     run(f, STEP_MS);
     // A shotgun only fires up close, so it has to climb (a long gun may shoot from the ground)
-    spawnPlayer(f.room, bot, CHAR_BY_ID.tanque, 'base');
+    spawnPlayer(f.room, bot, SHOTGUN);
     f.place(bot, -(f.room.map.half - 4), 0);
     run(f, 40000);
     // It stops to shoot as soon as it sees the rival, sometimes from the last flight: past the 2nd floor is enough
@@ -65,12 +68,12 @@ describe('practice bots', () => {
   });
 
   it('takes out the secondary when the rival is out of shotgun range', () => {
-    const f = makeRoom('ffa', undefined, 'polvo', 's');
+    const f = makeRoom('ffa', undefined, 'pueblo', 's');
     f.join('Ana', 0, 0);
     addBot(f.registry, f.room, 'easy');
     const bot = [...f.room.players.values()].find(isBot)!;
     run(f, STEP_MS);
-    spawnPlayer(f.room, bot, CHAR_BY_ID.tanque, 'base');
+    spawnPlayer(f.room, bot, SHOTGUN);
     f.place(bot, 0, 25);
     bot.protUntil = 0;
     run(f, 1000);
@@ -103,14 +106,14 @@ describe('practice bots', () => {
   it('takes a jump pad onto the Patio tower to pick up a tag', () => {
     const f = makeRoom('kc', undefined, 'patio', 'm');
     expect(navGrid(f.room.map, f.room.colliders).padJumps.size).toBeGreaterThan(0);
-    // A Red player dies on top of the central tower and drops a tag there
+    // A Red player dies on the east terrace of the central tower (3 m up) and drops a tag there
     const me = f.join('Ana', 0, 0);
-    f.place(me, 3, 5, 3);
+    f.place(me, 5.5, 2, 3);
     addBot(f.registry, f.room, 'normal');
     const bot = [...f.room.players.values()].find(isBot)!;
     run(f, STEP_MS);
-    applyDamage(f.room, bot, me, 999, false, WEAPONS.rifle, [3, 4, 5]);
-    // The bot starts next to the pad at the foot of the tower
+    applyDamage(f.room, bot, me, 999, false, WEAPONS.rifle, [5.5, 4, 2]);
+    // The bot starts south of the terrace's jump pad (5.5, 6.6)
     f.place(bot, 6.5, 11.5);
     let launched = false;
     for (let t = 0; t < 8000 && !f.room.teamScore[2]; t += 100) {

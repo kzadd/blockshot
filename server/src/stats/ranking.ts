@@ -3,16 +3,16 @@
 // overwritten, and a new season keeps a copy of the old one.
 import fs from 'node:fs';
 import path from 'node:path';
-import { isCharacterId, type CharacterId, type RankingRow, type Team } from '@blockshot/shared';
+import { isOutfitColor, isWeaponId, type RankingRow, type Team, type WeaponId } from '@blockshot/shared';
 import type { Logger } from '../logger';
 import { isBot } from '../players/bot';
 import type { Room } from '../rooms/room';
 
 const FIELDS = ['matches', 'wins', 'kills', 'deaths', 'shots', 'hits', 'heads', 'medals', 'caps'] as const;
-/** What the file keeps per name: the counters, spawns per character and the colour last worn with each */
+/** What the file keeps per name: the counters, spawns per primary weapon and the outfit colour last worn */
 type Totals = Record<(typeof FIELDS)[number], number> & {
-  picks: Partial<Record<CharacterId, number>>;
-  colors: Partial<Record<CharacterId, string>>;
+  picks: Partial<Record<WeaponId, number>>;
+  color: string;
 };
 const empty = (): Totals => ({
   matches: 0,
@@ -25,7 +25,7 @@ const empty = (): Totals => ({
   medals: 0,
   caps: 0,
   picks: {},
-  colors: {},
+  color: '',
 });
 
 const rows = new Map<string, Totals>();
@@ -51,11 +51,10 @@ export function loadRanking(at: string, logger: Logger): void {
       if (typeof r?.name !== 'string') continue;
       const t = empty();
       for (const k of FIELDS) t[k] = Number.isFinite(r[k]) ? Math.max(0, Math.floor(r[k])) : 0;
-      // Older files have no picks/colors: those players simply have no favourite yet
-      for (const [c, n] of Object.entries(r.picks ?? {}))
-        if (isCharacterId(c) && Number.isFinite(n)) t.picks[c] = Math.max(0, Math.floor(n as number));
-      for (const [c, col] of Object.entries(r.colors ?? {}))
-        if (isCharacterId(c) && typeof col === 'string') t.colors[c] = col;
+      // Older files counted characters (gone, 2026-11-04) instead of weapons: those players start a new favourite
+      for (const [w, n] of Object.entries(r.picks ?? {}))
+        if (isWeaponId(w) && Number.isFinite(n)) t.picks[w] = Math.max(0, Math.floor(n as number));
+      if (isOutfitColor(r.color)) t.color = r.color;
       rows.set(r.name, t);
     }
     logger.info({ file: at, players: rows.size }, 'ranking loaded');
@@ -91,7 +90,7 @@ function save(): void {
 export function recordMatch(room: Room, winnerName: string, winnerTeam: Team): void {
   let changed = false;
   for (const p of room.players.values()) {
-    if (isBot(p) || Object.keys(p.picks).length === 0) continue;
+    if (isBot(p) || !p.played) continue;
     const t = rows.get(p.name) ?? empty();
     t.matches++;
     if (winnerTeam ? p.team === winnerTeam : p.name === winnerName) t.wins++;
@@ -102,8 +101,8 @@ export function recordMatch(room: Room, winnerName: string, winnerTeam: Team): v
     t.heads += p.heads;
     t.medals += p.medals;
     t.caps += p.caps;
-    for (const [c, n] of Object.entries(p.picks) as [CharacterId, number][]) t.picks[c] = (t.picks[c] ?? 0) + n;
-    if (p.characterId && p.color) t.colors[p.characterId] = p.color;
+    for (const [w, n] of Object.entries(p.picks) as [WeaponId, number][]) t.picks[w] = (t.picks[w] ?? 0) + n;
+    if (p.color) t.color = p.color;
     rows.set(p.name, t);
     changed = true;
   }
@@ -113,10 +112,10 @@ export function recordMatch(room: Room, winnerName: string, winnerTeam: Team): v
 /** Best first: most wins, then most kills, then fewest deaths. */
 export function rankingRows(): RankingRow[] {
   return [...rows]
-    .map(([name, { picks, colors, ...t }]) => {
-      let fav: CharacterId | null = null;
-      for (const [c, n] of Object.entries(picks) as [CharacterId, number][]) if (n > (fav ? picks[fav]! : 0)) fav = c;
-      return { name, ...t, fav, favColor: (fav && colors[fav]) || '' };
+    .map(([name, { picks, color, ...t }]) => {
+      let fav: WeaponId | null = null;
+      for (const [w, n] of Object.entries(picks) as [WeaponId, number][]) if (n > (fav ? picks[fav]! : 0)) fav = w;
+      return { name, ...t, fav, favColor: color };
     })
     .sort((a, b) => b.wins - a.wins || b.kills - a.kills || a.deaths - b.deaths);
 }

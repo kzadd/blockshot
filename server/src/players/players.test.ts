@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CHAR_BY_ID, FIXED_DT, MAX_QUEUED_INPUTS, MAX_SIM_BUDGET_S, type MoveInput } from '@blockshot/shared';
+import { FIXED_DT, MAX_QUEUED_INPUTS, MAX_SIM_BUDGET_S, type MoveInput } from '@blockshot/shared';
 import { bestPlays } from '../match/match';
 import { makeRoom } from '../testing/fakeRoom';
 import { queueInputs, simulateRoom } from './movement';
@@ -24,7 +24,7 @@ describe('input queue', () => {
     const { room, join } = makeRoom('ffa');
     const p = join('A', 0, 20);
     p.lastSeq = 20000; // last command of the previous match
-    spawnPlayer(room, p, CHAR_BY_ID.soldado, 'base');
+    spawnPlayer(room, p);
     queueInputs(p, [cmd(0), cmd(1)]);
     expect(p.inputs.map((c) => c.seq)).toEqual([0, 1]);
   });
@@ -32,10 +32,10 @@ describe('input queue', () => {
   it('keeps the camouflage and finish picked at spawn, and ignores unknown ones', () => {
     const { room, join } = makeRoom('ffa');
     const p = join('A', 0, 20);
-    spawnPlayer(room, p, CHAR_BY_ID.soldado, 'base', undefined, 'tigre', 'oro');
+    spawnPlayer(room, p, { camo: 'tigre', finish: 'oro' });
     expect([p.camo, p.finish]).toEqual(['tigre', 'oro']);
     p.alive = false;
-    spawnPlayer(room, p, CHAR_BY_ID.soldado, 'base', undefined, 'rosa', 'diamante');
+    spawnPlayer(room, p, { camo: 'rosa', finish: 'diamante' });
     expect([p.camo, p.finish]).toEqual(['liso', 'estandar']);
   });
 

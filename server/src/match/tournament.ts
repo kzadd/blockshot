@@ -40,7 +40,7 @@ export function scoreRound(room: Room): TournamentResult | undefined {
   const t = room.tournament;
   if (!t) return undefined;
   const players = [...room.players.values()]
-    .filter((p) => !isBot(p) && Object.keys(p.picks).length > 0)
+    .filter((p) => !isBot(p) && p.played)
     .sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
   const gained = new Map<string, number>();
   players.forEach((p, i) => {

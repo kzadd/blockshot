@@ -5,9 +5,10 @@ import { notice } from '../rooms/room';
 import type { GameMode } from './gameMode';
 
 // Each kill gives the next weapon; a kill with the last one (the knife) wins.
-// A knife kill also takes a weapon from the victim.
+// A knife kill also takes a weapon from the victim. No power weapons: a railgun would skip the ladder.
 export const createGunGame = (): GameMode => ({
   streakRewards: true,
+  powerWeapons: false,
   initialTeam: () => 0,
   onKill(room, shooter, victim, w) {
     const ladder = gunLadder(room.scoreLimit);

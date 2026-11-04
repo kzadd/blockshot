@@ -4,9 +4,12 @@ import * as THREE from 'three';
 import {
   type CamoId,
   type FinishId,
-  CHAR_BY_ID,
+  BODY,
+  accessorySpeed,
+  staminaMult,
   CLIENT_SEND_MS,
   FIXED_DT,
+  movesOrJumps,
   HITBOX,
   INFECT,
   PLAYER,
@@ -18,14 +21,17 @@ import {
   stepGrenade,
   throwVelocity,
   castShot,
+  HAZARD,
   climbables,
   liveColliders,
+  GOGGLES,
   grenadesFor,
   gunLadder,
   isTeamMode,
   loadoutOf,
-  type Character,
+  unlimitedAmmo,
   type Collider,
+  type PlayerClass,
   type GameMap,
   type GrenadeSnapshot,
   type InfectSnapshot,
@@ -46,9 +52,10 @@ import type { GameSocket } from '../../network/socket';
 import { getSettings, subscribe, type Settings } from '../../settings/settingsStore';
 import { attachAudio } from '../audio/audioEvents';
 import { sfx } from '../audio/sound';
-import type { HudState, DamageMark, SoundMark } from '../hud/hudState';
+import type { HudState, DamageMark, SoundMark, SpectateView } from '../hud/hudState';
 import type { MinimapSource, MinimapView } from '../hud/Minimap';
 import type { Look } from '../../characters/looks';
+import { wearKevlar } from '../render/gear';
 import { loadGun } from '../render/gunAssets';
 import { buildCharacter, buildGun, type CharacterModel } from '../render/models';
 import { preloadProps, prop } from '../render/props';
@@ -64,6 +71,7 @@ import { LocalPlayer } from './localPlayer';
 import { NetClient } from './netClient';
 import { Objectives } from './objectives';
 import { RemotePlayers, WALK_PHASE_PER_M, animateLegs, outfitFor } from './remotePlayers';
+import { pickTarget, shouldSpectate } from './spectate';
 import { wallNormal } from './surface';
 import { damp, dampAngle, screenAngle } from './util';
 import { ViewModel, type Gadget } from './viewModel';
@@ -111,6 +119,8 @@ const SHOT_MARK_RANGE = 45;
 /** Body box used to tell a remote bullet that stopped on a player (blood) from one in the air. */
 const BODY_HALF_WIDTH = HITBOX.halfWidth + 0.1;
 const BODY_HEIGHT = HITBOX.headHeight + HITBOX.headRadius;
+/** A silenced gunshot is heard from this share of the normal distance. */
+const SILENCED_RANGE = 0.35;
 /** Gunshots fade out with distance and are silent from this far (m). */
 const SHOT_SOUND_RANGE = 70;
 const REMOTE_SHOT_VOLUME = 0.8;
@@ -129,6 +139,12 @@ const REPLAY_SHOT_VOLUME = 0.6;
 const REPLAY_KICK_MS = 110;
 /** How fast the replay ghost's knees follow their pose (1/s). */
 const GHOST_FOLLOW = 14;
+/** Spectating: how fast the eye height follows the watched player crouching (1/s), how long their gun kicks
+ * after a shot (ms), and the mouse buttons that pick the next / previous player. */
+const WATCH_EYE_FOLLOW = 12;
+const WATCH_KICK_MS = 110;
+const MOUSE_LEFT = 0;
+const MOUSE_RIGHT = 2;
 
 interface SelfPose {
   t: number;
@@ -185,8 +201,8 @@ interface SoundTick {
 export type HudListener = (hud: HudState) => void;
 
 export class Engine implements MinimapSource {
-  /** character, skin and outfit colour to respawn with automatically (null while choosing) */
-  autoChar: { id: string; look: Look } | null = null;
+  /** the class and looks to respawn with automatically (null while choosing) */
+  autoChar: Look | null = null;
 
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
@@ -197,6 +213,8 @@ export class Engine implements MinimapSource {
   /** map boxes, the barrels and crates standing and the cover walls (rebuilt when any of them changes) */
   private readonly colliders: Collider[];
   private readonly mapObjs: MapObjects;
+  /** server clock minus ours (ms), from the snapshots */
+  private serverOffset: number | null = null;
   private readonly abilityObjs: AbilityObjects;
   /** G is held: the arc and landing ring show, release throws */
   private grenadeAim = false;
@@ -217,7 +235,8 @@ export class Engine implements MinimapSource {
   private disposed = false;
 
   // Our player
-  private character: Character | null = null;
+  /** the class the server equipped on the last spawn (null before the first) */
+  private cls: PlayerClass | null = null;
   private skin: SkinId = 'base';
   private color = '';
   private camo: CamoId = 'liso';
@@ -230,6 +249,9 @@ export class Engine implements MinimapSource {
   private level = 0;
   private myTeam: Team = 0;
   private protUntil = 0;
+  /** not moved or jumped since spawning: the protection waits (PLAYER.idleGrace, as on the server) */
+  private idle = false;
+  private spawnedAt = 0;
   private life = 0;
   private readonly renderPos = new THREE.Vector3();
   private readonly tmpNormal = new THREE.Vector3();
@@ -268,6 +290,13 @@ export class Engine implements MinimapSource {
   private readonly flying = new Map<number, { mesh: THREE.Object3D; target: THREE.Vector3 }>();
   /** when the last grenade left the hand (the first-person throw) */
   private thrownAt = -1e9;
+  /** Spectating (dead until the round ends): the player followed, their gun in killVm, eye height and last
+   * position (gun bob), and whether killVm shows their gun this frame */
+  private watching: string | null = null;
+  private watchGun: string | null = null;
+  private watchEye: number = PLAYER.eye;
+  private watchLast: { x: number; z: number } | null = null;
+  private watchVm = false;
 
   constructor(
     private readonly container: HTMLElement,
@@ -343,6 +372,8 @@ export class Engine implements MinimapSource {
       (t) => this.isMate(t),
       () => this.myTeam,
     );
+    // A rival's laser stops at the first wall
+    this.remotes.laserReach = (o, d, max) => castShot([o.x, o.y, o.z], [d.x, d.y, d.z], this.colliders, [], '', max).t;
     this.net = new NetClient(socket);
 
     this.input = new InputController(r.domElement, {
@@ -386,6 +417,7 @@ export class Engine implements MinimapSource {
     );
 
     this.offs.push(attachAudio(this.bus));
+    this.bindSpectate(r.domElement);
     this.applySettings(getSettings());
     this.offs.push(subscribe((st) => this.applySettings(st)));
     this.bindNet();
@@ -419,21 +451,15 @@ export class Engine implements MinimapSource {
   }
 
   private setGun(): void {
-    if (!this.character) return;
-    const { color, skin, camo } = outfitFor(
-      this.mode,
-      this.character.id,
-      this.skin,
-      this.myTeam,
-      this.color,
-      this.camo,
-    );
-    this.vm.setGun(this.weapons.weaponId(), color, skin, camo, this.finish);
+    if (!this.cls) return;
+    const { color, skin, camo } = outfitFor(this.mode, this.skin, this.myTeam, this.color, this.camo);
+    this.vm.setGun(this.weapons.weaponId(), color, skin, camo, this.finish, this.cls.accessory);
   }
 
   private equip(): void {
-    if (!this.character) return;
-    this.weapons.equip(loadoutOf(this.mode, this.character, this.level, this.limit, this.myTeam));
+    if (!this.cls) return;
+    this.weapons.accessory = this.cls.accessory;
+    this.weapons.equip(loadoutOf(this.mode, this.cls, this.level, this.limit, this.myTeam), unlimitedAmmo(this.mode));
   }
 
   /** Movement rules for one command: the held weapon's weight and the mode's speed bonus. */
@@ -441,14 +467,15 @@ export class Engine implements MinimapSource {
     const id = this.weapons.loadout[input.slot] ?? this.weapons.weaponId();
     const w = WEAPONS[id];
     const infected = this.mode === 'infect' && this.myTeam === 2;
-    const speed = this.character?.speed ?? 0;
+    const speed = this.cls ? BODY.speed : 0;
     const spawn = this.map.spawns[0];
     return {
       colliders: this.colliders,
-      walk: speed * w.weight * (infected ? INFECT.speed : 1),
+      walk: speed * w.weight * accessorySpeed(this.cls?.accessory) * (infected ? INFECT.speed : 1),
       adsMove: w.adsMove,
       fallback: spawn ? [spawn[0], spawn[1], spawn[2]] : [0, 0, 0],
-      dash: this.character?.ability === 'dash',
+      dash: this.cls?.ability === 'dash',
+      staminaMult: staminaMult(w.weight),
       ...climbables(this.map),
     };
   }
@@ -461,7 +488,7 @@ export class Engine implements MinimapSource {
     net.on('player:ack', (ack) => {
       if (this.alive && ack.life === this.life) this.local.reconcile(ack, (i) => this.moveContext(i));
     });
-    net.on('shot', (d) => this.onRemoteShot(d.id, d.w, d.e));
+    net.on('shot', (d) => this.onRemoteShot(d.id, d.w, d.e, !!d.s));
     net.on('shield:hit', (d) => {
       if (d.id === this.myId) {
         this.shieldHitAt = performance.now();
@@ -475,7 +502,9 @@ export class Engine implements MinimapSource {
       this.hp = d.hp;
       if (healed) return;
       this.damageTime = performance.now();
-      this.damageDirs.push({ x: d.from[0], z: d.from[1], t: this.damageTime });
+      // (no direction mark when it comes from where we stand: camping drains health)
+      if (Math.hypot(d.from[0] - this.renderPos.x, d.from[1] - this.renderPos.z) > 1)
+        this.damageDirs.push({ x: d.from[0], z: d.from[1], t: this.damageTime });
       this.bus.emit('hurt');
     });
     net.on('hitmarker', (d) => {
@@ -485,6 +514,9 @@ export class Engine implements MinimapSource {
       this.weapons.confirmHit(this.hitTime);
       this.bus.emit('hit', { head: d.head, kill: d.kill });
       this.effects.damageNumber(d.at, d.dmg, d.head, d.kill);
+      // Tactical goggles: the rival hit shows on the minimap for a while
+      const hitR = d.id && this.cls?.accessory === 'goggles' ? this.remotes.all.get(d.id) : undefined;
+      if (hitR) hitR.markedUntil = this.hitTime + GOGGLES.markMs;
     });
     net.on('kill', (d) => {
       if (d.victim === this.myId) return this.die(d);
@@ -508,6 +540,19 @@ export class Engine implements MinimapSource {
       const at = new THREE.Vector3(d.x, d.y, d.z);
       this.effects.splinters(at);
       sfx.thud(140, 0.25, Math.max(0.1, 0.6 - at.distanceTo(this.rig.camera.position) / 60));
+    });
+    net.on('strike', (d) => {
+      this.mapObjs.strikeMarks(d.at, d.ms, performance.now());
+      for (let i = 0; i < 4; i++) sfx.blip(900 - i * 120, 0.18, 'sawtooth', 0.12, i * 0.22);
+    });
+    net.on('knocked', (d) => {
+      // Knocked by a moving obstacle: feel it at once (the server's ack confirms it)
+      const st = this.local.state;
+      st.vx = d.x * HAZARD.knock;
+      st.vz = d.z * HAZARD.knock;
+      st.vy = HAZARD.lift;
+      st.grounded = false;
+      sfx.thud(110, 0.2, 0.5);
     });
     net.on('pickup', () => {
       sfx.blip(660, 0.07, 'triangle', 0.18);
@@ -635,13 +680,13 @@ export class Engine implements MinimapSource {
     this.sendAcc = 0;
   }
 
-  /** Spawn now (first time, or after picking a character once the countdown ended). */
-  spawn(characterId: string, look: Look): void {
-    this.autoChar = { id: characterId, look };
+  /** Spawn now (first time, or after building the class once the countdown ended). */
+  spawn(look: Look): void {
+    this.autoChar = look;
     const now = performance.now();
     if (this.alive || (this.deathAt && now - this.deathAt < PLAYER.respawnDelay)) return;
     this.spawnReqAt = now;
-    this.net.spawn(characterId, look);
+    this.net.spawn(look);
   }
 
   requestLock(): void {
@@ -657,7 +702,7 @@ export class Engine implements MinimapSource {
     return Math.max(fast, floor);
   }
 
-  /** New match (or a new map after a vote): respawn almost at once with the same character. */
+  /** New match (or a new map after a vote): respawn almost at once with the same class. */
   respawnSoon(): void {
     this.killerName = '';
     this.deathAt = performance.now() - PLAYER.respawnDelay + RESTART_RESPAWN_MS;
@@ -665,8 +710,8 @@ export class Engine implements MinimapSource {
 
   /** Key E: the dash goes with the next movement command; the rest are asked to the server. */
   private useAbility(): void {
-    if (!this.alive || !this.character) return;
-    if (this.character.ability === 'dash') {
+    if (!this.alive || !this.cls) return;
+    if (this.cls.ability === 'dash') {
       if (this.local.state.dashCd <= 0) this.input.pressDash();
       return;
     }
@@ -679,7 +724,7 @@ export class Engine implements MinimapSource {
     this.protUntil = 0;
     sfx.thud(420, 0.1, 0.3);
     // The ability's object shows in the left hand: the shield for as long as it lasts, the rest briefly
-    const gadget = GADGET_OF[this.character.ability];
+    const gadget = GADGET_OF[this.cls.ability];
     if (gadget) this.vm.showGadget(gadget, performance.now() + (gadget === 'shield' ? SHIELD.durationMs : GADGET_MS));
   }
 
@@ -698,21 +743,30 @@ export class Engine implements MinimapSource {
 
   /** ms until the ability is ready: the dash from our own prediction, the rest from the server. */
   private abilityLeft(): number {
-    if (this.character?.ability === 'dash') return this.local.state.dashCd * MS_PER_S;
+    if (this.cls?.ability === 'dash') return this.local.state.dashCd * MS_PER_S;
     return this.players.find((p) => p.id === this.myId)?.ac ?? 0;
   }
 
-  private onState({ players, ts, fl, tg, inf, gr, dp, wo, dz, rd }: StateSnapshot): void {
+  private onState({ t, players, ts, fl, tg, inf, gr, dp, wo, pw, dz, rd, ic, bm }: StateSnapshot): void {
+    // The server's clock (for the moving obstacles), smoothed; the snapshot left it half a round trip ago
+    const offset = t + this.net.rtt / 2 - performance.now();
+    this.serverOffset = this.serverOffset === null ? offset : this.serverOffset + (offset - this.serverOffset) * 0.1;
     const shielded = !!players.find((p) => p.id === this.myId)?.sh;
     const now = performance.now();
+    // The server lowers the shield early when we fire: the one in the left hand goes too
+    if (!shielded && this.shieldUntil) this.vm.showGadget('shield', 0);
     if (!shielded) this.shieldUntil = 0;
     else if (!this.shieldUntil) this.shieldUntil = now + SHIELD.durationMs - this.net.rtt / 2;
     this.players = players;
     this.objectives.zones = dz ?? null;
+    this.objectives.bomb = bm ?? null;
+    this.objectives.syncIce(ic ?? null);
+    this.remotes.frozen = new Set((ic ?? []).map(([id]) => id));
     this.round = rd ?? null;
     this.syncGrenades(gr ?? []);
     // Cover walls, barrels or crates changed: the prediction must bump into the same things as the server
     const objs = this.mapObjs.sync(wo);
+    this.mapObjs.syncPower(pw);
     if (this.abilityObjs.sync(dp ?? [], performance.now()) || objs) {
       this.colliders.length = 0;
       this.colliders.push(...liveColliders(this.map, this.mapObjs.objectsDown()), ...this.abilityObjs.walls());
@@ -724,6 +778,11 @@ export class Engine implements MinimapSource {
     // Radar: you have it, or (team modes) a teammate does
     this.radar = players.some((p) => p.rd && (p.id === this.myId || (isTeamMode(this.mode) && p.tm === this.myTeam)));
     const me = players.find((p) => p.id === this.myId);
+    // Power weapon: the server gave us one, or ours is spent
+    if (me && this.alive) {
+      if (me.pw) this.weapons.addPower(me.pw, now);
+      else this.weapons.dropPower();
+    }
     if (me && me.tm !== this.myTeam) {
       this.myTeam = me.tm;
       // Changed team: allies and enemies change colour, and so does the uniform on our arms
@@ -740,7 +799,7 @@ export class Engine implements MinimapSource {
 
   private onSpawned(d: SpawnedMessage): void {
     this.endReplay();
-    this.character = CHAR_BY_ID[d.characterId];
+    this.cls = { primary: d.primary, secondary: d.secondary, ability: d.ability, accessory: d.accessory ?? 'none' };
     this.skin = d.skin || 'base';
     this.color = d.color;
     this.camo = d.camo ?? 'liso';
@@ -756,19 +815,24 @@ export class Engine implements MinimapSource {
     this.armor = 0;
     this.alive = true;
     this.protUntil = performance.now() + PLAYER.spawnProtection;
+    this.idle = true;
+    this.spawnedAt = performance.now();
     // Clicking to respawn sooner used to fire on spawning and drop the protection at once
     this.input.clearButtons();
     this.weapons.holdFire(performance.now() + SPAWN_FIRE_GRACE_MS);
     this.everSpawned = true;
     this.deathPos = null;
+    this.watching = null;
     this.level = d.level;
-    this.grenades = grenadesFor(this.mode, d.team);
+    this.grenades = grenadesFor(this.mode, d.team, this.cls.accessory);
     this.rig.reset();
     this.equip();
+    this.abilityObjs.seeThrough = this.cls.accessory === 'goggles';
   }
 
   private die(d: KillEvent): void {
     this.alive = false;
+    this.abilityObjs.seeThrough = false;
     this.deathAt = performance.now();
     this.startReplay(d.killer);
     this.deathPos = this.rig.camera.position.clone();
@@ -781,20 +845,16 @@ export class Engine implements MinimapSource {
   // ============================================================ Death replay
   private startReplay(killerId: string): void {
     this.endReplay();
+    this.watchGun = null; // killVm gets the killer's gun
     const killer = this.remotes.all.get(killerId);
-    if (killerId === this.myId || !killer?.model || !this.character) return;
+    if (killerId === this.myId || !killer?.model || !this.cls) return;
     const now = this.deathAt;
     // The killer's own gun, finish and gloves, as they had it
-    if (killer.weaponId) this.killVm.setGun(killer.weaponId, killer.color, killer.skin ?? 'base', killer.cm, killer.fn);
-    const { color, skin, camo } = outfitFor(
-      this.mode,
-      this.character.id,
-      this.skin,
-      this.myTeam,
-      this.color,
-      this.camo,
-    );
-    const ghost = buildCharacter(this.character.id, skin, color, camo);
+    if (killer.weaponId)
+      this.killVm.setGun(killer.weaponId, killer.color, killer.skin ?? 'base', killer.cm, killer.fn, killer.ax);
+    const { color, skin, camo } = outfitFor(this.mode, this.skin, this.myTeam, this.color, this.camo);
+    const ghost = buildCharacter(this.cls.ability, skin, color, camo);
+    wearKevlar(ghost, this.cls.accessory);
     ghost.holdGun(buildGun(this.weapons.weaponId(), true, color));
     const wid = this.weapons.weaponId();
     void loadGun(wid, { finish: this.finish, color, camo, withFlash: true }).then((g) => {
@@ -909,16 +969,18 @@ export class Engine implements MinimapSource {
     return log[0] ?? null;
   }
 
-  private onRemoteShot(id: string, w: keyof typeof WEAPONS | null, ends: Vec3[]): void {
+  /** A rival's shot: tracer, sound and a mark (`muffled`: silenced, no tracer, flash, minimap or crosshair mark, a quiet pop). */
+  private onRemoteShot(id: string, w: keyof typeof WEAPONS | null, ends: Vec3[], muffled = false): void {
     const now = performance.now();
     this.shotLog.push({ id, t: now, w, ends });
     this.shotLog = this.shotLog.filter((s) => now - s.t < REPLAY_LOG_MS);
-    const r = this.remotes.markShot(id, now);
+    const r = this.remotes.markShot(id, now, !muffled);
     if (!r) return;
     const from = this.remotes.muzzle(r)?.clone();
     if (!from) return;
     const feet = this.remotes.position(id);
     if (
+      !muffled &&
       feet &&
       !this.isMate(r.team === -1 ? 0 : r.team) &&
       this.alive &&
@@ -932,11 +994,12 @@ export class Engine implements MinimapSource {
         const to = new THREE.Vector3(...end);
         // The server only sends where each bullet stopped: on a collider face it hit a wall
         const n = wallNormal(to, this.colliders, this.tmpNormal);
-        this.effects.bullet(from, to, n ? 'wall' : this.onPlayer(to) ? 'player' : null, n, pellet);
+        this.effects.bullet(from, to, n ? 'wall' : this.onPlayer(to) ? 'player' : null, n, pellet, muffled);
       }
     }
     const dist = from.distanceTo(this.rig.camera.position);
-    this.bus.emit('shot', { weapon: w, volume: Math.max(0, 1 - dist / SHOT_SOUND_RANGE) * REMOTE_SHOT_VOLUME });
+    const range = SHOT_SOUND_RANGE * (muffled ? SILENCED_RANGE : 1);
+    this.bus.emit('shot', { weapon: w, volume: Math.max(0, 1 - dist / range) * REMOTE_SHOT_VOLUME, muffled });
   }
 
   /** Whether a point is on someone's body (us or a drawn remote): for remote shots' blood puffs. */
@@ -952,13 +1015,114 @@ export class Engine implements MinimapSource {
     this.ticks.push({ key: t + Math.random(), x, z, color, t });
   }
 
+  // ============================================================ Spectating
+  /** Dead with no respawn this round (round modes, frozen): the camera follows a living teammate. */
+  private spectating(): boolean {
+    return shouldSpectate(this.alive, this.everSpawned, this.round);
+  }
+
+  /** Left click / → the next player, right click / ← the previous one; a click also skips the replay. */
+  private bindSpectate(canvas: HTMLCanvasElement): void {
+    const step = (dir: 1 | -1) => {
+      if (!this.spectating()) return;
+      if (this.replay) return this.endReplay();
+      this.watching = this.watchTarget(dir);
+    };
+    const down = (e: MouseEvent) => {
+      // Clicks on the death card's buttons are theirs
+      if (!this.input.locked && e.target !== canvas) return;
+      if (e.button === MOUSE_LEFT) step(1);
+      else if (e.button === MOUSE_RIGHT) step(-1);
+    };
+    const key = (e: KeyboardEvent) => {
+      if (e.repeat || e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
+      if (e.code === 'ArrowRight') step(1);
+      else if (e.code === 'ArrowLeft') step(-1);
+    };
+    window.addEventListener('mousedown', down);
+    window.addEventListener('keydown', key);
+    this.offs.push(() => {
+      window.removeEventListener('mousedown', down);
+      window.removeEventListener('keydown', key);
+    });
+  }
+
+  private watchTarget(dir: -1 | 0 | 1): string | null {
+    return pickTarget(this.players, this.watching, dir, {
+      myId: this.myId,
+      myTeam: this.myTeam,
+      teams: isTeamMode(this.mode),
+    });
+  }
+
+  /** First person from the watched player's eye, as drawn (interpolated); nobody left: the map overview. */
+  private spectate(dt: number, now: number): void {
+    const id = (this.watching = this.watchTarget(0));
+    const pose = id ? this.remotes.poseAt(id, now - VIEW_DELAY_MS) : null;
+    const r = id ? this.remotes.all.get(id) : undefined;
+    if (!pose || !r) {
+      this.watchLast = null;
+      this.rig.orbit(now, this.map.half);
+      return;
+    }
+    const low = pose.sl || pose.cr;
+    this.watchEye += ((low ? PLAYER.slideEye : PLAYER.eye) - this.watchEye) * damp(WATCH_EYE_FOLLOW, dt);
+    this.rig.replay(pose.x, pose.y + this.watchEye, pose.z, pose.ry, pose.rx);
+    // Their gun in our hands: it bobs with their speed and kicks with their shots
+    if (!r.weaponId) return;
+    if (r.weaponId !== this.watchGun) {
+      this.killVm.setGun(r.weaponId, r.color, r.skin ?? 'base', r.cm, r.fn, r.ax);
+      this.watchGun = r.weaponId;
+    }
+    const last = this.watchLast;
+    const speed = last ? Math.hypot(pose.x - last.x, pose.z - last.z) / Math.max(dt, 1e-3) : 0;
+    this.watchLast = { x: pose.x, z: pose.z };
+    const w = WEAPONS[r.weaponId];
+    this.killVm.update(dt, now, true, {
+      weapon: w,
+      speed,
+      grounded: true,
+      sliding: !!pose.sl,
+      sprintLerp: 0,
+      aimLerp: 0,
+      kick: Math.max(0, 1 - (now - r.lastShot) / WATCH_KICK_MS),
+      reloadEnd: 0,
+      swapUntil: 0,
+      swingAt: w.melee ? r.lastShot : -1e9,
+      flashTime: r.lastShot,
+    });
+    this.watchVm = true;
+  }
+
+  private spectateView(): SpectateView | null {
+    if (!this.spectating()) return null;
+    const p = this.watching ? this.players.find((q) => q.id === this.watching) : undefined;
+    if (!p) return { target: null };
+    const w = this.remotes.all.get(p.id)?.weaponId;
+    return {
+      target: {
+        name: p.n,
+        team: p.tm,
+        ability: p.ab ?? null,
+        hp: Math.max(0, Math.ceil(p.h)),
+        maxHp: p.mh || BODY.hp,
+        weapon: w ? WEAPONS[w].name : null,
+      },
+    };
+  }
+
   // ============================================================ Loop
   private simulate(frameDt: number): number {
     this.simAcc = Math.min(MAX_SIM_CATCH_UP, this.simAcc + frameDt);
     while (this.simAcc >= FIXED_DT) {
       const input = this.input.command(this.local.nextSeq(), this.weapons.slot);
+      if (this.idle) {
+        const now = performance.now();
+        if (movesOrJumps(input) || !this.protUntil || now - this.spawnedAt > PLAYER.idleGrace) this.idle = false;
+        else this.protUntil = now + PLAYER.spawnProtection;
+      }
       const ev = this.local.step(input, this.moveContext(input));
-      if (ev.jump) this.bus.emit('jump');
+      if (ev.jump || ev.wallJump) this.bus.emit('jump');
       if (ev.slide) this.bus.emit('slide');
       if (ev.pad) this.bus.emit('pad');
       if (ev.dash) {
@@ -981,6 +1145,7 @@ export class Engine implements MinimapSource {
     const dt = Math.min(frameDt, MAX_FRAME_DT);
     const now = performance.now();
     const st = this.local.state;
+    this.watchVm = false;
 
     if (this.alive) {
       const alpha = this.simulate(frameDt);
@@ -1017,13 +1182,14 @@ export class Engine implements MinimapSource {
         now - this.deathAt >= PLAYER.respawnDelay &&
         now - this.spawnReqAt > SPAWN_RETRY_MS
       ) {
-        // Automatic respawn with the chosen character
+        // Automatic respawn with the chosen class
         this.spawnReqAt = now;
-        this.net.spawn(this.autoChar.id, this.autoChar.look);
+        this.net.spawn(this.autoChar);
       }
       if (this.playReplay(now)) {
         // the camera is in the killer's eyes
-      } else if (this.deathPos) this.rig.dead(dt, this.deathPos, this.remotes.position(this.killerId));
+      } else if (this.spectating()) this.spectate(dt, now);
+      else if (this.deathPos) this.rig.dead(dt, this.deathPos, this.remotes.position(this.killerId));
       else this.rig.orbit(now, this.map.half);
     }
     this.weapons.tickCombo(now);
@@ -1059,7 +1225,7 @@ export class Engine implements MinimapSource {
       this.alive ? this.renderPos : null,
       (x, z) => this.addTick(x, z, STEP_MARK_COLOR),
       replaying ? now - (replaying.from + (now - replaying.start)) : 0,
-      replaying?.killerId ?? null,
+      replaying?.killerId ?? (this.watchVm ? this.watching : null),
     );
     this.effects.update(dt);
     for (const g of this.flying.values()) {
@@ -1067,7 +1233,7 @@ export class Engine implements MinimapSource {
       g.mesh.rotation.x += dt * GRENADE_TUMBLE;
     }
     this.abilityObjs.update(dt, performance.now());
-    this.mapObjs.update(performance.now());
+    this.mapObjs.update(performance.now(), performance.now() + (this.serverOffset ?? 0));
     this.objectives.update(dt, now, this.objectiveSources());
 
     this.sendAcc += frameDt * MS_PER_S;
@@ -1084,7 +1250,7 @@ export class Engine implements MinimapSource {
     if (this.vm.visible) {
       this.renderer.clearDepth();
       this.renderer.render(this.vm.scene, this.vm.camera);
-    } else if (replaying && this.killVm.visible) {
+    } else if ((replaying || this.watchVm) && this.killVm.visible) {
       this.renderer.clearDepth();
       this.renderer.render(this.killVm.scene, this.killVm.camera);
     }
@@ -1109,18 +1275,22 @@ export class Engine implements MinimapSource {
       if (!r.alive || !r.model) continue;
       const p = r.model.group.position;
       const mate = this.isMate(r.team === -1 ? 0 : r.team);
-      const age = this.radar ? 0 : now - (r.lastShot || -1e9);
+      // (silenced shots do not count: lastLoud)
+      // (tactical goggles: a rival just hit shows as if it had shot)
+      const age = this.radar || (r.markedUntil ?? 0) > now ? 0 : now - (r.lastLoud || -1e9);
       if (!mate && age > SHOW_SHOT_MS) continue;
       dots.push({ x: p.x, z: p.z, mate, alpha: mate ? 1 : 1 - age / SHOW_SHOT_MS });
     }
-    const { tags, flags, zones } = this.objectives.minimap(this.renderPos, this.objectiveSources());
+    const { tags, flags, zones, bomb } = this.objectives.minimap(this.renderPos, this.objectiveSources());
     return {
       me: this.alive ? { x: this.renderPos.x, z: this.renderPos.z, yaw: this.input.yaw } : null,
       dots,
       tags,
       flags,
       zones,
+      bomb,
       pickups: this.mapObjs.available(),
+      power: this.mapObjs.powerAt(),
     };
   }
 
@@ -1154,8 +1324,6 @@ export class Engine implements MinimapSource {
       locked: this.input.locked,
       hp: Math.max(0, Math.ceil(this.hp)),
       maxHp: this.maxHp,
-      characterId: this.character?.id,
-      charName: this.character?.name,
       stamina: PLAYER.useStamina ? st.stamina / PLAYER.stamina : null,
       armor: alive ? this.armor : 0,
       radar: this.radar,
@@ -1163,11 +1331,13 @@ export class Engine implements MinimapSource {
       staminaLow: st.staminaLock,
       sprinting: st.sprinting,
       speedFx: alive ? this.speedFx(st) : 0,
-      ability: alive && this.character ? { id: this.character.ability, left: this.abilityLeft() } : null,
+      ability: alive && this.cls ? { id: this.cls.ability, left: this.abilityLeft() } : null,
       shield: alive && this.shieldUntil ? Math.max(0, this.shieldUntil - now) : 0,
       shieldHit: now - this.shieldHitAt < SHIELD_FLASH_MS,
       adsSight: alive && this.adsSight(now) ? (this.weapons.loadout[this.weapons.slot] ?? null) : null,
-      smoke: alive ? this.abilityObjs.smokeAt(this.rig.camera.position, now) : 0,
+      // Tactical goggles see through the smoke
+      smoke: alive && this.cls?.accessory !== 'goggles' ? this.abilityObjs.smokeAt(this.rig.camera.position, now) : 0,
+      accessory: alive && this.cls ? this.cls.accessory : null,
       weaponName: w?.name,
       mag: a?.mag,
       magSize: w?.mag,
@@ -1186,10 +1356,10 @@ export class Engine implements MinimapSource {
       damage: Math.max(0, 1 - (now - this.damageTime) / DAMAGE_FLASH_MS),
       respawnIn: alive || !this.deathAt ? 0 : Math.max(0, PLAYER.respawnDelay - (now - this.deathAt)),
       killerName: this.killerName,
-      players: this.players.map(({ id, n, c, k, d, tm, pg, st: streak, cp, lv, md }) => ({
+      players: this.players.map(({ id, n, ab, k, d, tm, pg, st: streak, cp, lv, md }) => ({
         id,
         n,
-        c,
+        ab,
         k,
         d,
         tm,
@@ -1219,7 +1389,9 @@ export class Engine implements MinimapSource {
       grenadeAim: this.grenadeAim,
       zones: this.objectives.zones,
       round: this.round,
+      bomb: this.objectives.bomb,
       replay: !!this.replay && now >= this.replay.start,
+      spectate: this.spectateView(),
     };
   }
 

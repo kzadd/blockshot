@@ -12,6 +12,11 @@ export const MODE_ICON: Record<ModeId, string> = {
   infect: '<circle cx="12" cy="11" r="7"/><path d="M9 10h.01M15 10h.01M9 15c2-1.5 4-1.5 6 0M8 21l1-3M16 21l-1-3"/>',
   dom: '<path d="M12 3l9 5v8l-9 5-9-5V8z"/><circle cx="12" cy="12" r="3"/>',
   rounds: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/>',
+  race: '<path d="M5 21V4m0 0h11l-2 4 2 4H5"/>',
+  lms: '<circle cx="12" cy="5" r="3"/><path d="M12 8v7M8 11h8M9 21l3-6 3 6M4 21h16"/>',
+  insta: '<circle cx="12" cy="12" r="9"/><path d="M13 6l-4 7h4l-2 5"/>',
+  freeze: '<path d="M12 2v20M3.3 7l17.4 10M3.3 17L20.7 7M9 4l3 2 3-2M9 20l3-2 3 2"/>',
+  bomb: '<circle cx="11" cy="14" r="7"/><path d="M15 9l3-3M18 3v2M21 6h-2M20 4l-1 1"/>',
 };
 
 export const MODE_SUB: Record<ModeId, string> = {
@@ -21,17 +26,35 @@ export const MODE_SUB: Record<ModeId, string> = {
   gungame: 'Un arma nueva por baja',
   kc: 'Recoge las placas',
   infect: 'Huye de los del cuchillo',
-  dom: 'Controla las zonas',
-  rounds: 'El último en pie gana',
+  dom: 'Captura y mantén las zonas',
+  rounds: 'Por equipos, sin reaparecer',
+  race: 'Recorrido hasta la meta',
+  lms: 'Una vida, sin equipos',
+  insta: 'Railgun: un disparo, una baja',
+  freeze: 'Descongela a tu equipo',
+  bomb: 'Planta o desactiva',
 };
 
+/** The create form lists the modes in three families, in this order. */
+export const MODE_GROUPS: { name: string; modes: ModeId[] }[] = [
+  { name: 'Clásicos', modes: ['ffa', 'teams', 'rounds', 'lms'] },
+  { name: 'Objetivo', modes: ['ctf', 'dom', 'bomb', 'kc'] },
+  { name: 'Especiales', modes: ['gungame', 'insta', 'infect', 'freeze', 'race'] },
+];
+
 export const MODE_HOW: Record<ModeId, string> = {
-  ffa: 'Gana quien llegue antes al límite de bajas.',
-  teams: 'Las bajas suman para tu equipo. El reparto se equilibra solo.',
-  ctf: 'Lleva la bandera rival a tu base con la tuya en casa.',
-  gungame: 'Cada baja te da el arma siguiente; gana quien termine la escalera.',
-  kc: 'Una baja solo cuenta al recoger su placa.',
-  infect: 'Los infectados solo llevan cuchillo y contagian al matar.',
-  dom: 'Cada zona que controlas suma puntos cada segundo.',
-  rounds: 'Una vida por ronda: gana el equipo que quede en pie.',
+  ffa: 'Todos contra todos; gana el jugador con más eliminaciones y los jugadores reaparecen al morir.',
+  teams: 'Combate por equipos con reaparición; gana el equipo que acumule más bajas.',
+  ctf: 'Captura la bandera del equipo enemigo y llévala hasta tu base, con la tuya en casa.',
+  gungame: 'Progresión de armas: cada baja te otorga un arma diferente; gana quien mate con el cuchillo.',
+  kc: 'Por equipos: cada baja suelta una placa y solo cuenta al recogerla; tu equipo puede negarla.',
+  infect: 'Los infectados solo llevan cuchillo y contagian al matar; los supervivientes ganan si aguantan.',
+  dom: 'Controla y mantén los puntos repartidos por el mapa para sumar puntos con el tiempo.',
+  rounds: 'Por equipos y sin reaparición durante la ronda: aniquila a todos los miembros del equipo rival.',
+  race: 'Acrobacias y saltos: llega del punto de inicio al final del recorrido antes que nadie. Derriba a los rivales para mandarlos a su punto de control.',
+  lms: 'Todos contra todos, individual y sin reapariciones: la ronda es para el último superviviente.',
+  insta: 'Todos contra todos donde cualquier impacto mata: railgun con munición infinita y cuchillo.',
+  freeze:
+    'Al eliminar a un rival queda congelado en el sitio hasta que un compañero lo descongele (3 s a su lado). Gana la ronda quien congele a todo el equipo rival.',
+  bomb: 'Rojo debe plantar la bomba en A o B; Azul defiende o la desactiva. Una vida por ronda.',
 };

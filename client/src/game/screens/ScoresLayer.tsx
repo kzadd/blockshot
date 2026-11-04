@@ -39,7 +39,7 @@ const TOUR_ROWS = 8;
 
 // Scoreboard (Tab) and, when the match ends, the winner, your own result and the "best play" cards
 export default function ScoresLayer({ match, you, info, scoreLimit, mode, onLeave, onVote }: Props) {
-  const h = useHud((s) => ({ players: s.players, teamScore: s.teamScore }));
+  const h = useHud((s) => ({ players: s.players, teamScore: s.teamScore, carrier: s.bomb?.c ?? null }));
   const secondsLeft = useSecondsLeft(match);
   if (!h) return null;
   const ranked = [...h.players].sort((a, b) => b.k - a.k || a.d - b.d);
@@ -132,6 +132,7 @@ export default function ScoresLayer({ match, you, info, scoreLimit, mode, onLeav
           scoreLimit={scoreLimit}
           mode={mode}
           teamScore={h.teamScore}
+          carrier={h.carrier}
         />
       </div>
     </div>

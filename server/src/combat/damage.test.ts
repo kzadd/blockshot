@@ -36,22 +36,26 @@ describe('applyDamage', () => {
     applyDamage(room, a, b, 200, false, WEAPONS.sniper, at);
     expect(b).toMatchObject({ alive: false, hp: 0, deaths: 1, streak: 0 });
     expect(a).toMatchObject({ kills: 1, streak: 1, bestStreak: 1 });
-    expect(channel.of('kill')[0]).toMatchObject({ killer: a.id, victim: b.id, weapon: 'Francotirador', ended: 4 });
+    expect(channel.of('kill')[0]).toMatchObject({ killer: a.id, victim: b.id, weapon: 'SR8', ended: 4 });
   });
 
-  it('gives radar at 5 and armor at 7 kills in a row, but not in Infected', () => {
-    const { room, join } = makeRoom('ffa');
+  it('gives radar at 3, armor at 5 and an air strike at 7 kills in a row, but not in Infected', () => {
+    const { room, join, channel } = makeRoom('ffa');
     const a = join('A');
-    a.streak = 4;
+    a.streak = 2;
     applyDamage(room, a, join('B'), 999, false, WEAPONS.rifle, at);
     expect(a.radarUntil).toBeGreaterThan(Date.now());
-    a.streak = 6;
+    a.streak = 4;
     applyDamage(room, a, join('C'), 999, false, WEAPONS.rifle, at);
     expect(a.armor).toBe(50);
+    a.streak = 6;
+    applyDamage(room, a, join('D'), 999, false, WEAPONS.rifle, at);
+    expect(room.strikes).toHaveLength(1);
+    expect(channel.of('strike')).toHaveLength(1);
 
     const inf = makeRoom('infect');
     const z = inf.join('Z');
-    z.streak = 4;
+    z.streak = 2;
     applyDamage(inf.room, z, inf.join('Y'), 999, false, WEAPONS.knife, at);
     expect(z.radarUntil).toBe(0);
   });

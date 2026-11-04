@@ -2,14 +2,13 @@
 // reaches the game. Invalid or excessive messages are dropped and logged.
 import type { Server, Socket } from 'socket.io';
 import {
-  CHAR_BY_ID,
   AbilitySchema,
   AdminLockSchema,
   AdminRoomSchema,
   AdminTargetSchema,
   TournamentSchema,
   BotAddSchema,
-  COMBAT_LOCK_MS,
+  ClassSchema,
   DIRECTION_LENGTH_TOLERANCE,
   CreateRoomSchema,
   EmptySchema,
@@ -26,15 +25,13 @@ import {
   ShootSchema,
   SpawnSchema,
   SwitchSchema,
-  TEAM_SWITCH_COOLDOWN,
   TeamSetSchema,
   VoteSchema,
   canSwitchTeam,
   clamp,
-  isCharacterId,
   isMapId,
   isModeId,
-  teamName,
+  fitMapMode,
   v,
   type ClientToServerEvents,
   type ServerToClientEvents,
@@ -49,7 +46,7 @@ import { castVote } from '../match/vote';
 import { addBot, removeBots } from '../players/bot';
 import { queueInputs } from '../players/movement';
 import type { Player } from '../players/player';
-import { canJoinTeam, isTeamRoom } from '../players/teams';
+import { isTeamRoom, requestTeam } from '../players/teams';
 import { spawnPlayer } from '../players/spawn';
 import { cleanNickname, type RoomRegistry } from '../rooms/registry';
 import { rankingRows, resetRanking } from '../stats/ranking';
@@ -185,11 +182,18 @@ export function attachGateway(io: GameServer, rooms: RoomRegistry, log: Logger):
     // ------------------------------------------------------------ Player
     on('player:spawn', 'misc', SpawnSchema, (data) => {
       const c = ctx();
-      if (!c || c.room.matchOver || !isCharacterId(data.characterId)) return;
+      if (!c || c.room.matchOver) return;
       const { room, p } = c;
       if (p.alive || room.mode.canSpawn?.(room, p) === false) return;
       if (p.deathTime && Date.now() - p.deathTime < PLAYER.respawnDelay - SPAWN_REQUEST_GRACE_MS) return;
-      spawnPlayer(room, p, CHAR_BY_ID[data.characterId], data.skin, data.color, data.camo, data.finish);
+      // The class and looks are checked part by part in spawnPlayer (classOf): missing or unknown → the default
+      spawnPlayer(room, p, data);
+    });
+
+    // In-match loadout menu: the class for the next respawn (whoever spawns the player next, it is checked then)
+    on('player:class', 'misc', ClassSchema, (data) => {
+      const c = ctx();
+      if (c) c.p.nextCls = data;
     });
 
     // Team modes: pick or change team. Alive players respawn on their new team's side
@@ -199,25 +203,8 @@ export function attachGateway(io: GameServer, rooms: RoomRegistry, log: Logger):
       const { room, p } = c;
       const team = d.team === 1 || d.team === 2 ? d.team : 0;
       if (!team || team === p.team) return;
-      const now = Date.now();
-      // The cooldown stops team hopping mid-game; on the character screen (not alive) you switch at once
-      if (p.alive && now - p.teamAt < TEAM_SWITCH_COOLDOWN) {
-        return socket.emit('notice', 'Espera unos segundos para volver a cambiar de equipo.');
-      }
-      if (p.alive && now - p.lastDamage < COMBAT_LOCK_MS) {
-        return socket.emit('notice', 'No puedes cambiar de equipo en pleno combate.');
-      }
-      if (!canJoinTeam(room, p, team)) {
-        return socket.emit(
-          'notice',
-          `${teamName(room.modeId, team)} ya tiene más jugadores: los equipos se mantienen equilibrados.`,
-        );
-      }
-      p.team = team;
-      p.teamAt = now;
-      p.streak = 0;
-      notice(room, `${p.name} se cambió al equipo ${teamName(room.modeId, team)}`);
-      if (p.alive && p.characterId) spawnPlayer(room, p, CHAR_BY_ID[p.characterId], p.skin, p.color, p.camo, p.finish);
+      const refused = requestTeam(room, p, team, Date.now());
+      if (refused) socket.emit('notice', refused);
     });
 
     // Movement commands: simulated by the server at a fixed rate (players/movement.ts)
@@ -334,7 +321,7 @@ export function attachGateway(io: GameServer, rooms: RoomRegistry, log: Logger):
     on('admin:room', 'lobby', AdminRoomSchema, (d) => {
       const c = ctx();
       if (!admin || !c || !isMapId(d.mapId) || !isModeId(d.mode)) return;
-      adminChangeRoom(c.room, { mapId: d.mapId, mode: d.mode });
+      adminChangeRoom(c.room, fitMapMode(d.mapId, d.mode));
     });
     on('admin:lock', 'lobby', AdminLockSchema, (d) => {
       const c = ctx();

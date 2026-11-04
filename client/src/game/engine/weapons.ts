@@ -5,7 +5,11 @@ import {
   VIEW_DELAY_MS,
   WEAPONS,
   WEAPON_HANDLING,
+  bloomRecovery,
   castShot,
+  gearedWeapon,
+  silenced,
+  type AccessoryId,
   type Collider,
   type HitTarget,
   type MoveState,
@@ -76,6 +80,9 @@ export class WeaponController {
   combo = 0;
   comboAt = 0;
   private readonly pendingShots: number[] = [];
+  private unlimited = false;
+  /** the class's accessory: silencer, laser and extra ammo change the guns (gearedWeapon) */
+  accessory: AccessoryId = 'none';
 
   constructor(
     private readonly input: InputController,
@@ -88,8 +95,9 @@ export class WeaponController {
   weaponId(slot = this.slot): WeaponId {
     return this.loadout[slot] ?? this.loadout[0] ?? 'knife';
   }
+  /** The weapon in hand as carried, with the accessory (the same numbers the server uses). */
   weapon(): Weapon {
-    return WEAPONS[this.weaponId()];
+    return gearedWeapon(this.weaponId(), this.accessory);
   }
   current(): Ammo {
     return this.ammo[this.slot] ?? { mag: 0, reloadEnd: 0 };
@@ -100,10 +108,11 @@ export class WeaponController {
     this.fireBlockedUntil = until;
   }
 
-  /** Weapons for the mode and level, with full magazines. */
-  equip(loadout: WeaponId[]): void {
+  /** Weapons for the mode and level, with full magazines (`unlimited`: shots spend no ammo, InstaGib). */
+  equip(loadout: WeaponId[], unlimited = false): void {
     this.loadout = loadout;
-    this.ammo = loadout.map((id) => ({ mag: WEAPONS[id].mag, reloadEnd: 0 }));
+    this.unlimited = unlimited;
+    this.ammo = loadout.map((id) => ({ mag: gearedWeapon(id, this.accessory).mag, reloadEnd: 0 }));
     this.lastShot = loadout.map(() => 0);
     this.slot = 0;
     this.prevSlot = 1;
@@ -133,6 +142,30 @@ export class WeaponController {
     this.shooter.sendSwitch(s);
   }
 
+  /** A power weapon picked up (the server says so): a slot after the normal ones, full, and into the hands. */
+  addPower(id: WeaponId, now: number): void {
+    if (this.loadout.includes(id) && WEAPONS[id].power) return;
+    this.dropPower();
+    this.loadout = [...this.loadout, id];
+    this.ammo.push({ mag: WEAPONS[id].mag, reloadEnd: 0 });
+    this.lastShot.push(0);
+    this.switchSlot(this.loadout.length - 1, now);
+  }
+
+  /** The power weapon is spent (or lost): its slot goes and, if it was in the hands, the first weapon comes back. */
+  dropPower(): void {
+    const last = this.loadout[this.loadout.length - 1];
+    if (!last || !WEAPONS[last].power) return;
+    const held = this.slot === this.loadout.length - 1;
+    this.loadout = this.loadout.slice(0, -1);
+    this.ammo.pop();
+    this.lastShot.pop();
+    if (held) {
+      this.slot = 0;
+      this.onGunChanged();
+    }
+  }
+
   cycle(dir: 1 | -1, now: number): void {
     const n = this.loadout.length;
     if (n) this.switchSlot((this.slot + (dir < 0 ? n - 1 : 1)) % n, now);
@@ -141,7 +174,7 @@ export class WeaponController {
   startReload(now: number): void {
     const w = this.weapon();
     const a = this.current();
-    if (w.melee || a.reloadEnd || a.mag === w.mag) return;
+    if (w.melee || w.power || a.reloadEnd || a.mag === w.mag) return;
     a.reloadEnd = now + w.reload;
     this.shooter.sendReload();
     this.bus.emit('reload');
@@ -185,9 +218,9 @@ export class WeaponController {
     if ((this.input.mouseDown || this.input.clicked) && this.input.locked) this.tryShoot(now, w, a, move);
     this.input.clicked = false;
     this.recoverRecoil(dt, now);
-    // Burst spread comes down as soon as you stop firing
+    // Burst spread comes down as soon as you stop firing: quicker crouched and still, hardly at all in the air
     if (now - (this.lastShot[this.slot] ?? 0) > H.bloom.recoverDelayMs)
-      this.bloom *= Math.exp(-H.bloom.recoverRate * dt);
+      this.bloom *= Math.exp(-H.bloom.recoverRate * bloomRecovery(move) * dt);
     this.kick = Math.max(0, this.kick - dt * KICK_RECOVER);
   }
 
@@ -229,7 +262,7 @@ export class WeaponController {
     this.shooter.fired();
     this.input.markShot(); // shooting stops the sprint for a moment (simulated with the movement)
     if (w.melee) return this.swing(now, w);
-    a.mag--;
+    if (!this.unlimited) a.mag--;
 
     const cam = this.shooter.camera;
     const base = cam.getWorldDirection(new THREE.Vector3());
@@ -267,7 +300,7 @@ export class WeaponController {
     this.input.yaw += (Math.random() - 0.5) * w.recoil * H.recoil.yaw;
     this.kick = 1;
     this.flashTime = now;
-    this.bus.emit('shot', { weapon: w.sound, volume: 1 });
+    this.bus.emit('shot', { weapon: w.sound, volume: 1, muffled: silenced(this.weaponId(), this.accessory) });
   }
 
   // Knife slash: no tracer or recoil; the server forgives the aim a bit at this distance

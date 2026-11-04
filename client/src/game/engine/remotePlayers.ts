@@ -3,13 +3,16 @@
 // rewinds by the same delay when checking shots).
 import * as THREE from 'three';
 import {
-  CHAR_BY_ID,
+  BODY,
+  DEFAULT_OUTFIT_COLOR,
   VIEW_DELAY_MS,
+  classFromIndex,
   isOutfitColor,
   isTeamMode,
   loadoutOf,
+  type AbilityId,
+  type AccessoryId,
   type CamoId,
-  type CharacterId,
   type FinishId,
   type HitTarget,
   type ModeId,
@@ -29,6 +32,7 @@ import {
   type NameTag,
 } from '../render/models';
 import { loadGun } from '../render/gunAssets';
+import { LASER_RANGE, LaserBeam, fitGunGear, laserOrigin, wearKevlar } from '../render/gear';
 import { damp, dampAngle } from './util';
 
 const INFECTED_COLOR = '#6fcf3a';
@@ -124,7 +128,8 @@ export interface Remote {
   shield: THREE.Object3D | null;
   /** lens glint of a sniper who is scoped in */
   glint: THREE.Sprite | null;
-  charId: CharacterId | null;
+  /** the class's ability: it picks the body's kit (null before the first spawn) */
+  charId: AbilityId | null;
   skin: SkinId | null;
   /** outfit colour picked by the player */
   co: string;
@@ -145,8 +150,16 @@ export interface Remote {
   prot: boolean;
   walk: number;
   stepAcc: number;
-  /** performance.now() of its last shot (minimap) */
+  /** performance.now() of its last shot (gun kick and flash) */
   lastShot: number;
+  /** and of its last shot that was not silenced (minimap) */
+  lastLoud: number;
+  /** shown on the minimap until then (performance.now ms): hit by a player with tactical goggles */
+  markedUntil?: number;
+  /** the class's accessory as drawn (vest and helmet, suppressor, laser) */
+  ax: AccessoryId | null;
+  /** its laser's beam, while it carries one */
+  laser: LaserBeam | null;
 }
 
 /**
@@ -173,22 +186,16 @@ export const WALK_PHASE_PER_M = WALK_CYCLE;
  * In team modes everybody wears its team colour on a plain uniform (a camouflage would hide who is who);
  * in free for all, the colour and camouflage the player picked. The skin (who you are) is always yours.
  */
-export function outfitFor(
-  mode: ModeId,
-  charId: CharacterId,
-  skin: string,
-  team: Team,
-  color?: string,
-  camo: CamoId = 'liso',
-): Outfit {
-  const ch = CHAR_BY_ID[charId];
+export function outfitFor(mode: ModeId, skin: string, team: Team, color?: string, camo: CamoId = 'liso'): Outfit {
   if (mode === 'infect' && team === 2) return { color: INFECTED_COLOR, skin: 'zombi', camo: 'liso' };
-  if (isTeamMode(mode) && team) return { color: teamColor(team, ch.color), skin, camo: 'liso' };
-  return { color: isOutfitColor(color) ? color : ch.color, skin, camo };
+  if (isTeamMode(mode) && team) return { color: teamColor(team, DEFAULT_OUTFIT_COLOR), skin, camo: 'liso' };
+  return { color: isOutfitColor(color) ? color : DEFAULT_OUTFIT_COLOR, skin, camo };
 }
 
 export class RemotePlayers {
   readonly all = new Map<string, Remote>();
+  /** Freeze tag: frozen players stay drawn where they fell (inside their ice block) */
+  frozen: ReadonlySet<string> = new Set();
   private readonly tmp = new THREE.Vector3();
 
   constructor(
@@ -239,12 +246,16 @@ export class RemotePlayers {
           cm: 'liso',
           fn: 'estandar',
           lastShot: 0,
+          lastLoud: 0,
+          ax: null,
+          laser: null,
         };
         this.all.set(p.id, r);
       }
       const changed =
-        r.charId !== p.c || r.skin !== p.sk || r.co !== p.co || r.cm !== p.cm || r.fn !== p.fn || r.team !== p.tm;
-      if (p.c && changed) this.build(r, p);
+        r.charId !== p.ab || r.skin !== p.sk || r.co !== p.co || r.cm !== p.cm || r.fn !== p.fn || r.team !== p.tm;
+      if (p.ab && changed) this.build(r, p);
+      if (r.model && (changed || r.ax !== p.ax)) this.dress(r, p.ax ?? null);
       r.name = p.n;
       r.rx = p.rx;
       r.sl = p.sl;
@@ -258,25 +269,26 @@ export class RemotePlayers {
       if (r.alive && !r.wasAlive) r.buffer.length = 0;
       r.buffer.push({ t: now, x: p.x, y: p.y, z: p.z, ry: p.ry, rx: p.rx, sl: p.sl, cr: p.cr });
       if (r.buffer.length > BUFFER_SIZE) r.buffer.shift();
-      const ch = CHAR_BY_ID[r.charId];
-      r.tag?.userData.setHp(Math.min(1, p.h / (p.mh || ch.hp)));
-      const wid = loadoutOf(this.mode, ch, p.lv, this.limit, p.tm)[p.s] ?? ch.primary;
+      r.tag?.userData.setHp(Math.min(1, p.h / (p.mh || BODY.hp)));
+      const cls = classFromIndex(p.wc);
+      const base = loadoutOf(this.mode, cls, p.lv, this.limit, p.tm);
+      const wid = (p.pw && p.s >= base.length ? p.pw : base[p.s]) ?? cls.primary;
       if (wid !== r.weaponId) this.setGun(r, wid);
       if (r.alive && !r.wasAlive) {
         r.model.group.position.set(p.x, p.y, p.z);
         r.model.group.rotation.y = p.ry;
       }
       r.wasAlive = r.alive;
-      r.model.group.visible = r.alive;
+      r.model.group.visible = r.alive || this.frozen.has(r.id);
     }
     for (const id of [...this.all.keys()]) if (!seen.has(id)) this.remove(id);
   }
 
   private build(r: Remote, p: PlayerSnapshot): void {
-    if (!p.c) return;
+    if (!p.ab) return;
     if (r.model) this.scene.remove(r.model.group);
-    const { color, skin, camo } = outfitFor(this.mode, p.c, p.sk, p.tm, p.co, p.cm);
-    r.model = buildCharacter(p.c, skin, color, camo);
+    const { color, skin, camo } = outfitFor(this.mode, p.sk, p.tm, p.co, p.cm);
+    r.model = buildCharacter(p.ab, skin, color, camo);
     r.color = color;
     // Team modes: name in the team colour (teammates are seen through walls); otherwise the enemy colour
     const teams = isTeamMode(this.mode);
@@ -304,7 +316,7 @@ export class RemotePlayers {
     r.model.group.add(r.glint);
     r.model.group.position.set(p.x, p.y, p.z);
     this.scene.add(r.model.group);
-    r.charId = p.c;
+    r.charId = p.ab;
     r.skin = p.sk;
     r.co = p.co;
     r.cm = p.cm;
@@ -315,9 +327,23 @@ export class RemotePlayers {
     r.buffer.length = 0;
   }
 
+  /** The accessory on the body and the gun: Kevlar vest and helmet, suppressor, laser module and beam. */
+  private dress(r: Remote, ax: AccessoryId | null): void {
+    r.ax = ax;
+    if (!r.model) return;
+    wearKevlar(r.model, ax);
+    if (r.gun) fitGunGear(r.gun, ax);
+    if (ax === 'laser') r.laser ??= new LaserBeam(this.scene);
+    else {
+      r.laser?.dispose();
+      r.laser = null;
+    }
+  }
+
   private setGun(r: Remote, wid: WeaponId): void {
     if (!r.model) return;
     const hold = (g: GunModel) => {
+      fitGunGear(g, r.ax);
       g.scale.setScalar(REMOTE_GUN_SCALE);
       r.model?.holdGun(g);
       r.gun = g;
@@ -335,7 +361,26 @@ export class RemotePlayers {
   private remove(id: string): void {
     const r = this.all.get(id);
     if (r?.model) this.scene.remove(r.model.group);
+    r?.laser?.dispose();
     this.all.delete(id);
+  }
+
+  /** How far a laser goes from `o` along `d` before it touches something (set by the engine: map colliders). */
+  laserReach: (o: THREE.Vector3, d: THREE.Vector3, max: number) => number = (_o, _d, max) => max;
+  private readonly laserFrom = new THREE.Vector3();
+  private readonly laserDir = new THREE.Vector3();
+  private readonly laserQuat = new THREE.Quaternion();
+
+  /** A remote's laser beam: from its gun, along the barrel, to the first wall (or LASER_RANGE). */
+  private aimLaser(r: Remote): void {
+    const beam = r.laser;
+    if (!beam) return;
+    if (!r.gun || !r.model?.group.visible || !r.alive) return beam.hide();
+    r.model.group.updateMatrixWorld(true);
+    const from = r.gun.localToWorld(laserOrigin(r.gun, this.laserFrom));
+    const dir = this.laserDir.set(0, 0, -1).applyQuaternion(r.gun.getWorldQuaternion(this.laserQuat)).normalize();
+    const len = Math.min(LASER_RANGE, this.laserReach(from, dir, LASER_RANGE));
+    beam.set(from, dir, len, len < LASER_RANGE);
   }
 
   /** Interpolated pose at `renderTime` (ms, performance.now based). */
@@ -386,7 +431,7 @@ export class RemotePlayers {
     bubbleMat.opacity = BUBBLE_OPACITY + BUBBLE_PULSE * Math.sin(now * BUBBLE_PULSE_SPEED);
     const renderTime = now - VIEW_DELAY_MS - rewind;
     for (const r of this.all.values()) {
-      if (r.model) r.model.group.visible = r.alive && r.id !== hidden;
+      if (r.model) r.model.group.visible = (r.alive || this.frozen.has(r.id)) && r.id !== hidden;
       if (!r.model || !r.alive) continue;
       if (r.bubble) r.bubble.visible = r.prot;
       const flash = r.gun?.userData.flash;
@@ -418,6 +463,11 @@ export class RemotePlayers {
       }
       animateLegs(r.model, r.walk, speed, s.sl, s.cr, k);
     }
+    for (const r of this.all.values()) {
+      if (!r.laser) continue;
+      if (r.id === hidden || !r.alive) r.laser.hide();
+      else this.aimLaser(r);
+    }
   }
 
   /** Where every visible enemy is drawn right now (what the player aims at). */
@@ -438,11 +488,13 @@ export class RemotePlayers {
     return this.all.get(id)?.model?.group.position ?? null;
   }
 
-  markShot(id: string, now: number): Remote | undefined {
+  markShot(id: string, now: number, loud = true): Remote | undefined {
     const r = this.all.get(id);
     if (!r) return r;
     r.lastShot = now;
-    const flash = r.gun?.userData.flash;
+    if (loud) r.lastLoud = now;
+    // (a silenced shot shows no muzzle flash)
+    const flash = loud ? r.gun?.userData.flash : null;
     if (flash) {
       flash.rotation.z = Math.random() * Math.PI * 2;
       flash.visible = true;

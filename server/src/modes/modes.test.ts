@@ -112,8 +112,8 @@ describe('capture the flag', () => {
 
 describe('gun game', () => {
   it('levels up on kills, demotes on knife kills and is won with the knife', () => {
-    const r = makeRoom('gungame', 5);
-    const ladder = gunLadder(5);
+    const r = makeRoom('gungame', 10);
+    const ladder = gunLadder(10);
     const a = r.join('A');
     const b = r.join('B');
     expect(a.loadout).toEqual([ladder[0], 'knife']);

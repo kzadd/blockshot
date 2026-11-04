@@ -54,8 +54,8 @@ export class NetClient {
   grenade(o: Vec3, d: Vec3): void {
     this.socket.emit('player:grenade', { o, d });
   }
-  spawn(characterId: string, look: Look): void {
-    this.socket.emit('player:spawn', { characterId, ...look });
+  spawn(look: Look): void {
+    this.socket.emit('player:spawn', { ...look });
   }
 
   dispose(): void {

@@ -1,16 +1,17 @@
-// Session statistics (server PC only): who plays what and how well, since the server started. The character
-// share at the top is the quick balance check: one character far above the rest is the one to look at.
+// Session statistics (server PC only): who plays what and how well, since the server started. The share of lives
+// per primary weapon at the top is the quick balance check: one gun far above the rest is the one to look at.
 import { useEffect, useState } from 'react';
-import { CHARACTERS, CHAR_BY_ID, type CharacterId, type SessionStatsRow } from '@blockshot/shared';
+import { WEAPONS, type SessionStatsRow, type WeaponId } from '@blockshot/shared';
 import { socket } from '../../network/socket';
 
 const REFRESH_MS = 3000;
 
 const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)} %` : '—');
-const favourite = (r: SessionStatsRow): CharacterId | null => {
-  const best = Object.entries(r.picks).sort((a, b) => b[1] - a[1])[0];
-  return best ? (best[0] as CharacterId) : null;
-};
+const entries = (picks: SessionStatsRow['picks']) =>
+  (Object.entries(picks) as [WeaponId, number | undefined][]).filter(
+    (e): e is [WeaponId, number] => !!e[1] && e[1] > 0 && e[0] in WEAPONS,
+  );
+const favourite = (r: SessionStatsRow): WeaponId | null => entries(r.picks).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 
 export default function StatsDialog({ onClose }: { onClose: () => void }) {
   const [rows, setRows] = useState<SessionStatsRow[] | null>(null);
@@ -27,10 +28,11 @@ export default function StatsDialog({ onClose }: { onClose: () => void }) {
     };
   }, [onClose]);
 
-  const picks = Object.fromEntries(
-    CHARACTERS.map((c) => [c.id, (rows ?? []).reduce((n, r) => n + (r.picks[c.id] ?? 0), 0)]),
-  ) as Record<CharacterId, number>;
-  const totalPicks = Object.values(picks).reduce((a, b) => a + b, 0);
+  // Lives per primary weapon over every player: only the guns somebody carried, most carried first
+  const totals = new Map<WeaponId, number>();
+  for (const r of rows ?? []) for (const [id, n] of entries(r.picks)) totals.set(id, (totals.get(id) ?? 0) + n);
+  const picks = [...totals].sort((a, b) => b[1] - a[1]);
+  const totalPicks = picks.reduce((n, [, v]) => n + v, 0);
 
   return (
     <div className="pz pz-layer dim wins" onClick={onClose}>
@@ -54,21 +56,25 @@ export default function StatsDialog({ onClose }: { onClose: () => void }) {
         </header>
 
         <section>
-          <h2 className="lbl">Personajes elegidos</h2>
-          <div className="st-picks">
-            {CHARACTERS.map((c) => (
-              <div key={c.id} className="st-pick" style={{ '--t': c.color }}>
-                <span className="aw-team">{c.name}</span>
-                <b>{pct(picks[c.id], totalPicks)}</b>
-                <span className="bar">
-                  <i style={{ width: totalPicks ? `${(picks[c.id] / totalPicks) * 100}%` : 0 }} />
-                </span>
-                <small className="meta">
-                  {picks[c.id]} {picks[c.id] === 1 ? 'vez' : 'veces'}
-                </small>
-              </div>
-            ))}
-          </div>
+          <h2 className="lbl">Armas principales elegidas</h2>
+          {picks.length === 0 ? (
+            <p className="meta">Todavía nadie ha salido a jugar.</p>
+          ) : (
+            <div className="st-picks">
+              {picks.map(([id, n]) => (
+                <div key={id} className="st-pick">
+                  <span className="aw-team">{WEAPONS[id].name}</span>
+                  <b>{pct(n, totalPicks)}</b>
+                  <span className="bar">
+                    <i style={{ width: `${(n / totalPicks) * 100}%` }} />
+                  </span>
+                  <small className="meta">
+                    {n} {n === 1 ? 'vida' : 'vidas'}
+                  </small>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         <section className="st-players">
@@ -98,15 +104,7 @@ export default function StatsDialog({ onClose }: { onClose: () => void }) {
                     return (
                       <tr key={r.name}>
                         <td className="nm">{r.name}</td>
-                        <td>
-                          {fav ? (
-                            <span className="aw-team" style={{ '--t': CHAR_BY_ID[fav].color }}>
-                              {CHAR_BY_ID[fav].name}
-                            </span>
-                          ) : (
-                            '—'
-                          )}
-                        </td>
+                        <td>{fav ? <span className="aw-team">{WEAPONS[fav].name}</span> : '—'}</td>
                         <td className="r">{r.kills}</td>
                         <td className="r">{r.deaths}</td>
                         <td className="r">{(r.kills / Math.max(1, r.deaths)).toFixed(1)}</td>

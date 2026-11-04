@@ -2,13 +2,16 @@
 // movement code at a fixed rate and tells each client where it really is (ack).
 import {
   BTN_AIM,
-  CHAR_BY_ID,
+  BODY,
+  accessorySpeed,
   climbables,
   FIXED_DT,
+  movesOrJumps,
   MAX_QUEUED_INPUTS,
   MAX_SIM_BUDGET_S,
   WEAPONS,
   clamp,
+  staminaMult,
   stepMovement,
   type MoveInput,
 } from '@blockshot/shared';
@@ -30,18 +33,20 @@ export function queueInputs(p: Player, cmds: readonly MoveInput[]): void {
 }
 
 function stepPlayer(room: Room, p: Player, input: MoveInput): void {
-  if (!p.characterId) return;
+  if (!p.cls) return;
+  if (movesOrJumps(input)) p.idle = false;
   // The weapon actually held decides the speed: the slot inside the input is only the client's prediction
   const weaponId = p.loadout[p.slot];
   const w = weaponId ? WEAPONS[weaponId] : null;
-  const walk = CHAR_BY_ID[p.characterId].speed * (w?.weight ?? 1) * (room.mode.speedFactor?.(p) ?? 1);
+  const walk = BODY.speed * (w?.weight ?? 1) * accessorySpeed(p.cls.accessory) * (room.mode.speedFactor?.(p) ?? 1);
   const spawn = room.map.spawns[0];
   stepMovement(p.move, input, FIXED_DT, {
     colliders: room.colliders,
     walk,
     adsMove: w?.adsMove ?? 1,
     fallback: spawn ? [spawn[0], spawn[1], spawn[2]] : [0, 0, 0],
-    dash: CHAR_BY_ID[p.characterId].ability === 'dash',
+    dash: p.cls.ability === 'dash',
+    staminaMult: staminaMult(w?.weight ?? 1),
     ...climbables(room.map),
   });
   const m = p.move;

@@ -1,4 +1,4 @@
-import type { CharacterId, ModeId, SideTeam } from '@blockshot/shared';
+import type { ModeId, SideTeam } from '@blockshot/shared';
 import CharacterSelect from '../../characters/CharacterSelect';
 import type { Look } from '../../characters/looks';
 import { useHud } from '../hud/hudStore';
@@ -6,15 +6,16 @@ import type { RoomView } from '../roomView';
 
 interface Props {
   info: RoomView;
-  current: CharacterId | null;
+  /** the class in play (null before the first spawn) */
+  current: Look | null;
   mode: ModeId;
-  onPick: (id: CharacterId, look: Look) => void;
+  onPick: (look: Look) => void;
   onKeep: () => void;
   onLeave: () => void;
   onTeam: (t: SideTeam) => void;
 }
 
-// Character select fed with the live game state (respawn countdown, team, players per team)
+// The class screen fed with the live game state (respawn countdown, team, players per team)
 export default function CharacterScreen({ info, current, mode, onPick, onKeep, onLeave, onTeam }: Props) {
   const h = useHud((s) => ({
     everSpawned: s.everSpawned,

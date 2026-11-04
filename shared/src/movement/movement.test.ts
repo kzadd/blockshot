@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ladderVolume, ZIPLINE } from '../maps/objects';
-import { PAD, PLAYER } from '../player/player';
+import { PAD, PLAYER, staminaMult } from '../player/player';
 import type { Collider } from '../physics/raycast';
 import {
   BTN_CROUCH,
@@ -142,6 +142,90 @@ describe('movement simulation', () => {
     expect(st.height).toBe(PLAYER.crouchHeight);
   });
 
+  it('powerslides: turning the view while sliding turns the slide, keeping the speed of a straight one', () => {
+    const slide = (turnTo: number) => {
+      const st = grounded();
+      run(st, ctxWith(), 60, () => input({ f: 1 }));
+      run(st, ctxWith(), 1, () => input({ f: 1, b: BTN_CROUCH }));
+      run(st, ctxWith(), 24, () => input({ f: 1, yaw: turnTo, b: BTN_CROUCH }));
+      expect(st.sliding).toBe(true);
+      return st;
+    };
+    const straight = slide(0);
+    const turned = slide(Math.PI / 2); // now looking towards -x
+    expect(turned.vx).toBeLessThan(-0.95 * Math.hypot(turned.vx, turned.vz));
+    expect(Math.hypot(turned.vx, turned.vz)).toBeCloseTo(Math.hypot(straight.vx, straight.vz), 1);
+  });
+
+  it('air control: holding only forward turns the jump towards the view; a strafe key strafe jumps instead', () => {
+    const jumpAndTurn = (s: number) => {
+      const st = grounded();
+      run(st, ctxWith(), 60, () => input({ f: 1 }));
+      run(st, ctxWith(), 1, () => input({ f: 1, b: BTN_JUMP | BTN_JUMP_PRESSED }));
+      // turn the view 90° to the left (towards -x) over a third of a second
+      run(st, ctxWith(), 40, (i) => input({ f: 1, s, yaw: (Math.min(1, i / 20) * Math.PI) / 2 }));
+      return st;
+    };
+    const w = jumpAndTurn(0);
+    expect(w.vx).toBeLessThan(-0.95 * Math.hypot(w.vx, w.vz));
+    // W + A keeps most of the old heading (it gains speed instead)
+    const wa = jumpAndTurn(-1);
+    expect(Math.abs(wa.vz)).toBeGreaterThan(Math.abs(w.vz) + 2);
+  });
+
+  it('a long bunny hop barely tires you (stamina recovers in the air), a slide still costs', () => {
+    const st = grounded();
+    // 20 s of hopping forward: about 27 jumps
+    const ev = run(st, ctxWith(), 20 * 60, () => input({ f: 1, b: BTN_JUMP }));
+    expect(ev.filter((e) => e.jump).length).toBeGreaterThan(20);
+    expect(st.stamina).toBeGreaterThan(PLAYER.stamina - 25);
+    expect(st.staminaLock).toBe(false);
+    run(st, ctxWith(), 70, () => input({ f: 1 }));
+    const before = st.stamina;
+    expect(run(st, ctxWith(), 1, () => input({ f: 1, b: BTN_CROUCH }))[0]!.slide).toBe(true);
+    expect(st.stamina).toBeCloseTo(before - PLAYER.slideCost, 0);
+  });
+
+  it('a heavy weapon tires more: sprint, jumps and wall jumps cost ×1/weight (a bunny hop is still sustainable)', () => {
+    const heavy = { ...ctxWith(), staminaMult: staminaMult(0.8) }; // ×1.25
+    // Sprinting one second
+    const light = grounded();
+    const loaded = grounded();
+    run(light, ctxWith(), 60, () => input({ f: 1, b: BTN_SPRINT }));
+    run(loaded, heavy, 60, () => input({ f: 1, b: BTN_SPRINT }));
+    const drained = (st: MoveState) => PLAYER.stamina - st.stamina;
+    expect(drained(loaded)).toBeCloseTo(drained(light) * 1.25, 0);
+    expect(drained(loaded)).toBeGreaterThan(drained(light));
+    // One jump
+    const jumper = grounded();
+    run(jumper, heavy, 1, () => input({ b: BTN_JUMP | BTN_JUMP_PRESSED }));
+    expect(jumper.stamina).toBeCloseTo(PLAYER.stamina - PLAYER.jumpCost * 1.25);
+    // 20 s of hopping with the heavy weapon: still about as many jumps, never exhausted
+    const hopper = grounded(heavy);
+    const ev = run(hopper, heavy, 20 * 60, () => input({ f: 1, b: BTN_JUMP }));
+    expect(ev.filter((e) => e.jump).length).toBeGreaterThan(20);
+    expect(hopper.staminaLock).toBe(false);
+    // (the light hop keeps above stamina − 25; this one, the heaviest case, spends more but never runs dry)
+    expect(hopper.stamina).toBeGreaterThan(PLAYER.stamina - 45);
+  });
+
+  it('exhausted (out of stamina) you move slower until rested', () => {
+    const st = grounded();
+    st.stamina = 0;
+    st.staminaLock = true;
+    run(st, ctxWith(), 60, () => input({ f: 1 }));
+    expect(Math.hypot(st.vx, st.vz)).toBeCloseTo(WALK * PLAYER.tiredSpeed, 1);
+    // Rested back to staminaMin: full speed again
+    st.stamina = PLAYER.staminaMin;
+    run(st, ctxWith(), 60, () => input({ f: 1 }));
+    expect(Math.hypot(st.vx, st.vz)).toBeCloseTo(WALK, 1);
+    // Spending the last stamina on a jump leaves you exhausted
+    const tired = grounded();
+    tired.stamina = PLAYER.jumpCost + 1;
+    run(tired, ctxWith(), 1, () => input({ b: BTN_JUMP | BTN_JUMP_PRESSED }));
+    expect(tired.staminaLock).toBe(true);
+  });
+
   it('keeps speed while bunny hopping (no ground friction between jumps)', () => {
     const st = grounded();
     run(st, ctxWith(), 60, () => input({ f: 1 }));
@@ -192,7 +276,7 @@ describe('movement simulation', () => {
     const ladder = ladderVolume({ x: 0, z: -1, y0: 0, y1: 4, dir: 0 });
     const ctx = { ...ctxWith(block), ladders: [ladder] };
     const st = grounded(ctx);
-    run(st, ctx, 85, () => input({ f: 1 }));
+    run(st, ctx, 110, () => input({ f: 1 }));
     expect(st.y).toBeCloseTo(4, 1);
     expect(st.z).toBeLessThan(-1.2);
     // Back down: walk back to the edge and keep going back
@@ -209,6 +293,7 @@ describe('movement simulation', () => {
     const ctx = { ...ctxWith(), ziplines: [line] };
     // In the air with the hands at the cable, jump held: grabs it
     const st = createMoveState(0, 8 - PLAYER.height - 0.1 - 0.2, -1);
+    st.vy = 3; // on the way up
     const ev = run(st, ctx, 1, () => input({ b: BTN_JUMP }));
     expect(ev[0]!.zip).toBe(true);
     expect(st.zip).toBe(0);
@@ -229,10 +314,154 @@ describe('movement simulation', () => {
       ] as [[number, number, number], [number, number, number]][],
     };
     const st = createMoveState(0, 8 - PLAYER.height - 0.3, -1);
+    st.vy = 3;
     run(st, ctx, 1, () => input({ b: BTN_JUMP }));
     run(st, ctx, 10, () => input());
     run(st, ctx, 1, () => input({ b: BTN_JUMP | BTN_JUMP_PRESSED }));
     expect(st.zip).toBe(-1);
     expect(st.z).toBeGreaterThan(-10);
+  });
+
+  it('rides a zipline both ways: from its low end, looking up the cable, it climbs to the high end', () => {
+    const line: [[number, number, number], [number, number, number]] = [
+      [0, 8, 0],
+      [0, 4, -20],
+    ];
+    const ctx = { ...ctxWith(), ziplines: [line] };
+    // Jumping under the low end (z = -20), looking towards +z (yaw π): no button needed to grab it
+    const st = createMoveState(0, 4 - PLAYER.height - 0.3, -20);
+    st.vy = 3;
+    const ev = run(st, ctx, 1, () => input({ yaw: Math.PI, b: BTN_JUMP }));
+    expect(ev[0]!.zip).toBe(true);
+    for (let i = 0; i < 120 && st.zip >= 0; i++) run(st, ctx, 1, () => input({ yaw: Math.PI }));
+    expect(st.zip).toBe(-1);
+    expect(st.z).toBeGreaterThan(-1);
+    expect(st.y).toBeGreaterThan(8 - ZIPLINE.hang - 0.5);
+  });
+
+  it('jumps off a wall in the air (Urban Terror style), alternating between two walls, a limited number of times', () => {
+    // An alley: a wall to the east (+x) of a player in the air, close to it, and another one to the west
+    const east: Collider = { c: 'wall', min: [0.4, 0, -5], max: [1.4, 20, 5] };
+    const west: Collider = { c: 'wall', min: [-4.4, 0, -5], max: [-3.4, 20, 5] };
+    const ctx = ctxWith(east, west);
+    const st = createMoveState(0, 2, 0);
+    const jumpAt = (x: number) => {
+      st.x = x;
+      st.vy = -1;
+      st.wallJumpCd = 0;
+      return run(st, ctx, 1, () => input({ b: BTN_JUMP | BTN_JUMP_PRESSED }))[0]!.wallJump;
+    };
+    expect(jumpAt(0)).toBe(true);
+    expect(st.vx).toBeLessThan(-PLAYER.wallJumpPush + 1); // pushed away to the west
+    expect(st.vy).toBeGreaterThan(PLAYER.wallJumpUp - 1);
+    // Never twice off the same wall
+    expect(jumpAt(0)).toBe(false);
+    // Bouncing between the two: no more than PLAYER.wallJumps before landing
+    let jumps = 1;
+    for (let i = 0; i < 10; i++) if (jumpAt(i % 2 === 0 ? -3 : 0)) jumps++;
+    expect(jumps).toBe(PLAYER.wallJumps);
+  });
+
+  it('a wall jump is a diagonal bounce (Urban Terror): mostly up, the run along the wall kept, a small push off it', () => {
+    const east: Collider = { c: 'wall', min: [0.4, 0, -10], max: [1.4, 20, 10] };
+    const st = createMoveState(0, 2, 0);
+    st.vz = -7; // running north along the wall
+    st.vy = -1;
+    // holding forward, looking north-east (half into the wall, half along it)
+    const ev = run(st, ctxWith(east), 1, () => input({ f: 1, yaw: -Math.PI / 4, b: BTN_JUMP | BTN_JUMP_PRESSED }))[0]!;
+    expect(ev.wallJump).toBe(true);
+    expect(st.vz).toBeLessThan(-7); // the run along the wall is kept, plus a push the way you steer
+    expect(st.vx).toBeLessThan(-PLAYER.wallJumpPush + 0.5); // off the wall, but only the push
+    expect(st.vx).toBeGreaterThan(-PLAYER.wallJumpPush - 0.5);
+    expect(st.vy).toBeGreaterThan(-2 * st.vx); // much more up than out
+  });
+
+  it('climbs an alley of the maps (parkour.ts) by wall jumping from side to side, not off one wall', () => {
+    // Two 6.5 m blocks 2.2 m apart, east and west of the player
+    const H = 6.5;
+    const east: Collider = { c: 'wall', min: [1.1, 0, -1.5], max: [3.3, H, 1.5] };
+    const west: Collider = { c: 'wall', min: [-3.3, 0, -1.5], max: [-1.1, H, 1.5] };
+    // Holding jump, tap it again on touching a wall. 'switch': strafe (A / D) towards the wall you are flying to;
+    // 'hold': keep D held all the way (the bounce still carries you across); 'east': only ever the east wall
+    const climb = (how: 'switch' | 'hold' | 'east') => {
+      const ctx = ctxWith(east, west);
+      const st = grounded(ctx);
+      let dir = 1;
+      for (let i = 0; i < 300 && !(st.grounded && st.y > 1); i++) {
+        const touching = how === 'east' ? st.x > 1.1 - 0.45 : Math.abs(st.x) > 1.1 - 0.45;
+        const tap = i === 0 || (touching && !st.grounded && i % 4 === 0);
+        const ev = stepMovement(st, input({ s: dir, b: BTN_JUMP | (tap ? BTN_JUMP_PRESSED : 0) }), FIXED_DT, ctx);
+        if (ev.wallJump && how === 'switch') dir = -dir;
+      }
+      return st;
+    };
+    for (const how of ['switch', 'hold'] as const) {
+      const up = climb(how);
+      expect(up.grounded, how).toBe(true);
+      expect(up.y, how).toBeCloseTo(H, 1);
+    }
+    expect(climb('east').y).toBeLessThan(H - 2); // one wall alone never takes you to the roof
+  });
+
+  it('jumps cost stamina: wall jumps need it, and a tired jump is lower', () => {
+    const wall: Collider = { c: 'wall', min: [0.4, 0, -5], max: [1.4, 20, 5] };
+    const ctx = ctxWith(wall);
+    const st = createMoveState(0, 2, 0);
+    st.vy = -1;
+    st.stamina = PLAYER.wallJumpCost - 1;
+    expect(run(st, ctx, 1, () => input({ b: BTN_JUMP | BTN_JUMP_PRESSED }))[0]!.wallJump).toBe(false);
+    const fresh = grounded();
+    run(fresh, ctxWith(), 1, () => input({ b: BTN_JUMP | BTN_JUMP_PRESSED }));
+    expect(fresh.stamina).toBe(PLAYER.stamina - PLAYER.jumpCost);
+    const tired = grounded();
+    tired.stamina = 0;
+    run(tired, ctxWith(), 1, () => input({ b: BTN_JUMP | BTN_JUMP_PRESSED }));
+    expect(tired.vy).toBeLessThan(fresh.vy);
+  });
+
+  it('wall jumps round a corner: off one wall, the next press finds the other one', () => {
+    // A corner: a wall to the east (+x) and one to the north (-z), both touching
+    const east: Collider = { c: 'wall', min: [0.4, 0, -5], max: [1.4, 20, 5] };
+    const north: Collider = { c: 'wall', min: [-5, 0, -1.4], max: [5, 20, -0.4] };
+    const st = createMoveState(0, 2, 0);
+    st.vy = -1;
+    // Just jumped off the east wall
+    [st.wallNx, st.wallNz] = [-1, 0];
+    st.wallJumps = PLAYER.wallJumps - 1;
+    expect(run(st, ctxWith(east, north), 1, () => input({ b: BTN_JUMP | BTN_JUMP_PRESSED }))[0]!.wallJump).toBe(true);
+    expect(st.wallNz).toBe(1); // the north wall's normal
+    expect(st.vz).toBeGreaterThan(0); // off the north wall
+  });
+
+  it('on a ladder (holding forward) a jump press is no wall jump: nothing is spent', () => {
+    const block: Collider = { c: 'wall', min: [-3, 0, -5], max: [3, 4, -1] };
+    const ladder = ladderVolume({ x: 0, z: -1, y0: 0, y1: 4, dir: 0 });
+    const ctx = { ...ctxWith(block), ladders: [ladder] };
+    const st = createMoveState(0, 1, -0.7);
+    st.vy = -1;
+    const ev = run(st, ctx, 1, () => input({ f: 1, b: BTN_JUMP | BTN_JUMP_PRESSED }))[0]!;
+    expect(ev.wallJump).toBe(false);
+    expect([st.stamina, st.wallJumps, st.wallJumpCd]).toEqual([PLAYER.stamina, PLAYER.wallJumps, 0]);
+    expect(st.climbing).toBe(true);
+  });
+
+  it('with a heavy weapon, too little left for one (heavier) jump already means exhausted', () => {
+    const heavy = { ...ctxWith(), staminaMult: staminaMult(0.8) }; // a jump costs jumpCost × 1.25
+    const st = grounded(heavy);
+    st.stamina = PLAYER.jumpCost * 1.25 + PLAYER.jumpCost + 0.5; // after one jump: between jumpCost and its ×1.25
+    run(st, heavy, 1, () => input({ b: BTN_JUMP | BTN_JUMP_PRESSED }));
+    expect(st.stamina).toBeGreaterThan(PLAYER.jumpCost);
+    expect(st.stamina).toBeLessThan(PLAYER.jumpCost * 1.25);
+    expect(st.staminaLock).toBe(true);
+  });
+
+  it('pulls itself up onto a ledge within reach when jumping at it', () => {
+    // A 2.2 m block ahead (towards -z): too high for a plain jump (1.6 m), within the ledge reach
+    const block: Collider = { c: 'wall', min: [-3, 0, -6], max: [3, 2.2, -1] };
+    const ctx = ctxWith(block);
+    const st = grounded(ctx);
+    run(st, ctx, 90, (i) => input({ f: 1, b: i === 10 ? BTN_JUMP | BTN_JUMP_PRESSED : i < 40 ? BTN_JUMP : 0 }));
+    expect(st.y).toBeCloseTo(2.2, 1);
+    expect(st.z).toBeLessThan(-1.2);
   });
 });

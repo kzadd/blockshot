@@ -594,18 +594,18 @@ kbd.down,
   flex-wrap: wrap;
 }
 
-/* Etiqueta de personaje: fondo teñido y filete de su color */
+/* Class tag (ability, weapon): tinted background and an outline in its colour (the accent by default) */
 .chip-char {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 3px 10px;
   border-radius: var(--radius-s);
-  background: color-mix(in oklch, var(--c) 24%, transparent);
+  background: color-mix(in oklch, var(--c, var(--accent)) 24%, transparent);
   color: var(--txt-1);
   font: 700 12.5px var(--body);
   white-space: nowrap;
-  box-shadow: inset 0 0 0 1px var(--c);
+  box-shadow: inset 0 0 0 1px var(--c, var(--accent));
 }
 .tag-sol {
   display: inline-block;
@@ -1667,6 +1667,19 @@ kbd.down,
   background: rgba(255, 122, 26, 0.16);
   box-shadow: inset 0 0 0 1px rgba(255, 122, 26, 0.55);
 }
+/* Accessory (Kevlar, silencer…): a quiet chip just before the ability */
+.slots span.acc {
+  margin-left: auto;
+  padding: 0 8px;
+  gap: 5px;
+  color: var(--txt-3);
+  font: 700 11px var(--body);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.slots span.acc + span.abil {
+  margin-left: 0;
+}
 /* Grenade aim: a hint under the crosshair while G is held */
 .grenade-hint {
   position: absolute;
@@ -2228,6 +2241,115 @@ kbd.down,
 }
 .death .btn {
   pointer-events: auto;
+}
+
+/* Espectador (modos por rondas, muerto hasta la siguiente): una barra compacta abajo, la vista queda libre */
+.spec-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  width: min(600px, calc(100vw - 32px));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'who stats'
+    'foot foot';
+  align-items: center;
+  gap: 8px 16px;
+  padding: 12px 14px 10px;
+  background: rgba(12, 14, 18, 0.8);
+  border: 1px solid var(--plate-line);
+  box-shadow: inset 0 3px 0 var(--spec-c);
+  backdrop-filter: blur(8px);
+  font: 500 13.5px var(--body);
+  color: var(--txt-2);
+  animation: bsTab 160ms ease-out;
+}
+.spec-who {
+  grid-area: who;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  white-space: nowrap;
+}
+.spec-who b {
+  font: 700 17px var(--body);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.spec-label {
+  color: var(--txt-3, var(--txt-2));
+}
+.spec-stats {
+  grid-area: stats;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.spec-hp {
+  width: 72px;
+  height: 6px;
+  background: var(--track);
+  overflow: hidden;
+}
+.spec-hp > i {
+  display: block;
+  height: 100%;
+  background: var(--ok);
+  transition: width 200ms ease-out;
+}
+.spec-hp-num {
+  min-width: 28px;
+  color: var(--txt-1);
+  font-variant-numeric: tabular-nums;
+}
+.spec-weapon {
+  padding-left: 8px;
+  border-left: 1px solid var(--plate-line);
+  color: var(--txt-1);
+}
+.spec-foot {
+  grid-area: foot;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12.5px;
+}
+.spec-foot > :first-child {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.spec-keys {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.spec-keys .key {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  background: var(--key);
+  color: var(--accent-ink);
+  font: 700 12px var(--display);
+  box-shadow: inset 0 -2px 0 var(--key-edge);
+}
+.spec-bar .btn {
+  pointer-events: auto;
+  height: 30px;
+  font-size: 13px;
+}
+.spec-bar .btn .key {
+  min-width: 22px;
+  height: 22px;
+  font-size: 13px;
 }
 
 /* ================================================================ PAUSA (src/game/screens: pz-extra.css) */

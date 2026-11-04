@@ -12,6 +12,7 @@ import {
   getMap,
   isMapId,
   isModeId,
+  fitMapMode,
   isSizeId,
   teamName,
   type CreateRoomInput,
@@ -81,11 +82,13 @@ export class RoomRegistry {
 
   create(data: CreateRoomInput, nickname: string): Room {
     const password = typeof data.password === 'string' ? data.password.slice(0, PASSWORD_MAX) : '';
-    const mapId = isMapId(data.mapId) ? data.mapId : 'patio';
+    // Carrera and Circuito only go together
+    const fit = fitMapMode(isMapId(data.mapId) ? data.mapId : 'patio', isModeId(data.mode) ? data.mode : 'ffa');
+    const mapId = fit.mapId;
     const size = isSizeId(data.size) ? data.size : 'm';
     const max = clamp(Number(data.max) || MAP_SIZES[size].players, ROOM_MIN_PLAYERS, ROOM_MAX_PLAYERS);
     const map = getMap(mapId, size);
-    const modeId = isModeId(data.mode) ? data.mode : 'ffa';
+    const modeId = fit.mode;
     const limit = Number(data.scoreLimit);
     const id = crypto.randomBytes(ROOM_ID_BYTES).toString('hex');
     const room: Room = {
@@ -108,6 +111,7 @@ export class RoomRegistry {
       channel: this.channelFor(id),
       vote: null,
       grenades: [],
+      strikes: [],
       deployables: [],
       // Filled right below (resetWorld also builds the colliders)
       world: undefined as never,

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { FX, fxFrame } from './fxAtlas';
-import type { CamoId, CharacterId, SkinId, WeaponId } from '@blockshot/shared';
+import type { AbilityId, CamoId, SkinId, WeaponId } from '@blockshot/shared';
 
 /** Guns whose muzzle is further than this (m) are held with the left hand on the handguard. */
 const LONG_GUN_MUZZLE_Z = -0.4;
@@ -630,9 +630,13 @@ function drawTorso(k: Kit, build: Build): void {
   k.box(0.012, 0.08, 0.012, -0.16, 1.4, -0.12 - d - 0.02, 'metal'); // antenna
 }
 
-const EXTRAS: Record<CharacterId, CharacterLook> = {
+/**
+ * The kit a body wears, by the class's ability (key E), so a rival's ability reads at a glance: the shield brings
+ * the heavy armour, the dash the light runner's kit, the mine the ghillie hunter, and so on.
+ */
+const EXTRAS: Record<AbilityId, CharacterLook> = {
   // Standard rifleman: ballistic helmet with headset, plate carrier
-  soldado: {
+  smoke: {
     build: 'standard',
     skinTone: '#d9a77c',
     hair: '#3a2a1e',
@@ -658,7 +662,7 @@ const EXTRAS: Record<CharacterId, CharacterLook> = {
     },
   },
   // Sniper: hood over a cap, scarf on the face and a pack with a bedroll
-  cazador: {
+  mine: {
     build: 'standard',
     skinTone: '#b07b52',
     hair: '#1e1612',
@@ -682,7 +686,7 @@ const EXTRAS: Record<CharacterId, CharacterLook> = {
     },
   },
   // Heavy armour: big pauldrons, chest plate, helmet with visor and jaw guard
-  tanque: {
+  shield: {
     build: 'heavy',
     skinTone: '#8a5a3c',
     hair: '#141414',
@@ -713,7 +717,7 @@ const EXTRAS: Record<CharacterId, CharacterLook> = {
     },
   },
   // Scout: boonie hat with a scarf, binoculars on the chest and light gear
-  explorador: {
+  radar: {
     build: 'light',
     skinTone: '#c48a5e',
     hair: '#2a1d14',
@@ -735,7 +739,7 @@ const EXTRAS: Record<CharacterId, CharacterLook> = {
     },
   },
   // Grenadier: heavy padded jacket, goggles over a beanie, bandolier of fat launcher rounds
-  artillero: {
+  medkit: {
     build: 'heavy',
     skinTone: '#a96f48',
     hair: '#3a2a1e',
@@ -763,7 +767,7 @@ const EXTRAS: Record<CharacterId, CharacterLook> = {
     },
   },
   // Runner: light top with bare forearms, headband, spiky hair, goggles on the forehead
-  rayo: {
+  dash: {
     build: 'light',
     skinTone: '#efc49c',
     hair: '#d9a520',
@@ -790,7 +794,7 @@ const EXTRAS: Record<CharacterId, CharacterLook> = {
     },
   },
   // Heavy gunner: closed helmet with a glowing slit, ammo belt and an ammo backpack
-  bastion: {
+  wall: {
     build: 'heavy',
     skinTone: '#a06c46',
     hair: '#2a1d14',
@@ -1158,6 +1162,12 @@ const SHORT_GUN_LEFT_HAND = v3(0.08, -0.2, -0.34);
 const AIM_Y = 1.36;
 /** Gun mount in the aim group; guns are scaled for remote players. */
 const GUN_MOUNT = v3(0.12, -0.02, -0.5);
+/**
+ * Machine guns are carried low, at the hip (2026-11-04: shouldered like a rifle, the hands sat by the face and the
+ * gun hid behind them): the mount and both hands move this much (down, back towards the body).
+ */
+const HIP_CARRY: ReadonlySet<WeaponId> = new Set(['lmg', 'lightlmg', 'minigun']);
+const HIP_CARRY_SHIFT = v3(0.02, -0.26, 0.14);
 
 function drawArm(k: Kit, look: CharacterLook, side: number, hand: V3): void {
   const shoulder = v3(side * SHOULDER_X, 0, 0.01);
@@ -1264,12 +1274,12 @@ const HIP_X = 0.12;
 
 const creatureOf = (skin: string): Creature | undefined => CREATURES[skin as Exclude<SkinId, 'base'>];
 
-function bodyMaterials(charId: CharacterId, color: string, skin: string, camo: CamoId): BodyMaterials {
+function bodyMaterials(charId: AbilityId, color: string, skin: string, camo: CamoId): BodyMaterials {
   return { ...skinMaterials(color, skin, camo), ...characterMaterials(charId, skin) };
 }
 const charMatCache = new Map<string, Pick<BodyMaterials, 'skin' | 'hair'>>();
 /** Bare skin and hair: the class's own for the human, the creature's fur / metal otherwise. */
-function characterMaterials(charId: CharacterId, skin: string): Pick<BodyMaterials, 'skin' | 'hair'> {
+function characterMaterials(charId: AbilityId, skin: string): Pick<BodyMaterials, 'skin' | 'hair'> {
   const creature = creatureOf(skin);
   const key = creature ? skin : charId;
   let m = charMatCache.get(key);
@@ -1284,8 +1294,9 @@ function characterMaterials(charId: CharacterId, skin: string): Pick<BodyMateria
   return m;
 }
 
+/** A player's body: `charId` is the class's ability, which picks the kit it wears (EXTRAS). */
 export function buildCharacter(
-  charId: CharacterId,
+  charId: AbilityId,
   skin: string = 'base',
   color = '#3f7fe0',
   camo: CamoId = 'liso',
@@ -1338,11 +1349,12 @@ export function buildCharacter(
   hand.position.copy(GUN_MOUNT);
   aim.add(hand);
 
-  const poseArms = (left: V3) => {
+  const poseArms = (left: V3, right: V3 = RIGHT_HAND) => {
     arms.clear();
-    const key = `${charId}:arms:${left.x.toFixed(2)},${left.y.toFixed(2)},${left.z.toFixed(2)}`;
+    const at = (p: V3) => `${p.x.toFixed(2)},${p.y.toFixed(2)},${p.z.toFixed(2)}`;
+    const key = `${charId}:arms:${at(left)}:${at(right)}`;
     addKit(arms, key, mats, (k) => {
-      drawArm(k, look, 1, RIGHT_HAND.clone());
+      drawArm(k, look, 1, right.clone());
       drawArm(k, look, -1, left.clone());
     });
   };
@@ -1352,9 +1364,12 @@ export function buildCharacter(
     hand.clear();
     hand.add(gun);
     const long = gun.userData.muzzleZ < LONG_GUN_MUZZLE_Z;
+    const shift = HIP_CARRY.has(gun.userData.id) ? HIP_CARRY_SHIFT : v3(0, 0, 0);
+    hand.position.copy(GUN_MOUNT).add(shift);
     // Left hand on the handguard of long guns (as far as the arm reaches), under the right one on short guns
     const z = GUN_MOUNT.z + gun.userData.muzzleZ * 0.45 * gun.scale.z;
-    poseArms(long ? v3(0.1, -0.08, Math.round(z * 20) / 20) : SHORT_GUN_LEFT_HAND);
+    const left = long ? v3(0.1, -0.08, Math.round(z * 20) / 20) : SHORT_GUN_LEFT_HAND.clone();
+    poseArms(left.add(shift), RIGHT_HAND.clone().add(shift));
   };
 
   return { group, legL: legs[0]!, legR: legs[1]!, kneeL: knees[0]!, kneeR: knees[1]!, upper, aim, hand, holdGun };
@@ -1864,6 +1879,53 @@ const GUNS: Record<WeaponId, (d: GunDraw) => void> = {
     d.sight(0.06);
   },
   // Sawed-off: two short side by side barrels, a wooden fore-end and a cut-down pistol stock
+  // Power weapons, drawn like the guns they are built on (only seen until the pack's model loads)
+  railgun(d) {
+    GUNS.sniper(d);
+  },
+  minigun(d) {
+    GUNS.lmg(d);
+  },
+  autoshotgun(d) {
+    GUNS.shotgun(d);
+  },
+  // Loadout alternatives, drawn like the gun their model is built on (gunAssets.ts VARIANTS)
+  heavyrifle(d) {
+    GUNS.rifle(d);
+  },
+  lightrifle(d) {
+    GUNS.rifle(d);
+  },
+  carbine(d) {
+    GUNS.dmr(d);
+  },
+  pdw(d) {
+    GUNS.smg(d);
+  },
+  compact(d) {
+    GUNS.mpistol(d);
+  },
+  heavypistol(d) {
+    GUNS.pistol(d);
+  },
+  grenadelauncher(d) {
+    GUNS.launcher(d);
+  },
+  lightlmg(d) {
+    GUNS.lmg(d);
+  },
+  ump45(d) {
+    GUNS.smg(d);
+  },
+  frf1(d) {
+    GUNS.sniper(d);
+  },
+  colt(d) {
+    GUNS.pistol(d);
+  },
+  benelli(d) {
+    GUNS.shotgun(d);
+  },
   sawedoff(d) {
     for (const s of [-1, 1]) {
       d.cyl(0.017, 0.3, s * 0.018, 0.022, -0.21, 's', 12); // barrels

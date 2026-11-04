@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { CHARACTERS, OUTFIT_COLORS, SKINS, isCharacterId, isOutfitColor, isSkinId } from '../characters/characters';
+import { OUTFIT_COLORS, SKINS, isOutfitColor, isSkinId } from '../characters/characters';
+import { isWeaponId } from '../weapons/weapons';
 import { isMapId, isSizeId } from '../maps/maps';
 import { isModeId } from '../modes/modes';
 import { CreateRoomSchema, InputSchema, MAX_INPUTS_PER_MESSAGE, ShootSchema, SpawnSchema, v } from './schemas';
@@ -29,22 +30,29 @@ describe('message schemas', () => {
   });
 
   it('accepts a spawn with any palette outfit colour, or none, and nothing else', () => {
-    expect(ok(SpawnSchema, { characterId: 'soldado', skin: 'robot' })).toBe(true);
-    for (const c of OUTFIT_COLORS)
-      expect(ok(SpawnSchema, { characterId: 'rayo', skin: 'base', color: c.hex })).toBe(true);
-    expect(ok(SpawnSchema, { characterId: 'rayo', color: '#123456' })).toBe(false);
-    expect(ok(SpawnSchema, { characterId: 'rayo', color: 0x3f7fe0 })).toBe(false);
-    expect(ok(SpawnSchema, { characterId: 'rayo', color: 'red' })).toBe(false);
+    expect(ok(SpawnSchema, { skin: 'robot' })).toBe(true);
+    for (const c of OUTFIT_COLORS) expect(ok(SpawnSchema, { skin: 'base', color: c.hex })).toBe(true);
+    expect(ok(SpawnSchema, { color: '#123456' })).toBe(false);
+    expect(ok(SpawnSchema, { color: 0x3f7fe0 })).toBe(false);
+    expect(ok(SpawnSchema, { color: 'red' })).toBe(false);
   });
 
   it('accepts the listed camouflages and finishes, or none, and nothing else', () => {
-    expect(ok(SpawnSchema, { characterId: 'soldado', camo: 'tigre', finish: 'oro' })).toBe(true);
-    expect(ok(SpawnSchema, { characterId: 'soldado', camo: 'rosa' })).toBe(false);
-    expect(ok(SpawnSchema, { characterId: 'soldado', finish: 'diamante' })).toBe(false);
+    expect(ok(SpawnSchema, { camo: 'tigre', finish: 'oro' })).toBe(true);
+    expect(ok(SpawnSchema, { camo: 'rosa' })).toBe(false);
+    expect(ok(SpawnSchema, { finish: 'diamante' })).toBe(false);
   });
 
-  it('every character can spawn in its own colour (the client sends it when nothing else was picked)', () => {
-    for (const c of CHARACTERS) expect(ok(SpawnSchema, { characterId: c.id, color: c.color }), c.name).toBe(true);
+  it('carries the class as text (the server checks each part, classOf)', () => {
+    expect(ok(SpawnSchema, { primary: 'carbine', secondary: 'heavypistol', ability: 'dash' })).toBe(true);
+    expect(ok(SpawnSchema, {})).toBe(true);
+    expect(ok(SpawnSchema, { ability: 3 })).toBe(false);
+    expect(ok(SpawnSchema, { primary: 7 })).toBe(false);
+    expect(ok(SpawnSchema, { secondary: 'x'.repeat(500) })).toBe(false);
+  });
+
+  it('still accepts an older client that sends a character id (ignored)', () => {
+    expect(ok(SpawnSchema, { characterId: 'soldado', skin: 'robot' })).toBe(true);
   });
 });
 
@@ -70,13 +78,8 @@ describe('cosmetics', () => {
 describe('id guards', () => {
   it('reject inherited object keys like constructor or toString', () => {
     for (const key of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
-      expect([isCharacterId(key), isMapId(key), isSizeId(key), isModeId(key)]).toEqual([false, false, false, false]);
+      expect([isWeaponId(key), isMapId(key), isSizeId(key), isModeId(key)]).toEqual([false, false, false, false]);
     }
-    expect([isCharacterId('soldado'), isMapId('patio'), isSizeId('m'), isModeId('ffa')]).toEqual([
-      true,
-      true,
-      true,
-      true,
-    ]);
+    expect([isWeaponId('rifle'), isMapId('patio'), isSizeId('m'), isModeId('ffa')]).toEqual([true, true, true, true]);
   });
 });

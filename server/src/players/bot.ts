@@ -2,16 +2,24 @@
 // rival, walking the map (stairs and jump pads too), and shoot with the same rules as a player (fire rate, ammo,
 // damage), only less accurately.
 import {
+  BOMB,
   BOT_LEVELS,
+  ABILITY_IDS,
+  ACCESSORY_IDS,
   BTN_JUMP,
-  CHARACTERS,
   DOM,
+  FREEZE,
   PLAYER,
+  PRIMARIES,
+  SIDEARMS,
   WEAPONS,
+  bombSites,
   castShot,
   dominationZones,
+  fitAccessory,
   type BotLevel,
   type MoveInput,
+  type PlayerClass,
   type Vec3,
 } from '@blockshot/shared';
 import { handleReload, handleShoot, handleSwitch } from '../combat/shooting';
@@ -44,6 +52,8 @@ const WAYPOINT_REACHED = 0.6;
 /** Out of shotgun range, and too close for a sniper scope, the bot takes out its secondary (m). */
 const SHOTGUN_RANGE = 15;
 const SNIPER_MIN_RANGE = 10;
+/** Bots aim straight, so a lobbed grenade falls short beyond this (m): the secondary then. */
+const LOB_RANGE = 18;
 /** With an objective to play, rivals further than this are shot on the way instead of stopping for them. */
 const ENGAGE_RANGE = 25;
 /** The objective is looked up again this often (ms). */
@@ -135,9 +145,9 @@ function findTargets(room: Room, bot: Player, eye: Vec3) {
     if (!near || dist < near.dist) near = aim;
     if (dist > SIGHT_RANGE || (seen && dist >= seen.dist)) continue;
     const dir: Vec3 = [dx / dist, dy / dist, dz / dist];
-    // No wall and no smoke in between
-    if (!castShot(eye, dir, room.colliders, [], bot.id, dist).hit && !smokeBlocks(room, eye, [t.x, t.y + CHEST, t.z]))
-      seen = aim;
+    // No wall and no smoke in between (tactical goggles see through the smoke)
+    const smoke = bot.cls?.accessory !== 'goggles' && smokeBlocks(room, eye, [t.x, t.y + CHEST, t.z]);
+    if (!castShot(eye, dir, room.colliders, [], bot.id, dist).hit && !smoke) seen = aim;
   }
   return { seen, near };
 }
@@ -154,7 +164,19 @@ function followPath(room: Room, bot: Player, brain: Brain, target: Vec3, now: nu
   while (brain.path.length && Math.hypot(brain.path[0]![0] - bot.x, brain.path[0]![2] - bot.z) < WAYPOINT_REACHED)
     brain.path.shift();
   const next = brain.path[0];
-  return next ? Math.atan2(-(next[0] - bot.x), -(next[2] - bot.z)) : null;
+  return next ? steer(bot, next[0] - bot.x, next[2] - bot.z) : null;
+}
+
+/**
+ * Yaw to walk towards (dx, dz) while cancelling sideways drift: with Quake 3 ground friction the bot coasts, so on a
+ * turn (a stair landing) it pushes against the momentum that would carry it off, like a player does.
+ */
+function steer(bot: Player, dx: number, dz: number): number {
+  const len = Math.hypot(dx, dz) || 1;
+  const s = Math.max(Math.hypot(bot.move.vx, bot.move.vz), 1);
+  const wx = (2 * s * dx) / len - bot.move.vx;
+  const wz = (2 * s * dz) / len - bot.move.vz;
+  return Math.atan2(-wx, -wz);
 }
 
 const at = (p: { x: number; y: number; z: number }): Vec3 => [p.x, p.y, p.z];
@@ -190,6 +212,27 @@ function objectiveOf(room: Room, bot: Player): { goal: Vec3; radius: number } | 
     });
     return best ? { goal: best, radius: DOM.radius - 1.5 } : null;
   }
+  if (snap?.ic) {
+    // Freeze tag: thaw the nearest frozen teammate
+    let best: Vec3 | null = null;
+    for (const [, x, y, z, t] of snap.ic) {
+      if (t === team && (!best || Math.hypot(x - bot.x, z - bot.z) < Math.hypot(best[0] - bot.x, best[2] - bot.z)))
+        best = [x, y, z];
+    }
+    return best ? { goal: best, radius: FREEZE.radius - 0.8 } : null;
+  }
+  if (snap?.bm) {
+    // Bomb: the carrier goes to the nearest site and stays; a dropped bomb is picked up; Blue goes to defuse it
+    const b = snap.bm;
+    if (b.c === bot.id) {
+      const [a, s] = bombSites(room.map);
+      const d = (p: Vec3) => Math.hypot(p[0] - bot.x, p[2] - bot.z);
+      return { goal: d(a) <= d(s) ? a : s, radius: BOMB.siteRadius - 1.5 };
+    }
+    if ((b.st === 1 && team === 1) || (b.st === 2 && team === 2))
+      return { goal: [b.x, b.y, b.z], radius: b.st === 2 ? BOMB.defuseRadius - 0.8 : 0.5 };
+    return null;
+  }
   if (snap?.tg) {
     let best: Vec3 | null = null;
     for (const [, x, y, z] of snap.tg) {
@@ -201,14 +244,28 @@ function objectiveOf(room: Room, bot: Player): { goal: Vec3; radius: number } | 
   return null;
 }
 
-/** Shotgun out of range or sniper too close: the secondary is better. */
+/** Shotgun or grenade launcher out of range, or sniper too close: the secondary is better. */
 function pickWeapon(bot: Player, dist: number): void {
   const primary = bot.loadout[0];
   if (!primary || bot.loadout.length < 2 || WEAPONS[primary].melee) return;
   const w = WEAPONS[primary];
-  const secondary = (w.pellets > 1 && dist > SHOTGUN_RANGE) || (!!w.scope && dist < SNIPER_MIN_RANGE);
+  const secondary =
+    (w.pellets > 1 && dist > SHOTGUN_RANGE) || (!!w.scope && dist < SNIPER_MIN_RANGE) || (!!w.lob && dist > LOB_RANGE);
   const slot = secondary ? 1 : 0;
   if (bot.slot !== slot) handleSwitch(bot, slot);
+}
+
+const anyOf = <T>(list: readonly T[]): T => list[Math.floor(Math.random() * list.length)]!;
+/** Bots build a random class: any primary, any sidearm, any ability and any accessory those weapons take. */
+export function randomClass(): PlayerClass {
+  const primary = anyOf(PRIMARIES);
+  const secondary = anyOf(SIDEARMS);
+  return {
+    primary,
+    secondary,
+    ability: anyOf(ABILITY_IDS),
+    accessory: fitAccessory(anyOf(ACCESSORY_IDS), primary, secondary),
+  };
 }
 
 function think(room: Room, bot: Player, now: number): void {
@@ -219,8 +276,7 @@ function think(room: Room, bot: Player, now: number): void {
   if (!bot.alive) {
     const ready = !bot.deathTime || now - bot.deathTime >= PLAYER.respawnDelay;
     if (!room.matchOver && ready && room.mode.canSpawn?.(room, bot) !== false) {
-      const ch = CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)]!;
-      spawnPlayer(room, bot, ch, 'base');
+      spawnPlayer(room, bot, { ...randomClass(), skin: 'base' });
       brain.seq = 0;
       brain.path = [];
       brain.goal = null;

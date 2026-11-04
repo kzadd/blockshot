@@ -9,6 +9,7 @@ import type {
 } from '@blockshot/shared';
 import type { Deployable } from '../combat/abilities';
 import type { Grenade } from '../combat/grenades';
+import type { Strike } from '../combat/strike';
 import type { WorldObjects } from '../combat/worldObjects';
 import type { Tournament } from '../match/tournament';
 import type { GameMode } from '../modes/gameMode';
@@ -52,6 +53,8 @@ export interface Room {
   /** tells the lobby the room list changed (map / mode after a vote) */
   lobbyChanged: () => void;
   grenades: Grenade[];
+  /** air strikes on their way down */
+  strikes: Strike[];
   /** smoke clouds, mines and cover walls (abilities) */
   deployables: Deployable[];
   /** barrels, crates and pickups of the map (worldObjects.ts) */

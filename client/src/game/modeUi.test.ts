@@ -10,7 +10,7 @@ describe('mode presentation', () => {
   it('keeps the original texts', () => {
     expect(MODE_UI.teams.hint(40)).toBe('40 bajas del equipo');
     expect(MODE_UI.infect.hint(3)).toBe('Aguantar 3 min');
-    expect(MODE_UI.gungame.goal(5)).toBe('gana quien elimine con el cuchillo (5 armas)');
+    expect(MODE_UI.gungame.goal(10)).toBe('gana quien elimine con el cuchillo (10 armas)');
     expect(MODE_UI.kc.points).toBe('Placas');
   });
 });

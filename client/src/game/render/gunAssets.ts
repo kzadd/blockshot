@@ -20,6 +20,23 @@ const FILES: Partial<Record<WeaponId, { file: string; bipod?: boolean; tube?: bo
   revolver: { file: 'revolver' },
   mpistol: { file: 'mpistol' },
   sawedoff: { file: 'sawedoff' },
+  // Power weapons: the pack's guns they are based on (with their own finish)
+  railgun: { file: 'sniper' },
+  minigun: { file: 'lmg', bipod: true },
+  autoshotgun: { file: 'shotgun' },
+  // Loadout alternatives: a pack gun at another size and finish (VARIANTS)
+  heavyrifle: { file: 'rifle' },
+  lightrifle: { file: 'rifle' },
+  carbine: { file: 'dmr' },
+  pdw: { file: 'smg' },
+  compact: { file: 'mpistol' },
+  heavypistol: { file: 'pistol' },
+  grenadelauncher: { file: 'launcher-body', tube: true },
+  lightlmg: { file: 'lmg' },
+  ump45: { file: 'smg' },
+  frf1: { file: 'sniper' },
+  colt: { file: 'pistol' },
+  benelli: { file: 'shotgun' },
   // Quaternius's Knife (CC0, Poly Pizza) stands blade up: laid down along +X like the guns
   knife: { file: 'knife', upright: true },
 };
@@ -305,8 +322,33 @@ export interface GunLook {
  * The gun for a weapon with the pack's model and the chosen finish. Resolves to the procedural gun when the
  * weapon has no model (launcher) or the file fails to load, so callers can always use the result.
  */
+/** Power weapons always wear their own glowing finish, so they read as special in every hand. */
+const POWER_FINISH: Partial<Record<WeaponId, FinishId>> = { railgun: 'neon', minigun: 'lava', autoshotgun: 'oro' };
+/**
+ * Loadout alternatives reuse a pack gun: `size` scales it (from the muzzle back, so the muzzle, sights and hands
+ * keep their place) and `finish` is what it wears when the player kept the standard finish, so each one reads
+ * apart from the gun it is built on (the heavy rifle longer and dark, the compact SMG a stubby tan one…).
+ */
+const VARIANTS: Partial<Record<WeaponId, { size: number; finish: FinishId }>> = {
+  heavyrifle: { size: 1.15, finish: 'carbono' },
+  lightrifle: { size: 0.9, finish: 'arena' },
+  carbine: { size: 0.88, finish: 'acero' },
+  pdw: { size: 1.12, finish: 'carbono' },
+  compact: { size: 1.2, finish: 'arena' },
+  heavypistol: { size: 1.18, finish: 'acero' },
+  grenadelauncher: { size: 0.92, finish: 'arena' },
+  lightlmg: { size: 0.86, finish: 'acero' },
+  ump45: { size: 1.05, finish: 'acero' },
+  frf1: { size: 0.9, finish: 'arena' },
+  colt: { size: 1.06, finish: 'arena' },
+  benelli: { size: 0.92, finish: 'carbono' },
+};
+
 export async function loadGun(id: WeaponId, look: GunLook = {}): Promise<GunModel> {
-  const { finish = 'estandar', color = '#ffc93c', camo = 'liso', withFlash = false } = look;
+  const { color = '#ffc93c', camo = 'liso', withFlash = false } = look;
+  const variant = VARIANTS[id];
+  const picked = look.finish && look.finish !== 'estandar' ? look.finish : undefined;
+  const finish = POWER_FINISH[id] ?? picked ?? variant?.finish ?? 'estandar';
   const gun = buildGun(id, withFlash, color);
   const entry = FILES[id];
   if (!entry) return gun;
@@ -334,6 +376,7 @@ export async function loadGun(id: WeaponId, look: GunLook = {}): Promise<GunMode
     target.expandByObject(o);
     gun.remove(o);
   }
+  if (variant) target.max.z = target.min.z + (target.max.z - target.min.z) * variant.size;
   const pivot = new THREE.Group();
   pivot.rotation.y = Math.PI / 2; // barrel from +X to -Z
   pivot.add(model);

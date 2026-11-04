@@ -37,6 +37,7 @@ export function bestPlays(room: Room): BestPlay[] {
 export function endMatch(room: Room, winnerName: string, winnerTeam: Team = 0): void {
   room.matchOver = true;
   room.grenades = [];
+  room.strikes = [];
   recordMatch(room, winnerName, winnerTeam);
   for (const p of room.players.values()) p.alive = false;
   const scores = [...room.players.values()]

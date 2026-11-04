@@ -1,5 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { KillEvent } from '@blockshot/shared';
+import { WEAPONS, type KillEvent } from '@blockshot/shared';
+
+/** The rifle's numbers (the duels use the Soldado's rifle). */
+const RIFLE = WEAPONS.rifle;
 import { Bot, shootUntil, sleep, startServer, type TestServer } from './harness';
 
 // Open spot in Patio (medium): two bots 5 m apart with a clear line of fire
@@ -51,11 +54,17 @@ describe('combat', () => {
     b.dropProtection();
     await sleep(100);
     await shootUntil(a, b, () => a.count('hitmarker') > 0, { tries: 3 });
-    expect(a.find<{ dmg: number; head: boolean }>('hitmarker')).toMatchObject({ dmg: 24, head: false });
+    expect(a.find<{ dmg: number; head: boolean }>('hitmarker')).toMatchObject({
+      dmg: Math.round(RIFLE.damage),
+      head: false,
+    });
     a.events = [];
     await sleep(150);
     await shootUntil(a, b, () => a.count('hitmarker') > 0, { tries: 3, dy: HEAD_DY });
-    expect(a.find<{ dmg: number; head: boolean }>('hitmarker')).toMatchObject({ dmg: 38, head: true });
+    expect(a.find<{ dmg: number; head: boolean }>('hitmarker')).toMatchObject({
+      dmg: Math.round(RIFLE.damage * RIFLE.headMult),
+      head: true,
+    });
   });
 
   it('kills, scores and regenerates', async () => {
@@ -63,7 +72,7 @@ describe('combat', () => {
     b.dropProtection();
     await shootUntil(a, b, () => a.count('kill') > 0);
     const kill = a.find<KillEvent>('kill');
-    expect(kill).toMatchObject({ killer: a.id, victim: b.id, weapon: 'Rifle de asalto', streak: 1, killerName: 'A' });
+    expect(kill).toMatchObject({ killer: a.id, victim: b.id, weapon: 'M4', streak: 1, killerName: 'A' });
     await a.idle(200);
     expect(a.me()?.k).toBe(1);
     expect(a.state?.players.find((p) => p.id === b.id)).toMatchObject({ d: 1, a: 0 });
@@ -74,7 +83,7 @@ describe('combat', () => {
     b.dropProtection();
     await shootUntil(a, b, () => a.count('hitmarker') > 0, { tries: 3 });
     await b.idle(300);
-    expect(b.me()?.h).toBe(76);
+    expect(b.me()?.h).toBe(100 - RIFLE.damage);
     await b.idle(5000 + 2000);
     expect(b.me()?.h).toBe(100);
   });

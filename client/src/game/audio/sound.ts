@@ -25,8 +25,27 @@ const PRESETS: Record<WeaponId, ShotPreset> = {
   launcher: { f: 700, dur: 0.32, thump: 55, v: 1.1 }, // the hollow "bloop" of the tube
   mpistol: { f: 3500, dur: 0.07, thump: 190, v: 0.65 },
   sawedoff: { f: 1100, dur: 0.34, thump: 65, v: 1.3 },
+  // loadout alternatives: close to the gun they are built on, heavier or lighter
+  heavyrifle: { f: 1900, dur: 0.16, thump: 95, v: 1.05 },
+  lightrifle: { f: 2900, dur: 0.1, thump: 150, v: 0.8 },
+  carbine: { f: 2200, dur: 0.13, thump: 120, v: 0.9 },
+  pdw: { f: 3000, dur: 0.09, thump: 160, v: 0.72 },
+  compact: { f: 3800, dur: 0.06, thump: 200, v: 0.62 },
+  heavypistol: { f: 1900, dur: 0.18, thump: 100, v: 1.05 },
+  grenadelauncher: { f: 600, dur: 0.28, thump: 50, v: 1 },
+  lightlmg: { f: 2150, dur: 0.11, thump: 115, v: 0.85 },
+  ump45: { f: 2600, dur: 0.1, thump: 140, v: 0.8 },
+  frf1: { f: 1700, dur: 0.32, thump: 80, v: 1.1 },
+  colt: { f: 2300, dur: 0.14, thump: 130, v: 0.95 },
+  benelli: { f: 1400, dur: 0.26, thump: 85, v: 1.1 },
+  // power weapons sound like the gun they are built on
+  railgun: { f: 2200, dur: 0.5, thump: 90, v: 1.5 },
+  minigun: { f: 1500, dur: 0.12, thump: 50, v: 0.7 },
+  autoshotgun: { f: 1000, dur: 0.3, thump: 70, v: 1.2 },
 };
 
+/** Silenced shots: volume, filter cut-off and length of the normal shot, and how much of the thump is left. */
+const MUFFLED = { vol: 0.35, f: 0.45, dur: 0.45, thump: 0.25 };
 const MASTER_GAIN = 0.45;
 const NOISE_SECONDS = 0.5;
 const SILENT = 0.001;
@@ -74,11 +93,14 @@ class Sfx {
     this.nodes();
   }
 
-  shot(kind: WeaponId | null | undefined, vol = 1): void {
+  /** A gunshot; `muffled` (silencer): a short, dull, much quieter pop with almost no thump. */
+  shot(kind: WeaponId | null | undefined, vol = 1, muffled = false): void {
     const n = this.nodes();
+    if (muffled) vol *= MUFFLED.vol;
     if (!n || vol < MIN_SHOT_VOLUME) return;
     const { ctx, master } = n;
-    const p = PRESETS[kind ?? 'rifle'];
+    const raw = PRESETS[kind ?? 'rifle'];
+    const p = muffled ? { ...raw, f: raw.f * MUFFLED.f, dur: raw.dur * MUFFLED.dur, thump: raw.thump } : raw;
     const t = ctx.currentTime;
     const src = ctx.createBufferSource();
     src.buffer = this.noise;
@@ -97,7 +119,7 @@ class Sfx {
     o.frequency.setValueAtTime(p.thump, t);
     o.frequency.exponentialRampToValueAtTime(40, t + 0.12);
     const og = ctx.createGain();
-    og.gain.setValueAtTime(vol * 0.6, t);
+    og.gain.setValueAtTime(vol * 0.6 * (muffled ? MUFFLED.thump : 1), t);
     og.gain.exponentialRampToValueAtTime(SILENT, t + 0.14);
     o.connect(og).connect(master);
     o.start(t);

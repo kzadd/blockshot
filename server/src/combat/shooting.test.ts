@@ -1,5 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { CHAR_BY_ID, PLAYER, WEAPONS, damageAt, type Vec3 } from '@blockshot/shared';
+import {
+  BODY,
+  EXTRA_AMMO,
+  KEVLAR,
+  LIMB_MULT,
+  PLAYER,
+  PRIMARIES,
+  SIDEARMS,
+  SILENCER,
+  WEAPONS,
+  damageAt,
+  type Vec3,
+} from '@blockshot/shared';
 import { recordPosition } from '../players/history';
 import type { Player } from '../players/player';
 import { makeRoom } from '../testing/fakeRoom';
@@ -10,7 +22,7 @@ const A: [number, number] = [8, -2.5];
 const B: [number, number] = [13, -2.5];
 const CHEST = 1.3;
 const HEAD = 1.64;
-const TANK_HP = CHAR_BY_ID.tanque.hp;
+const HP = BODY.hp;
 
 const eye = (p: Player): Vec3 => [p.x, p.y + PLAYER.eye, p.z];
 function aim(from: Player, x: number, y: number, z: number): Vec3 {
@@ -47,31 +59,27 @@ describe('handleShoot', () => {
     expect(a).toMatchObject({ shots: 2, hits: 2, heads: 1 });
   });
 
-  // Every weapon of every character: one shot (all pellets) at 5 m deals its exact damage
+  // Every hitscan weapon a class can carry: one shot (all pellets) at 5 m deals its exact damage (capped at the hp)
   const ARSENAL = [
-    ['soldado', 0, 'rifle'],
-    ['soldado', 1, 'pistol'],
-    ['cazador', 0, 'sniper'],
-    ['tanque', 0, 'shotgun'],
-    ['tanque', 1, 'revolver'],
-    ['rayo', 0, 'smg'],
-    ['bastion', 0, 'lmg'],
-    ['soldado', 2, 'knife'],
-  ] as const;
-  it.each(ARSENAL)('%s slot %i fires the %s', (character, slot, weaponId) => {
+    ...PRIMARIES.filter((w) => !WEAPONS[w].projectile).map((w) => [w, 0] as const),
+    ...SIDEARMS.map((w) => [w, 1] as const),
+    ['knife', 2] as const,
+  ];
+  it.each(ARSENAL)('%s fires from slot %i', (weaponId, slot) => {
     const r = makeRoom('ffa');
-    const a = r.join('A', ...A, character);
+    const cls = slot === 1 ? { secondary: weaponId } : slot === 0 ? { primary: weaponId } : {};
+    const a = r.join('A', ...A, cls);
     const w = WEAPONS[weaponId];
     // the knife only reaches 2.6 m
-    const b = r.join('B', w.melee ? A[0] + 1.5 : 12, -2.5, 'tanque');
+    const b = r.join('B', w.melee ? A[0] + 1.5 : 12, -2.5, { ability: 'shield' });
     b.ry = Math.PI / 2; // facing the shooter: no backstab
     expect(a.loadout[slot]).toBe(weaponId);
     a.slot = slot;
     const dir = aim(a, b.x, b.y + CHEST, b.z);
     handleShoot(r.room, a, { o: eye(a), d: Array.from({ length: w.pellets }, () => dir), lag: 0 });
     const dist = Math.hypot(b.x - a.x, b.y + CHEST - (a.y + PLAYER.eye), b.z - a.z);
-    const expected = w.melee ? w.damage : Math.min(TANK_HP, damageAt(w, dist - 0.38) * w.pellets);
-    expect(TANK_HP - b.hp).toBeCloseTo(expected, 0);
+    const expected = w.melee ? w.damage : Math.min(HP, damageAt(w, dist - 0.38) * w.pellets);
+    expect(HP - b.hp).toBeCloseTo(expected, 0);
   });
 
   it('respects the fire rate and the magazine, and reloads', () => {
@@ -116,7 +124,7 @@ describe('handleShoot', () => {
     const r = makeRoom('ffa');
     // clear 23 m line south of the tower
     const a = r.join('A', -10, -14);
-    const b = r.join('B', 13, -14, 'tanque');
+    const b = r.join('B', 13, -14, { ability: 'shield' });
     a.slot = 1; // pistol: falloff from 20 m
     handleShoot(r.room, a, shotAt(a, b));
     const dist = Math.hypot(b.x - a.x, b.z - a.z);
@@ -155,7 +163,7 @@ describe('handleShoot', () => {
     vi.useFakeTimers();
     const r = makeRoom('ffa');
     const a = r.join('A', 13, -1.1);
-    const b = r.join('B', ...B, 'tanque');
+    const b = r.join('B', ...B, { ability: 'shield' });
     a.slot = 2;
     b.ry = 0; // looks towards -z, so a (on its +z side) is behind it
     // aimed a bit off: the melee assist still finds it
@@ -167,11 +175,11 @@ describe('handleShoot', () => {
   it('knife from the front only deals its normal damage', () => {
     const r = makeRoom('ffa');
     const a = r.join('A', 13, -3.9);
-    const b = r.join('B', ...B, 'tanque');
+    const b = r.join('B', ...B, { ability: 'shield' });
     a.slot = 2;
     b.ry = 0; // a is in front of b
     handleShoot(r.room, a, { o: eye(a), d: [aim(a, b.x, b.y + 1, b.z)], lag: 0 });
-    expect(b.hp).toBe(TANK_HP - WEAPONS.knife.damage);
+    expect(b.hp).toBe(HP - WEAPONS.knife.damage);
   });
 
   it('rejects a shot whose origin is on the other side of a wall', () => {
@@ -191,11 +199,84 @@ describe('handleShoot', () => {
   it('a shifted origin does not lengthen the knife', () => {
     const r = makeRoom('ffa');
     const a = r.join('A', 13, -6);
-    const b = r.join('B', ...B, 'tanque'); // 3.5 m away: out of the knife's 2.6 m reach
+    const b = r.join('B', ...B, { ability: 'shield' }); // 3.5 m away: out of the knife's 2.6 m reach
     b.ry = 0;
     a.slot = 2;
     const o: Vec3 = [a.x, a.y + PLAYER.eye, a.z + 1.2]; // moved towards b, inside the tolerance
     handleShoot(r.room, a, { o, d: [aim(a, b.x, b.y + 1, b.z)], lag: 0 });
-    expect(b.hp).toBe(TANK_HP);
+    expect(b.hp).toBe(HP);
+  });
+});
+
+describe('hit zones and accessories', () => {
+  const LEGS = 0.4;
+  const rifle = WEAPONS.rifle;
+
+  it('legs take 0.6 of the body damage (no head mark); the head keeps its multiplier', () => {
+    vi.useFakeTimers();
+    const { room, a, b, channel } = duel();
+    handleShoot(room, a, shotAt(a, b, LEGS));
+    expect(HP - b.hp).toBeCloseTo(rifle.damage * LIMB_MULT);
+    expect(channel.of('hitmarker', a.id)[0]).toMatchObject({ head: false });
+    expect(a.heads).toBe(0);
+  });
+
+  it('Kevlar: less on the torso, nothing off the head nor the legs (the helmet guards the head)', () => {
+    vi.useFakeTimers();
+    const r = makeRoom('ffa');
+    const a = r.join('A', ...A);
+    const b = r.join('B', ...B, { accessory: 'kevlar' });
+    handleShoot(r.room, a, shotAt(a, b));
+    expect(HP - b.hp).toBeCloseTo(rifle.damage * KEVLAR.torso);
+    b.hp = HP;
+    vi.advanceTimersByTime(200);
+    handleShoot(r.room, a, shotAt(a, b, HEAD));
+    expect(HP - b.hp).toBeCloseTo(Math.min(HP, rifle.damage * rifle.headMult));
+    b.hp = HP;
+    vi.advanceTimersByTime(200);
+    handleShoot(r.room, a, shotAt(a, b, LEGS));
+    expect(HP - b.hp).toBeCloseTo(rifle.damage * LIMB_MULT);
+  });
+
+  it('the SR8 kills with a torso shot, not with a leg shot', () => {
+    const r = makeRoom('ffa');
+    const a = r.join('A', ...A, { primary: 'sniper' });
+    const b = r.join('B', ...B);
+    handleShoot(r.room, a, shotAt(a, b, LEGS));
+    expect(b.alive).toBe(true);
+    expect(HP - b.hp).toBeCloseTo(WEAPONS.sniper.damage * LIMB_MULT);
+    b.hp = HP;
+    a.lastShot[0] = 0;
+    handleShoot(r.room, a, shotAt(a, b));
+    expect(b.alive).toBe(false);
+  });
+
+  it('silenced shots do 8 % less and go out marked as silenced (no minimap mark for the rivals)', () => {
+    const r = makeRoom('ffa');
+    const a = r.join('A', ...A, { accessory: 'silencer' });
+    const b = r.join('B', ...B);
+    r.channel.clear();
+    handleShoot(r.room, a, shotAt(a, b));
+    expect(HP - b.hp).toBeCloseTo(rifle.damage * SILENCER.damage);
+    expect(r.channel.of('shot')[0]).toMatchObject({ id: a.id, s: 1 });
+    // Without one, a plain shot
+    const c = r.join('C', ...A);
+    r.channel.clear();
+    handleShoot(r.room, c, shotAt(c, b));
+    expect(r.channel.of('shot')[0]).not.toHaveProperty('s');
+  });
+
+  it('extra ammo: the reload fills the bigger magazine', () => {
+    vi.useFakeTimers();
+    const r = makeRoom('ffa');
+    const a = r.join('A', ...A, { accessory: 'ammo' });
+    const big = rifle.mag + Math.round(rifle.mag * EXTRA_AMMO.mag);
+    expect(a.ammo[0]!.mag).toBe(big);
+    a.ammo[0]!.mag = 3;
+    handleReload(a);
+    vi.advanceTimersByTime(rifle.reload + 10);
+    const b = r.join('B', ...B);
+    handleShoot(r.room, a, shotAt(a, b));
+    expect(a.ammo[0]!.mag).toBe(big - 1);
   });
 });

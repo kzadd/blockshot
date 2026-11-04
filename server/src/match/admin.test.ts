@@ -6,7 +6,7 @@ import { canJoinTeam, autoBalance, teamCounts } from '../players/teams';
 import { loadRanking, rankingRows, recordMatch, resetRanking } from '../stats/ranking';
 import { makeRoom } from '../testing/fakeRoom';
 import type { Logger } from '../logger';
-import { CHAR_BY_ID, MATCH_RESTART_MS } from '@blockshot/shared';
+import { MATCH_RESTART_MS } from '@blockshot/shared';
 import { spawnPlayer } from '../players/spawn';
 import { adminChangeRoom, adminEnd, adminKill, adminRestart, adminSwitchTeam } from './admin';
 import { startTournament } from './tournament';
@@ -102,7 +102,7 @@ describe('league tournament', () => {
     expect(r.room.modeId).toBe('ffa');
     for (let round = 1; round <= 3; round++) {
       for (const p of [a, b, c]) {
-        if (!p!.alive) spawnPlayer(r.room, p!, CHAR_BY_ID.soldado, 'base');
+        if (!p!.alive) spawnPlayer(r.room, p!);
       }
       Object.assign(a!, { kills: 5 });
       Object.assign(b!, { kills: round === 2 ? 9 : 3 }); // Bea wins round 2

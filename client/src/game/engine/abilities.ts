@@ -16,6 +16,8 @@ const SMOKE_GROW_MS = 700;
 const SMOKE_FADE_MS = 1400;
 const SMOKE_OPACITY = 0.97;
 const SMOKE_DRIFT = 0.12;
+/** How much of the smoke's opacity is left through tactical goggles. */
+const GOGGLES_HAZE = 0.12;
 const WALL_RISE_MS = 220;
 const MINE_BLINK_MS = 700;
 
@@ -36,6 +38,8 @@ preloadProps('smokegren', 'mine', 'sacks');
 
 export class AbilityObjects {
   private readonly objs = new Map<number, Obj>();
+  /** Tactical goggles: the smoke is drawn as a thin haze (the HUD does not grey out either) */
+  seeThrough = false;
 
   constructor(private readonly scene: THREE.Scene) {}
 
@@ -138,7 +142,8 @@ export class AbilityObjects {
       if (o.kind === 'smoke') {
         o.group.scale.setScalar(0.2 + 0.8 * Math.min(1, age / SMOKE_GROW_MS));
         const left = SMOKE.durationMs - age;
-        const alpha = SMOKE_OPACITY * Math.max(0, Math.min(1, left / SMOKE_FADE_MS));
+        const alpha =
+          SMOKE_OPACITY * Math.max(0, Math.min(1, left / SMOKE_FADE_MS)) * (this.seeThrough ? GOGGLES_HAZE : 1);
         for (const p of o.puffs ?? []) {
           p.sprite.material.rotation += p.spin * dt;
           p.sprite.material.opacity = alpha;

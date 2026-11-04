@@ -1,12 +1,17 @@
 import type { ModeId } from '@blockshot/shared';
 import type { Room } from '../rooms/room';
+import { createBomb } from './bomb';
 import { createCaptureTheFlag } from './captureTheFlag';
 import { createDomination } from './domination';
 import { createFreeForAll } from './freeForAll';
+import { createFreezeTag } from './freezeTag';
 import type { GameMode } from './gameMode';
 import { createGunGame } from './gunGame';
 import { createInfected } from './infected';
+import { createInstagib } from './instagib';
 import { createKillConfirmed } from './killConfirmed';
+import { createLastManStanding } from './lastManStanding';
+import { createRace } from './race';
 import { createRounds } from './rounds';
 import { createTeamDeathmatch } from './teamDeathmatch';
 
@@ -20,6 +25,11 @@ const FACTORIES: Record<ModeId, (room: Room) => GameMode> = {
   infect: createInfected,
   dom: createDomination,
   rounds: createRounds,
+  race: createRace,
+  lms: createLastManStanding,
+  insta: createInstagib,
+  freeze: createFreezeTag,
+  bomb: createBomb,
 };
 
 export const createMode = (id: ModeId, room: Room): GameMode => FACTORIES[id](room);

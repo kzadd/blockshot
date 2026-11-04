@@ -2,6 +2,8 @@
 import {
   MAPS,
   MODES,
+  RACE_MAP,
+  fitMapMode,
   MODE_BY_ID,
   VOTE_OPTIONS,
   canSwitchTeam,
@@ -18,17 +20,26 @@ const pick = <T>(list: T[]): T => list[Math.floor(Math.random() * list.length)]!
 
 /** VOTE_OPTIONS map + mode pairs on different maps, none of them the one just played. */
 export function voteOptions(room: Room): VoteOption[] {
-  const maps = MAPS.map((m) => m.id).sort(() => Math.random() - 0.5);
+  // (the race course comes up as an option of its own, with its mode; it is never a tournament round)
+  const maps = MAPS.map((m) => m.id)
+    .filter((m) => !room.tournament || m !== RACE_MAP)
+    .sort(() => Math.random() - 0.5);
   // A tournament is free for all: only the map is voted (a different one)
   if (room.tournament)
     return maps
       .filter((m) => m !== room.map.id)
       .slice(0, VOTE_OPTIONS)
       .map((mapId) => ({ mapId, mode: 'ffa' }));
-  return maps.slice(0, VOTE_OPTIONS).map((mapId) => ({
-    mapId,
-    mode: pick(MODES.map((m) => m.id).filter((mode) => mapId !== room.map.id || mode !== room.modeId)),
-  }));
+  return maps
+    .slice(0, VOTE_OPTIONS)
+    .map((mapId) =>
+      fitMapMode(
+        mapId,
+        pick(
+          MODES.map((m) => m.id).filter((mode) => mode !== 'race' && (mapId !== room.map.id || mode !== room.modeId)),
+        ),
+      ),
+    );
 }
 
 export function startVote(room: Room): VoteOption[] {

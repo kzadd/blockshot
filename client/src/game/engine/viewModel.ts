@@ -27,7 +27,9 @@ import { damp } from './util';
 
 const VM_FOV = 60;
 /** First-person size of gun space (Krunker-like: a rifle at the hip fills the lower-right quarter). */
-const HOLDER_SCALE = 0.95;
+const HOLDER_SCALE = 0.72;
+/** Aimed, the gun sits this many times further from the eye than its model asks: smaller, subtler optic and gun. */
+const ADS_FAR = 2.2;
 /** Reflections for the metal parts: a tiny room environment, prefiltered once. */
 const ENV_INTENSITY = 0.55;
 const ENV_BLUR = 0.04;
@@ -75,12 +77,12 @@ const AIM_Z: Partial<Record<WeaponId, number>> = {
   colt: -0.36,
   benelli: -0.3,
 };
-const HANDGUN_HIP = [-0.09, 0.14, -0.04, 0.0] as const;
+const HANDGUN_HIP = [-0.05, 0.07, -0.04, 0.0] as const;
 const HANDGUN_ADS_HANDS_DROP = 0.025;
 /** Hip position tweaks per gun (x, y, z, pitch): the knife blade up (every gun shares the handguns' framing: the
  * right fist on the grip, the left hand under the barrel, its forearm to the bottom-left). */
 const HIP_OFFSET: Partial<Record<WeaponId, readonly [number, number, number, number]>> = {
-  knife: [0.0, 0.11, -0.06, KNIFE_PITCH - 0.05],
+  knife: [0.0, 0.06, -0.06, KNIFE_PITCH - 0.05],
   // Handguns at their real size hide behind the fist: held higher and further out
   pistol: HANDGUN_HIP,
   colt: HANDGUN_HIP,
@@ -124,6 +126,7 @@ const v3 = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 const HELD: HandPose = { at: v3(-0.22, 0.03, -0.2), back: v3(-1, 0, 0.3), fore: v3(-0.4, -0.7, 0.6) };
 /** Where the left arm waits when nothing needs it (handguns, the knife): low at the bottom-left, fist showing. */
 const DOWN: HandPose = { at: v3(-0.24, -0.25, -0.05), back: v3(-0.3, 1, 0.2), fore: v3(-0.35, -0.8, 0.5) };
+const DOWN_ADS_DROP = 0.35;
 /** Aimed, the forearms run back and down under the gun (no V of two arms across the screen). */
 const AIM_FORE_R = v3(0.2, -0.7, 1);
 const AIM_FORE_L = v3(-0.2, -0.7, 1);
@@ -294,7 +297,10 @@ export class ViewModel {
       const k = Math.sin(throwT * Math.PI);
       target = { ...HELD, at: HELD.at.clone().add(v3(0.1 * k, 0.06 * k, -0.28 * k)) };
     }
-    const rest = this.leftPose ? aimed(this.leftPose, AIM_FORE_L, f.aimLerp, this.handsDrop() * 1.4) : DOWN;
+    // (an idle left hand drops out of view while aiming, instead of floating alone)
+    const rest = this.leftPose
+      ? aimed(this.leftPose, AIM_FORE_L, f.aimLerp, this.handsDrop() * 1.4)
+      : aimed(DOWN, DOWN.fore, f.weapon.melee ? 0 : f.aimLerp, DOWN_ADS_DROP);
     const pose = lerpPose(rest, target, this.offhandUp);
     this.armL.pose(pose);
     // The object sits in the palm, opposite the back of the hand
@@ -307,7 +313,9 @@ export class ViewModel {
    */
   private aimZ(): number {
     const eye = this.gun?.userData.eyeZ;
-    return eye === undefined ? (AIM_Z[this.gunId] ?? DEFAULT_AIM_Z) : -eye * this.holder.scale.z;
+    if (eye === undefined) return (AIM_Z[this.gunId] ?? DEFAULT_AIM_Z) * ADS_FAR;
+    const sight = this.gun!.userData.sightZ ?? 0;
+    return -(sight + (eye - sight) * ADS_FAR) * this.holder.scale.z;
   }
 
   /** How far the fists slide down the grip while aiming (handguns only). */

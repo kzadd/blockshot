@@ -1450,10 +1450,10 @@ function buildFpArm(color: string, skin: string, camo: CamoId, side: number): TH
     { ...(skinMaterials(color, skin, camo) as BodyMaterials), skin: fpSkin(bare) },
     (k) => {
       // Krunker-style: a bare blocky fist, a cuff and one chunky sleeve box running off the screen edge
-      k.box(0.115, 0.1, 0.12, 0, 0.005, 0, 'skin'); // fist
-      k.box(0.035, 0.035, 0.07, -side * 0.055, -0.01, -0.01, 'skin'); // thumb
-      k.box(0.135, 0.125, 0.06, 0, 0, 0.09, 'accent'); // cuff
-      k.box(0.15, 0.14, FP_ARM_LEN, 0, 0, 0.12 + FP_ARM_LEN / 2, 'main'); // sleeve
+      k.box(0.085, 0.075, 0.095, 0, 0.004, 0, 'skin'); // fist
+      k.box(0.026, 0.026, 0.055, -side * 0.041, -0.008, -0.008, 'skin'); // thumb
+      k.box(0.1, 0.092, 0.05, 0, 0, 0.07, 'accent'); // cuff
+      k.box(0.11, 0.1, FP_ARM_LEN, 0, 0, 0.095 + FP_ARM_LEN / 2, 'main'); // sleeve
     },
     false,
   );

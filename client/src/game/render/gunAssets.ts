@@ -530,7 +530,8 @@ const WINDOW_SHARE: Record<OpticKind, number> = { reflex: 0.3, acog: 0.21, holo:
 // (the reflex sight's long low mount may pass under the eye)
 const EYE_CLEAR: Record<OpticKind, number> = { reflex: -0.04, acog: 0.02, holo: 0.02, reddot: 0.02 };
 /** The optic sits this high over the rail's top (its own mount). */
-const OPTIC_RISER = 0.012;
+// (the boxy sights sit higher, so the receiver under the window does not hide a rival's body)
+const OPTIC_RISER: Record<OpticKind, number> = { reflex: 0.012, acog: 0.012, holo: 0.03, reddot: 0.03 };
 /** Iron sights: how far behind the grip the eye sits (gun space, m); handguns are held at arm's length. */
 const RIFLE_EYE = 0.08;
 const HANDGUN_EYE = 0.14;
@@ -555,16 +556,16 @@ function lifted(m: THREE.MeshStandardMaterial): THREE.Material {
   return c;
 }
 const reticleMat = new THREE.MeshBasicMaterial({ color: RETICLE_COLOR, toneMapped: false, side: THREE.DoubleSide });
-const DOT_R = 0.0013;
+const DOT_R = 0.0007;
 /** The reticle floats this far behind the window (eye side), in front of the sight's own emitter. */
 const RETICLE_BEHIND = 0.006;
 const reticleGeo: Record<OpticKind, () => THREE.BufferGeometry> = {
   reflex: () => new THREE.CircleGeometry(DOT_R, 12),
   reddot: () => new THREE.CircleGeometry(DOT_R, 12),
-  holo: () => mergeGeometries([new THREE.RingGeometry(0.0062, 0.0072, 32), new THREE.CircleGeometry(DOT_R * 0.9, 12)])!,
+  holo: () => mergeGeometries([new THREE.RingGeometry(0.0052, 0.0056, 32), new THREE.CircleGeometry(DOT_R, 12)])!,
   acog: () => {
     // Chevron: two short bars meeting at the aim point
-    const bar = (rz: number) => new THREE.PlaneGeometry(0.0007, 0.0035).translate(0, -0.00175, 0).rotateZ(rz);
+    const bar = (rz: number) => new THREE.PlaneGeometry(0.0004, 0.0028).translate(0, -0.0014, 0).rotateZ(rz);
     return mergeGeometries([bar(0.55), bar(-0.55)])!;
   },
 };
@@ -601,7 +602,7 @@ function mountOptic(gun: GunModel, holder: THREE.Object3D, optic: THREE.Group, s
     if (o instanceof THREE.Mesh && /glass/i.test((o.material as THREE.Material).name)) lens.expandByObject(o);
   });
   const centre = lens.isEmpty() ? box.getCenter(new THREE.Vector3()) : lens.getCenter(new THREE.Vector3());
-  pivot.position.set(-centre.x, rail + OPTIC_RISER - box.min.y, cz - (box.min.z + box.max.z) / 2);
+  pivot.position.set(-centre.x, rail + OPTIC_RISER[sight.kind] - box.min.y, cz - (box.min.z + box.max.z) / 2);
   centre.add(pivot.position);
   pivot.traverse((o) => {
     if (!(o instanceof THREE.Mesh)) return;
@@ -609,6 +610,9 @@ function mountOptic(gun: GunModel, holder: THREE.Object3D, optic: THREE.Group, s
     o.material = lifted(o.material as THREE.MeshStandardMaterial);
     // The glass is left out: the scene reads clear through the window
     if (/glass/i.test((o.material as THREE.Material).name)) o.visible = false;
+    // So is the model's own red emitter: only our reticle shows, one dot
+    const c = (o.material as THREE.MeshStandardMaterial).color;
+    if (c && c.r > 0.5 && c.g < 0.1 && c.b < 0.1) o.visible = false;
   });
   let geo = reticles.get(sight.kind);
   if (!geo) reticles.set(sight.kind, (geo = reticleGeo[sight.kind]()));

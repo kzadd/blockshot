@@ -1,32 +1,43 @@
-// The class's accessory on the models (cheap block parts in the characters' style): the Kevlar vest and helmet on
-// the body, the suppressor tube and the laser module on the gun, and the laser's beam and dot for the others.
+// The class's accessory on the models (props.ts models): the Kevlar vest, helmet, night-vision goggles, bandages and
+// the drum magazine on the body; the suppressor and the laser module on the gun, and the laser's beam and dot for
+// the others.
 import * as THREE from 'three';
 import { silenced, type AccessoryId } from '@blockshot/shared';
 import type { CharacterModel, GunModel } from './models';
+import { prop, type PropName } from './props';
 
 const GEAR = 'accessory-gear';
 const KEVLAR = 'accessory-kevlar';
-
-const kevlarMat = new THREE.MeshStandardMaterial({ color: '#4b5139', roughness: 0.85, metalness: 0.05 });
-const strapMat = new THREE.MeshStandardMaterial({ color: '#23262b', roughness: 0.9 });
-const tubeMat = new THREE.MeshStandardMaterial({ color: '#1d2024', roughness: 0.45, metalness: 0.6 });
-const laserBodyMat = new THREE.MeshStandardMaterial({ color: '#2a2d32', roughness: 0.5, metalness: 0.4 });
 const LASER_RED = 0xff2a2a;
-const laserLensMat = new THREE.MeshBasicMaterial({ color: LASER_RED });
 
-const box = (w: number, h: number, d: number, mat: THREE.Material, x: number, y: number, z: number) => {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-  m.position.set(x, y, z);
-  m.castShadow = true;
-  return m;
-};
+/** Suppressor (2026-11-04): length and diameter (m, gun space). */
+const SUPPRESSOR = { len: 0.17, d: 0.042 };
+/** Laser module on the right side of the barrel: size (w, h, d), and how far along the gun (share of the muzzle's z). */
+const LASER_BOX = [0.03, 0.026, 0.065] as const;
+const LASER_AT = 0.6;
+const SLICE = 0.03;
 
-/** Suppressor (2026-11-04): length and radius (m, gun space). */
-const SUPPRESSOR = { len: 0.17, r: 0.024 };
+/** Rightmost point of the gun's model around `z` (gun space), so the laser sits on its side whatever the model. */
+function sideX(gun: GunModel, z: number): number {
+  let x = 0.02;
+  const v = new THREE.Vector3();
+  gun.updateMatrixWorld(true);
+  const inv = gun.matrixWorld.clone().invert();
+  gun.traverse((o) => {
+    if (!(o instanceof THREE.Mesh) || o === gun.userData.flash) return;
+    const m = o.matrixWorld.clone().premultiply(inv);
+    const pos = o.geometry.attributes.position!;
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(m);
+      if (Math.abs(v.z - z) < SLICE && Math.abs(v.y - gun.userData.muzzleY) < 0.05) x = Math.max(x, v.x);
+    }
+  });
+  return x;
+}
 
 /**
  * Puts the accessory's parts on a gun (again after every model swap): a suppressor on the muzzle of a silenced gun,
- * a laser module under the barrel. The muzzle flash moves to the end of the suppressor and shrinks.
+ * a laser module on the right of the barrel. The muzzle flash moves to the end of the suppressor and shrinks.
  */
 export function fitGunGear(gun: GunModel, acc: AccessoryId | null | undefined): void {
   gun.getObjectByName(GEAR)?.removeFromParent();
@@ -36,10 +47,8 @@ export function fitGunGear(gun: GunModel, acc: AccessoryId | null | undefined): 
   const g = new THREE.Group();
   g.name = GEAR;
   if (silenced(id, acc)) {
-    const tube = new THREE.Mesh(new THREE.CylinderGeometry(SUPPRESSOR.r, SUPPRESSOR.r, SUPPRESSOR.len, 10), tubeMat);
-    tube.rotation.x = Math.PI / 2;
-    tube.position.set(0, y, z - SUPPRESSOR.len / 2 + 0.01);
-    tube.castShadow = true;
+    const tube = prop('silencer', [SUPPRESSOR.d, SUPPRESSOR.d, SUPPRESSOR.len]);
+    tube.position.set(0, y - SUPPRESSOR.d / 2, z - SUPPRESSOR.len / 2 + 0.01);
     g.add(tube);
     const flash = gun.userData.flash;
     if (flash && !flash.userData.moved) {
@@ -49,38 +58,58 @@ export function fitGunGear(gun: GunModel, acc: AccessoryId | null | undefined): 
     }
   }
   if (acc === 'laser') {
-    // Under the front of the barrel: the module and its red lens
-    const at = z * 0.6;
-    g.add(box(0.032, 0.03, 0.08, laserBodyMat, 0, y - 0.045, at));
-    g.add(box(0.018, 0.016, 0.004, laserLensMat, 0, y - 0.045, at - 0.042));
+    const [w, h, d] = LASER_BOX;
+    const at = z * LASER_AT;
+    // The PEQ's emitters face +Z in its file: turned round to face the muzzle's way
+    const box = prop('laser', [w, h, d]);
+    box.rotation.y = Math.PI;
+    const x = sideX(gun, at) + w / 2;
+    box.position.set(x, y - h / 2, at);
+    g.add(box);
+    g.userData.laser = new THREE.Vector3(x, y, at - d / 2);
   }
   gun.add(g);
 }
 
-/** Where the laser leaves the gun (gun space), for the beam. */
-export const laserOrigin = (gun: GunModel, out: THREE.Vector3): THREE.Vector3 =>
-  out.set(0, gun.userData.muzzleY - 0.045, gun.userData.muzzleZ * 0.6 - 0.045);
+/** Where the laser leaves the gun (gun space): the module's front face, for the beam. */
+export const laserOrigin = (gun: GunModel, out: THREE.Vector3): THREE.Vector3 => {
+  const at = gun.getObjectByName(GEAR)?.userData.laser as THREE.Vector3 | undefined;
+  return at ? out.copy(at) : out.set(0, gun.userData.muzzleY, gun.userData.muzzleZ * LASER_AT);
+};
 
-/** The armour accessory over whatever kit the body wears: the Kevlar vest, or the helmet (anything else: none). */
+/**
+ * Body accessories: model, size (largest side, or a box it is stretched to), where its bottom-centre goes and how it
+ * turns, on the upper body or (`thigh`) the left thigh. Drawn a bit bigger than any class kit under them.
+ */
+const WORN: Partial<
+  Record<
+    AccessoryId,
+    {
+      prop: PropName;
+      size: number | [number, number, number];
+      at: [number, number, number];
+      rot?: [number, number, number];
+      thigh?: boolean;
+    }
+  >
+> = {
+  kevlar: { prop: 'kevlar', size: [0.6, 0.54, 0.46], at: [0, 0.95, 0] },
+  helmet: { prop: 'helmet', size: [0.42, 0.36, 0.5], at: [0, 1.57, 0.02] },
+  goggles: { prop: 'goggles', size: 0.2, at: [0, 1.76, -0.17] },
+  bandage: { prop: 'bandage', size: 0.11, at: [-0.1, -0.2, 0], thigh: true },
+  ammo: { prop: 'ammo', size: 0.17, at: [0.1, 0.8, 0.19], rot: [0, Math.PI / 2, 0] },
+};
+
+/** The body accessory over whatever kit the body wears (the gun ones are fitGunGear's). */
 export function wearKevlar(model: CharacterModel, acc: AccessoryId | null | undefined): void {
-  model.upper.getObjectByName(KEVLAR)?.removeFromParent();
-  if (acc !== 'kevlar' && acc !== 'helmet') return;
-  const g = new THREE.Group();
+  for (const part of [model.upper, model.legL]) part.getObjectByName(KEVLAR)?.removeFromParent();
+  const w = acc ? WORN[acc] : undefined;
+  if (!w) return;
+  const g = prop(w.prop, w.size);
   g.name = KEVLAR;
-  if (acc === 'helmet') {
-    // A shell over the head with a brim (drawn a bit bigger than any hat under it)
-    g.add(box(0.36, 0.13, 0.38, kevlarMat, 0, 1.83, 0.01));
-    g.add(box(0.38, 0.05, 0.4, kevlarMat, 0, 1.765, 0.01));
-    g.add(box(0.33, 0.03, 0.08, strapMat, 0, 1.79, -0.2)); // front rim
-    model.upper.add(g);
-    return;
-  }
-  g.add(box(0.47, 0.4, 0.07, kevlarMat, 0, 1.19, -0.19)); // front plate
-  g.add(box(0.47, 0.42, 0.07, kevlarMat, 0, 1.19, 0.19)); // back plate
-  g.add(box(0.53, 0.14, 0.42, kevlarMat, 0, 1.02, 0)); // side wrap
-  for (const x of [-0.15, 0.15]) g.add(box(0.07, 0.04, 0.42, strapMat, x, 1.42, 0)); // shoulder straps
-  for (const x of [-0.12, 0, 0.12]) g.add(box(0.09, 0.1, 0.04, strapMat, x, 1.09, -0.24)); // pouches
-  model.upper.add(g);
+  g.position.set(...w.at);
+  if (w.rot) g.rotation.set(...w.rot);
+  (w.thigh ? model.legL : model.upper).add(g);
 }
 
 /** Longest a remote's laser is drawn (m). */

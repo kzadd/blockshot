@@ -60,6 +60,7 @@ export interface SpawnRequest extends ClassChoice {
 export function spawnPlayer(room: Room, p: Player, req?: SpawnRequest): void {
   const now = Date.now();
   const [x, y, z, ry] = pickSpawn(room, p);
+  room.mode.onSpawn?.(room, p);
   const hp = Math.round(BODY.hp * (room.mode.hpFactor?.(p) ?? 1));
   const r: SpawnRequest = req ?? {
     ...p.cls,

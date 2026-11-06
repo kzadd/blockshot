@@ -7,6 +7,7 @@ import {
   BTN_JUMP,
   BTN_JUMP_PRESSED,
   BTN_SHOT,
+  BTN_SHOVE,
   BTN_SPRINT,
   type MoveInput,
 } from '@blockshot/shared';
@@ -64,6 +65,8 @@ export class InputController {
   private shot = false;
   /** the dash was asked for since the last command */
   private dash = false;
+  /** V (shove) went down since the last command */
+  private shove = false;
   private readonly off: (() => void)[] = [];
 
   constructor(
@@ -116,6 +119,7 @@ export class InputController {
     if (!this.actions.canAct() || !this.locked || e.repeat) return;
     if (this.actions.intercept(e.code)) return;
     if (e.code === 'Space') this.jumpPressed = true;
+    if (e.code === 'KeyV') this.shove = true;
     if (e.code === 'Digit1') this.actions.switchSlot(0);
     if (e.code === 'Digit2') this.actions.switchSlot(1);
     if (e.code === 'Digit3') this.actions.switchSlot(2);
@@ -194,7 +198,9 @@ export class InputController {
     if (this.mouseDown) b |= BTN_FIRE;
     if (this.shot) b |= BTN_SHOT;
     if (live && this.dash) b |= BTN_DASH;
+    if (live && this.shove) b |= BTN_SHOVE;
     this.jumpPressed = false;
+    this.shove = false;
     this.shot = false;
     this.dash = false;
     return { seq, f, s, yaw: this.yaw, pitch: this.pitch, b, slot };

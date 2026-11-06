@@ -8,6 +8,7 @@ import type { TournamentResult } from '../modes/tournament';
 import type { MapId, PickupKind, SizeId } from '../maps/types';
 import type { BotLevel } from '../modes/bots';
 import type { MedalId } from '../modes/medals';
+import type { ZombieKind } from '../modes/infect';
 import type { ModeId, SideTeam, Team } from '../modes/modes';
 import type { MoveInput, MoveState } from '../movement/movement';
 import type { WeaponId } from '../weapons/weapons';
@@ -130,6 +131,18 @@ export interface PlayerSnapshot {
   wc: [number, number];
   /** the class's accessory (others see the vest, the laser, the suppressor); null before the first spawn */
   ax: AccessoryId | null;
+  /** 1: caught camping, rivals see it on their minimap until it leaves the zone (anti-camping) */
+  camp?: number;
+  /** rank points from the all-time ranking (none for bots and newcomers) */
+  rp?: number;
+  /** 1: aiming (right button): the death replay and spectators see the sight as the player did */
+  ad?: number;
+  /** Infectados: the infected's type (none for survivors) */
+  zt?: ZombieKind;
+  /** the mode's walking speed factor when it is not 1 (infected types, the scream's slow): the client predicts with it */
+  sf?: number;
+  /** ms until the mode's key F is ready again (Infectados: barricade or scream); absent: the mode has none */
+  fc?: number;
 }
 
 export interface FlagSnapshot {
@@ -150,6 +163,22 @@ export interface InfectSnapshot {
   st: number;
   /** ms left (match, or until the first pick; -1 = waiting for players) */
   t: number;
+  /** 1 in the last stretch: the infected see every survivor on their minimap */
+  rv?: number;
+  /** the last survivor (everybody sees him on the minimap) */
+  ls?: string;
+  /** 1 while his announcement is on screen (LAST_STAND.bannerMs) */
+  la?: number;
+  /** blackout: 1 about to start (warning), 2 lights out */
+  bo?: 1 | 2;
+}
+
+/** Traidores: what everybody may know (never the roles: those go to each player alone, `traitor:role`). */
+export interface TraitorSnapshot {
+  /** bodies lying where they fell: [player id, x, y, z] */
+  bd: [string, number, number, number][];
+  /** a meeting is on: ms left, who called it, whose body was found ('' for an emergency), who already voted */
+  mt?: { t: number; by: string; body: string; vd: string[] };
 }
 
 /** Domination zone: [owner, capture -100 (Blue) … 100 (Red), contested] */
@@ -184,10 +213,13 @@ export interface BombSnapshot {
   t: number;
 }
 
+/** Shrinking zone: [centre x, ground y, centre z, radius]. */
+export type ZoneSnapshot = [number, number, number, number];
+
 /** Grenade in flight: [id, x, y, z] */
 export type GrenadeSnapshot = [number, number, number, number];
 /** Ability objects in the world: [id, kind, x, y, z, along (wall: 0 = runs along x, 1 = along z), team, owner]. */
-export type DeployableKind = 'smoke' | 'mine' | 'wall';
+export type DeployableKind = 'smoke' | 'mine' | 'wall' | 'plank';
 export type DeployableSnapshot = [number, DeployableKind, number, number, number, number, Team, string];
 
 /** Map objects not there right now (indices): [fallen barrels, broken crates, taken pickups]. */
@@ -215,6 +247,10 @@ export interface StateSnapshot {
   ic: IceSnapshot[] | null;
   /** bomb mode: the bomb */
   bm: BombSnapshot | null;
+  /** shrinking zone (Supervivencia, Último en pie, Por equipos) */
+  zn: ZoneSnapshot | null;
+  /** Traidores: bodies and the meeting */
+  tt: TraitorSnapshot | null;
 }
 
 /** A batch of input commands (sent every CLIENT_SEND_MS, one command per FIXED_DT step). */
@@ -369,8 +405,12 @@ export interface ServerToClientEvents {
   pickup: (k: PickupKind | 'power') => void;
   /** a moving obstacle knocked you this way (x, z) */
   knocked: (d: { x: number; z: number }) => void;
+  /** Paciente cero's scream at `at`: `hit` are the survivors it slowed (their screen shakes) */
+  scream: (d: { id: string; at: Vec3; hit: string[] }) => void;
   /** the admin removed you from the room (you are back in the lobby) */
   kicked: (reason: string) => void;
+  /** Traidores, to each player alone at the start of a round: its role, and (traitors only) the other traitors */
+  'traitor:role': (d: { traitor: boolean; mates: string[] }) => void;
 }
 
 export interface ClientToServerEvents {
@@ -405,7 +445,13 @@ export interface ClientToServerEvents {
   'player:grenade': (d: { o: Vec3; d: Vec3 }) => void;
   /** key E (the dash goes with the movement commands instead) */
   'player:ability': (d: { o: Vec3; d: Vec3 }) => void;
+  /** key F: the mode's action (Infectados: a survivor's barricade, the Paciente cero's scream) */
+  'player:action': (d: { o: Vec3; d: Vec3 }) => void;
+  /** Infectados: the infected type to respawn as (ZombieType; anything else: back to rotating) */
+  'infect:pick': (d: { z: string }) => void;
   vote: (d: { i: number }) => void;
+  /** Traidores: vote in the meeting (a player id, '' to skip) */
+  'traitor:vote': (d: { id: string }) => void;
   'admin:stats': (cb: (rows: SessionStatsRow[]) => void) => void;
   /** everybody: the ranking (best first) */
   'ranking:get': (cb: (rows: RankingRow[]) => void) => void;
@@ -419,5 +465,5 @@ export interface ClientToServerEvents {
   'admin:lock': (d: { locked: boolean }) => void;
   'admin:ranking:reset': () => void;
   /** start a league of that many rounds (0 = stop it) */
-  'tournament:set': (d: { rounds: number }) => void;
+  'tournament:set': (d: { rounds: number; mode?: ModeId }) => void;
 }

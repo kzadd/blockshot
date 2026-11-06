@@ -80,10 +80,13 @@ export const PLAYER = {
   respawnDelay: 3000,
   /** ms without taking damage before regenerating */
   regenDelay: 5000,
-  /** Anti-camping: staying within campRadius m for campMs drains campDrain hp/s (down to 1 hp) until you move */
-  campRadius: 3,
-  campMs: 10000,
-  campDrain: 6,
+  /** Anti-camping: the zone is anchored where you stopped and only leaving it (further than campRadius m) resets it.
+   * After campWarnMs in it you are warned; from campMs rivals see you on the minimap and you lose campDrain hp/s,
+   * which can kill you */
+  campRadius: 8,
+  campWarnMs: 10000,
+  campMs: 15000,
+  campDrain: 10,
   /** hp per second */
   regenRate: 15,
   /** ms invulnerable after spawning (lost when shooting) */
@@ -92,6 +95,12 @@ export const PLAYER = {
    * ms, the spawn protection does not run down and the anti-camping clock does not start */
   idleGrace: 10000,
 };
+
+/**
+ * Pushes with no damage (race shots and the shove key V): `push` m/s away along the hit and `lift` m/s up. The shove
+ * reaches whoever is within `range` m in front (cosine of the cone's half angle `cone`), once every `cooldownMs`.
+ */
+export const SHOVE = { push: 7, lift: 4, range: 1.6, cone: 0.6, cooldownMs: 1000 };
 
 /** Jump pads (boxes of kind 'pad'): vertical impulse when stepped on. */
 export const PAD = { power: 17, h: 0.3, size: 1.8 };

@@ -1,9 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DOM, ROUNDS, SERVER_TICK_MS, WEAPONS, dominationZones } from '@blockshot/shared';
+import {
+  DOM,
+  MAPS,
+  ROUNDS,
+  SERVER_TICK_MS,
+  WEAPONS,
+  bombSites,
+  dominationZones,
+  getMap,
+  mapFits,
+} from '@blockshot/shared';
 import { applyDamage } from '../combat/damage';
 import { buildSnapshot } from '../game/tick';
 import { adminKill } from '../match/admin';
 import type { Player } from '../players/player';
+import { pickSpawn } from '../players/spawn';
 import { makeRoom, type FakeRoom } from '../testing/fakeRoom';
 
 const kill = (r: FakeRoom, a: Player, b: Player) => {
@@ -88,7 +99,27 @@ describe('rounds', () => {
     const c = r.join('C'); // Red has two players
     play(r, ROUNDS.breakMs + 100);
     expect(c.team).toBe(1);
+    // Everybody at the zone's centre: the shrinking zone must not decide it
+    const [x, y, z] = r.room.mode.snapshot!(r.room, Date.now()).zn!;
+    for (const p of r.room.players.values()) r.place(p, x, z, y);
     play(r, ROUNDS.roundMs);
     expect(r.room.teamScore).toEqual({ 1: 1, 2: 0 });
+  });
+});
+
+describe('team sides', () => {
+  const maps = MAPS.filter((m) => mapFits(m.id, 'bomb')).map((m) => m.id);
+  it.each(maps)('%s: Bomba and Supervivencia spawn Red west, Blue east; the bomb sites are on Blue’s side', (mapId) => {
+    for (const mode of ['bomb', 'rounds'] as const) {
+      const r = makeRoom(mode, 3, mapId);
+      const red = r.join('Rojo');
+      const blue = r.join('Azul');
+      expect([red.team, blue.team]).toEqual([1, 2]);
+      for (let i = 0; i < 10; i++) {
+        expect(pickSpawn(r.room, red)[0]).toBeLessThan(0);
+        expect(pickSpawn(r.room, blue)[0]).toBeGreaterThan(0);
+      }
+    }
+    for (const [x] of bombSites(getMap(mapId, 'm'))) expect(x).toBeGreaterThan(0);
   });
 });

@@ -14,6 +14,7 @@ import { createLastManStanding } from './lastManStanding';
 import { createRace } from './race';
 import { createRounds } from './rounds';
 import { createTeamDeathmatch } from './teamDeathmatch';
+import { createTraitor } from './traitor';
 
 /** Open/closed: a new mode is a new file plus one line here. */
 const FACTORIES: Record<ModeId, (room: Room) => GameMode> = {
@@ -30,6 +31,7 @@ const FACTORIES: Record<ModeId, (room: Room) => GameMode> = {
   insta: createInstagib,
   freeze: createFreezeTag,
   bomb: createBomb,
+  traitor: createTraitor,
 };
 
 export const createMode = (id: ModeId, room: Room): GameMode => FACTORIES[id](room);

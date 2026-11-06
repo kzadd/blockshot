@@ -104,11 +104,11 @@ export class CameraRig {
     this.apply();
   }
 
-  /** Death replay: exactly where the killer was looking. */
-  replay(x: number, y: number, z: number, yaw: number, pitch: number): void {
+  /** Death replay and spectating: exactly where that player was looking, zoomed in as far as they were. */
+  replay(x: number, y: number, z: number, yaw: number, pitch: number, zoom = 1): void {
     this.camera.position.set(x, y, z);
     this.camera.rotation.set(pitch, yaw, 0);
-    this.fov = this.baseFov;
+    this.fov = this.baseFov / zoom;
     this.apply();
   }
 

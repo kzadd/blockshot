@@ -9,6 +9,7 @@ import {
   type StateSnapshot,
 } from '@blockshot/shared';
 import { deployableSnapshot } from '../combat/abilities';
+import { dieAlone } from '../combat/damage';
 import { grenadeSnapshot } from '../combat/grenades';
 import { objectsSnapshot, powerSnapshot } from '../combat/worldObjects';
 import { serverConfig } from '../config';
@@ -16,6 +17,8 @@ import { sendAcks } from '../players/movement';
 import type { Player } from '../players/player';
 import { autoBalance, isTeamRoom } from '../players/teams';
 import type { Room } from '../rooms/room';
+import { isBot } from '../players/bot';
+import { rankPointsOf } from '../stats/ranking';
 
 const MS_PER_S = 1000;
 /** Cooldowns go out rounded to this (the HUD counts whole seconds). */
@@ -27,6 +30,9 @@ function regenerate(p: Player, now: number, dt: number): void {
   const [delay, rate] = regenOf(p.cls?.accessory, PLAYER.regenDelay, PLAYER.regenRate);
   if (now - p.lastDamage > delay) p.hp = Math.min(p.maxHp, p.hp + rate * dt);
 }
+
+/** Caught camping: in the same zone for PLAYER.campMs (rivals see the player on the minimap). */
+const camping = (p: Player, now: number): boolean => p.alive && p.campSince > 0 && now - p.campSince >= PLAYER.campMs;
 
 const playerSnapshot = (p: Player, now: number): PlayerSnapshot => ({
   id: p.id,
@@ -64,6 +70,9 @@ const playerSnapshot = (p: Player, now: number): PlayerSnapshot => ({
   pw: p.power,
   wc: choiceIndex(p),
   ax: p.cls?.accessory ?? null,
+  ...(camping(p, now) && { camp: 1 }),
+  ...(!isBot(p) && { rp: rankPointsOf(p.name) }),
+  ...(p.alive && p.aiming && { ad: 1 }),
 });
 
 /** The class's weapons as indices into PRIMARIES / SIDEARMS (0 = the default class's). */
@@ -79,7 +88,10 @@ export function buildSnapshot(room: Room, now: number): StateSnapshot {
   const mode = room.mode.snapshot?.(room, now) ?? {};
   return {
     t: now,
-    players: [...room.players.values()].map((p) => playerSnapshot(p, now)),
+    players: [...room.players.values()].map((p) => ({
+      ...playerSnapshot(p, now),
+      ...room.mode.playerSnapshot?.(p, now),
+    })),
     ts: isTeamRoom(room) ? room.teamScore : null,
     fl: mode.fl ?? null,
     tg: mode.tg ?? null,
@@ -92,29 +104,40 @@ export function buildSnapshot(room: Room, now: number): StateSnapshot {
     rd: mode.rd ?? null,
     ic: mode.ic ?? null,
     bm: mode.bm ?? null,
+    zn: mode.zn ?? null,
+    tt: mode.tt ?? null,
   };
 }
 
 /**
- * Anti-camping: a player who stays within PLAYER.campRadius of the same spot for PLAYER.campMs loses health
- * (never below 1, and no regeneration meanwhile) until it moves away. Not in the race (everybody runs there).
+ * Anti-camping: the zone is anchored where the player settled, and only leaving it (further than PLAYER.campRadius
+ * from the anchor) starts it again. After PLAYER.campWarnMs in it the player is warned; from PLAYER.campMs rivals see
+ * it on the minimap (snapshot `camp`) and it loses health with no regeneration, until it leaves or dies of it. Not in
+ * the race (everybody runs there) nor in Traidores (hiding and waiting is the game; the minimap mark would out people).
  */
 function campCheck(room: Room, p: Player, now: number, dt: number): void {
-  if (!serverConfig.campRule || !p.alive || room.modeId === 'race' || room.matchOver) return;
+  if (!serverConfig.campRule || !p.alive || room.modeId === 'race' || room.modeId === 'traitor' || room.matchOver)
+    return;
+  if (room.mode.paused?.()) {
+    p.campSince = 0; // between rounds: the clock starts again when the round does
+    return;
+  }
   const [x, y, z] = p.campAt;
   if (!p.campSince || Math.hypot(p.x - x, p.y - y, p.z - z) > PLAYER.campRadius) {
     p.campAt = [p.x, p.y, p.z];
     p.campSince = now;
     return;
   }
-  if (now - p.campSince < PLAYER.campMs) return;
-  if (now - p.campSince - PLAYER.campMs < dt * MS_PER_S)
-    room.channel.to(p.id, 'notice', [
-      '¡Muévete! Llevas mucho rato en el mismo sitio: pierdes vida hasta que cambies de lugar',
-    ]);
+  const t = now - p.campSince;
+  const reached = (ms: number) => t >= ms && t - ms < dt * MS_PER_S;
+  const left = (PLAYER.campMs - PLAYER.campWarnMs) / MS_PER_S;
+  if (reached(PLAYER.campWarnMs))
+    room.channel.to(p.id, 'notice', [`¡Sal de esta zona! En ${left} s te verán en el minimapa y perderás vida`]);
+  if (t < PLAYER.campMs) return;
+  if (reached(PLAYER.campMs)) room.channel.to(p.id, 'notice', ['¡Te ven en el minimapa! Sal de la zona o morirás']);
   p.lastDamage = now;
-  if (p.hp <= 1) return;
-  p.hp = Math.max(1, p.hp - PLAYER.campDrain * dt);
+  p.hp -= PLAYER.campDrain * dt;
+  if (p.hp <= 0) return dieAlone(room, p, 'Campeo');
   room.channel.to(p.id, 'damaged', [{ hp: Math.ceil(p.hp), from: [round2(p.x), round2(p.z)] }]);
 }
 

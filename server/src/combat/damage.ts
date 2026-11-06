@@ -1,4 +1,5 @@
 import {
+  HIDDEN_KILLER,
   LONGSHOT_M,
   MULTI_KILL_MS,
   STREAK_REWARDS,
@@ -7,6 +8,7 @@ import {
   type Vec3,
   type Weapon,
 } from '@blockshot/shared';
+import { pushPlayer } from '../players/movement';
 import type { Player } from '../players/player';
 import { notice, type Room } from '../rooms/room';
 import { callStrike } from './strike';
@@ -61,6 +63,13 @@ export function applyDamage(
   const now = Date.now();
   // Just respawned: invulnerable for a few seconds (until it shoots)
   if (!victim.alive || now < victim.protUntil) return;
+  const at: Vec3 = [round2(at3[0]), round2(at3[1]), round2(at3[2])];
+  // Race: shots and the knife push instead of hurting (knock rivals off the course into the lava)
+  if (room.modeId === 'race') {
+    pushPlayer(victim, victim.x - shooter.x, victim.z - shooter.z);
+    room.channel.to(shooter.id, 'hitmarker', [{ head, kill: false, dmg: 0, at, id: victim.id }]);
+    return;
+  }
   dmg = room.mode.damage?.(shooter, victim, w, dmg) ?? dmg;
   // Armor (streak reward) is spent before health
   const absorbed = Math.min(victim.armor || 0, dmg);
@@ -71,7 +80,6 @@ export function applyDamage(
     { hp: Math.max(0, Math.ceil(victim.hp)), from: [round2(shooter.x), round2(shooter.z)] },
   ]);
 
-  const at: Vec3 = [round2(at3[0]), round2(at3[1]), round2(at3[2])];
   if (victim.hp > 0) {
     room.channel.to(shooter.id, 'hitmarker', [{ head, kill: false, dmg: Math.round(dmg), at, id: victim.id }]);
     return;
@@ -89,24 +97,78 @@ export function applyDamage(
   const reward = grantStreakReward(room, shooter, now);
   const medals = medalsFor(room, shooter, victim, w, dmg, head, now);
   room.channel.to(shooter.id, 'hitmarker', [{ head, kill: true, dmg: Math.round(dmg), at, id: victim.id }]);
-  room.channel.broadcast('kill', [
+  if (room.mode.secretKills) secretKill(room, victim, w.name);
+  else
+    room.channel.broadcast('kill', [
+      {
+        killer: shooter.id,
+        killerName: shooter.name,
+        killerTeam: shooter.team,
+        killerClass: shooter.cls,
+        killerHp: Math.ceil(shooter.hp),
+        victim: victim.id,
+        victimName: victim.name,
+        victimTeam: victim.team,
+        weapon: w.name,
+        head,
+        streak: shooter.streak,
+        ended,
+        reward,
+        medals,
+      },
+    ]);
+  if (reward) notice(room, `${shooter.name} consiguió ${reward} por su racha`);
+  room.mode.onKill(room, shooter, victim, w);
+}
+
+/** Traidores: only the victim hears of its death, as if nobody had killed it (no killer, no death replay). */
+function secretKill(room: Room, victim: Player, weapon: string): void {
+  room.channel.to(victim.id, 'kill', [
     {
-      killer: shooter.id,
-      killerName: shooter.name,
-      killerTeam: shooter.team,
-      killerClass: shooter.cls,
-      killerHp: Math.ceil(shooter.hp),
+      killer: victim.id,
+      killerName: HIDDEN_KILLER,
+      killerTeam: 0,
+      killerClass: null,
+      killerHp: 0,
       victim: victim.id,
       victimName: victim.name,
       victimTeam: victim.team,
-      weapon: w.name,
-      head,
-      streak: shooter.streak,
-      ended,
-      reward,
-      medals,
+      weapon,
+      head: false,
+      streak: 0,
+      ended: 0,
+      reward: undefined,
+      medals: [],
     },
   ]);
-  if (reward) notice(room, `${shooter.name} consiguió ${reward} por su racha`);
-  room.mode.onKill(room, shooter, victim, w);
+}
+
+/**
+ * A death nobody scores (the admin's «Matar», falling into the void, camping): the kill feed shows `cause` as the
+ * killer and the weapon, with the victim as its own killer (no death replay). `counts`: it adds to the deaths.
+ */
+export function dieAlone(room: Room, p: Player, cause: string, counts = true): void {
+  if (!p.alive) return;
+  Object.assign(p, { alive: false, hp: 0, armor: 0, streak: 0, deathTime: Date.now() });
+  if (counts) p.deaths++;
+  p.inputs.length = 0;
+  room.channel.broadcast('kill', [
+    {
+      killer: p.id,
+      killerName: cause,
+      killerTeam: 0,
+      killerClass: null,
+      killerHp: 0,
+      victim: p.id,
+      victimName: p.name,
+      victimTeam: p.team,
+      weapon: cause,
+      head: false,
+      streak: 0,
+      ended: 0,
+      reward: undefined,
+      medals: [],
+    },
+  ]);
+  room.mode.onDeath?.(room, p); // a round mode may end the round now (a team wiped out); Infected infects
 }

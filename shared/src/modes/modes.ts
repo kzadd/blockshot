@@ -1,4 +1,6 @@
 import type { PlayerClass } from '../characters/characters';
+import { PLAYER } from '../player/player';
+import type { MapId } from '../maps/types';
 import type { WeaponId } from '../weapons/weapons';
 
 export type ModeId =
@@ -14,7 +16,8 @@ export type ModeId =
   | 'lms'
   | 'insta'
   | 'freeze'
-  | 'bomb';
+  | 'bomb'
+  | 'traitor';
 /** 0 = no team (free for all) · 1 = Red / Survivors · 2 = Blue / Infected */
 export type Team = 0 | 1 | 2;
 export type SideTeam = 1 | 2;
@@ -43,6 +46,7 @@ export const MODES: ModeInfo[] = [
   { id: 'insta', name: 'Disparo único', limits: [15, 25, 40], def: 25, unit: 'bajas' },
   { id: 'freeze', name: 'Congelados', limits: [3, 5, 7], def: 3, unit: 'rondas' },
   { id: 'bomb', name: 'Bomba', limits: [3, 5, 7], def: 3, unit: 'rondas' },
+  { id: 'traitor', name: 'Traidores', limits: [3, 5, 8], def: 5, unit: 'puntos' },
 ];
 export const MODE_BY_ID = Object.fromEntries(MODES.map((m) => [m.id, m])) as Record<ModeId, ModeInfo>;
 export const isModeId = (v: unknown): v is ModeId => typeof v === 'string' && Object.hasOwn(MODE_BY_ID, v);
@@ -107,10 +111,14 @@ export const TAG = { radius: 1.5, lifeMs: 30000 };
 /** Pick-up zones (flags, tags) ignore anything further than this vertically (m). */
 export const PICKUP_MAX_DY = 2.5;
 /**
- * Infected: the first infected is picked once 2 players are alive; infected only carry the knife and are
- * faster and tougher. If survivors remain when time runs out (minutes chosen at room creation), they win.
+ * Infected: the first infected (one per `perInfected` players, at least one) are picked once 2 players are alive;
+ * infected only carry the knife, are faster and tougher and respawn after `respawnMs`. If survivors remain when time
+ * runs out (minutes chosen at room creation), they win. In the last `revealMs` the infected see every survivor.
  */
-export const INFECT = { pickDelay: 10000, speed: 1.15, hp: 1.3 };
+export const INFECT = { pickDelay: 10000, speed: 1.25, hp: 2, respawnMs: 1000, perInfected: 4, revealMs: 30000 };
+/** ms a dead player waits before respawning (the infected come back sooner). */
+export const respawnDelayOf = (mode: ModeId, team: Team): number =>
+  mode === 'infect' && team === 2 ? INFECT.respawnMs : PLAYER.respawnDelay;
 /** Rounds: time limit of a round and the break before the next one (ms). */
 export const ROUNDS = { roundMs: 120000, breakMs: 4000 };
 /**
@@ -177,8 +185,10 @@ export function loadoutOf(
   team: Team = 0,
 ): WeaponId[] {
   if (mode === 'infect' && team === 2) return ['knife'];
-  // Racing: only the sidearm and the knife (to knock rivals back to their checkpoint, no sniping from the start)
+  // Racing: only the sidearm and the knife (their hits push rivals off the course, no sniping from the start)
   if (mode === 'race') return [cls.secondary, 'knife'];
+  // Traidores: everybody looks alike, so everybody carries the same (the traitors' knife kills with one hit)
+  if (mode === 'traitor') return [cls.secondary, 'knife'];
   if (mode === 'insta') return ['railgun', 'knife'];
   if (mode === 'gungame') {
     const ladder = gunLadder(limit);
@@ -188,13 +198,36 @@ export function loadoutOf(
   return [cls.primary, cls.secondary, 'knife'];
 }
 
-/** Carrera is only played on Circuito, and Circuito only hosts Carrera. */
+/** Carrera is only played on its courses (Circuito, Verbena, Tarta), and they only host Carrera. */
 export const RACE_MAP = 'circuito';
-/** The map and mode that go together: picking one of the race pair brings the other. */
-export function fitMapMode<M extends string>(mapId: M, mode: ModeId): { mapId: M | typeof RACE_MAP; mode: ModeId } {
-  if (mode === 'race') return { mapId: RACE_MAP, mode };
-  if (mapId === RACE_MAP) return { mapId, mode: 'race' };
-  return { mapId, mode };
+/** Maps built for some modes only: they host just these (any map not listed hosts every mode but RACE-like ones). */
+export const MAP_ONLY: Partial<Record<MapId, readonly ModeId[]>> = {
+  circuito: ['race'],
+  verbena: ['race'],
+  tarta: ['race'],
+  // Built for Infectados (tight, dark corridors) and Bomba (attack west, two sites east): no CTF bases, no mirror
+  sanatorio: ['infect', 'ffa', 'lms', 'traitor'],
+  aduana: ['bomb', 'rounds', 'teams'],
+};
+/** Modes played only on the maps that list them in MAP_ONLY. */
+const OWN_MAPS_ONLY: ReadonlySet<ModeId> = new Set(['race']);
+/** Modes played on some maps only, which keep hosting every other mode too (Traidores: rooms and corridors to sneak). */
+const MODE_MAPS: Partial<Record<ModeId, readonly MapId[]>> = {
+  traitor: ['sanatorio', 'monasterio', 'pueblo', 'ciudad', 'estacion'],
+};
+/** Whether this map hosts this mode (the create form, the vote and the server check it). */
+export const mapFits = (mapId: MapId, mode: ModeId): boolean =>
+  (MODE_MAPS[mode]?.includes(mapId) ?? true) && (MAP_ONLY[mapId]?.includes(mode) ?? !OWN_MAPS_ONLY.has(mode));
+/**
+ * The pair that fits (mapFits): a mode played on its own maps only moves to the first of them, otherwise a map that
+ * hosts some modes only brings its first one (picking one of the race pair brings the other).
+ */
+export function fitMapMode(mapId: MapId, mode: ModeId): { mapId: MapId; mode: ModeId } {
+  if (mapFits(mapId, mode)) return { mapId, mode };
+  const own = OWN_MAPS_ONLY.has(mode)
+    ? (Object.keys(MAP_ONLY) as MapId[]).find((m) => mapFits(m, mode))
+    : MODE_MAPS[mode]?.find((m) => mapFits(m, mode));
+  return own ? { mapId: own, mode } : { mapId, mode: MAP_ONLY[mapId]![0]! };
 }
 /** A race checkpoint you fall below this height from goes back to (m). */
 export const RACE_FALL_Y = 2;
@@ -208,14 +241,3 @@ export const seasonPoints = (r: {
   caps: number;
   medals: number;
 }): number => Math.max(0, r.wins * 30 + r.kills * 2 + r.heads + r.caps * 5 + r.medals * 3 - r.deaths);
-
-/** Season divisions, from the points they start at. */
-export const DIVISIONS = [
-  { name: 'Bronce', from: 0 },
-  { name: 'Plata', from: 150 },
-  { name: 'Oro', from: 400 },
-  { name: 'Platino', from: 900 },
-  { name: 'Diamante', from: 1800 },
-  { name: 'Leyenda', from: 3500 },
-] as const;
-export const divisionOf = (points: number) => [...DIVISIONS].reverse().find((d) => points >= d.from)!;

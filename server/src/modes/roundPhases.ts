@@ -15,6 +15,8 @@ export interface RoundHooks {
   timeUp(now: number): void;
   /** a round just started (everybody respawned) */
   started?(now: number): void;
+  /** ms a round lasts (ROUNDS.roundMs by default) */
+  roundMs?: number;
 }
 
 export function roundPhases(room: Room, hooks: RoundHooks) {
@@ -26,7 +28,7 @@ export function roundPhases(room: Room, hooks: RoundHooks) {
   function start(now: number): void {
     phase = 'play';
     round++;
-    until = now + ROUNDS.roundMs;
+    until = now + (hooks.roundMs ?? ROUNDS.roundMs);
     // Everybody back with full health, at once
     for (const p of room.players.values()) {
       if (p.cls) spawnPlayer(room, p);
@@ -40,6 +42,10 @@ export function roundPhases(room: Room, hooks: RoundHooks) {
     round: () => round,
     /** ms left in the round (or the break) */
     left: (now: number) => Math.max(0, until - now),
+    /** Gives the round (or the break) `ms` more: Traidores' meetings stop its clock. */
+    extend(ms: number): void {
+      until += ms;
+    },
     /** The round is over: a break before the next one. */
     end(now: number): void {
       phase = 'break';

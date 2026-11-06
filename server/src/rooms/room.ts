@@ -61,8 +61,6 @@ export interface Room {
   world: WorldObjects;
   /** the admin closed the room: nobody new can join */
   closed: boolean;
-  /** names the admin kicked: they cannot come back to this room */
-  banned: Set<string>;
   /** league tournament in progress (null: normal matches) */
   tournament: Tournament | null;
 }

@@ -160,6 +160,7 @@ export const MODE_ICON: Record<ModeId, IconName> = {
   insta: 'zap',
   freeze: 'snow',
   bomb: 'bomb',
+  traitor: 'users',
 };
 
 export function Icon({ name, size = 16, className }: { name: IconName; size?: number; className?: string }) {

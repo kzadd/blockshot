@@ -1,6 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { FLAG, INFECT, MATCH_RESTART_MS, TAG, WEAPONS, gunLadder } from '@blockshot/shared';
-import { applyDamage } from '../combat/damage';
+import {
+  FLAG,
+  INFECT,
+  MATCH_RESTART_MS,
+  PLAYER,
+  POWER_WEAPONS,
+  TAG,
+  WEAPONS,
+  ZOMBIES,
+  gunLadder,
+  respawnDelayOf,
+} from '@blockshot/shared';
+import { applyDamage, dieAlone } from '../combat/damage';
 import { buildSnapshot } from '../game/tick';
 import type { Player } from '../players/player';
 import { makeRoom, type FakeRoom } from '../testing/fakeRoom';
@@ -176,8 +187,9 @@ describe('infected', () => {
     const zombie = a.team === 2 ? a : b;
     const human = zombie === a ? b : a;
     expect(zombie.loadout).toEqual(['knife']);
-    expect(zombie.maxHp).toBe(Math.round(100 * INFECT.hp));
-    expect(r.room.mode.speedFactor?.(zombie)).toBe(INFECT.speed);
+    // the first infected is a Paciente cero (infected.test.ts)
+    expect(zombie.maxHp).toBe(Math.round(100 * ZOMBIES.alpha.hp));
+    expect(r.room.mode.speedFactor?.(zombie)).toBe(ZOMBIES.alpha.speed);
     expect(r.room.mode.streakRewards).toBe(false);
     // newcomers join the infected once the infection started
     expect(r.join('Late').team).toBe(2);
@@ -199,6 +211,40 @@ describe('infected', () => {
     expect(r.channel.of('match:end')[0]).toMatchObject({ winner: 'Los supervivientes', team: 1 });
     vi.advanceTimersByTime(MATCH_RESTART_MS);
     expect([...r.room.players.values()].every((p) => p.team === 1)).toBe(true);
+  });
+
+  it('one first infected per 4 players; they respawn after 1 s; the infected see everybody in the last 30 s', () => {
+    const r = makeRoom('infect', 2);
+    const ps = ['A', 'B', 'C', 'D', 'E'].map((n) => r.join(n));
+    tick(r);
+    vi.advanceTimersByTime(INFECT.pickDelay);
+    tick(r);
+    expect(ps.filter((p) => p.team === 2)).toHaveLength(2); // ceil(5 / 4)
+    expect(r.channel.notices().some((t) => t.includes('son los pacientes cero'))).toBe(true);
+    expect(respawnDelayOf('infect', 2)).toBe(INFECT.respawnMs);
+    expect(respawnDelayOf('infect', 1)).toBe(PLAYER.respawnDelay);
+    expect(buildSnapshot(r.room, Date.now()).inf?.rv).toBeUndefined();
+    vi.advanceTimersByTime(2 * 60000 - INFECT.revealMs);
+    expect(buildSnapshot(r.room, Date.now()).inf?.rv).toBe(1);
+  });
+
+  it('the last survivor is announced and gets a power weapon; a survivor who falls is infected too', () => {
+    const r = makeRoom('infect', 3);
+    const ps = ['A', 'B', 'C'].map((n) => r.join(n));
+    tick(r);
+    vi.advanceTimersByTime(INFECT.pickDelay);
+    tick(r);
+    const zombie = ps.find((p) => p.team === 2)!;
+    const [fell, last] = ps.filter((p) => p.team === 1) as [Player, Player];
+    dieAlone(r.room, fell, 'Vacío');
+    expect(fell.team).toBe(2);
+    tick(r);
+    expect(r.channel.notices()).toContain(`¡${last.name} es el último superviviente!`);
+    expect(POWER_WEAPONS).toContain(last.power);
+    expect(last.loadout.at(-1)).toBe(last.power);
+    expect(zombie.power).toBeNull();
+    tick(r); // only once
+    expect(r.channel.notices().filter((t) => t.includes('último superviviente'))).toHaveLength(1);
   });
 
   it('picks another infected if the infected leaves', () => {

@@ -14,6 +14,7 @@ import {
   canSwitchTeam,
   fitAccessory,
   isTeamMode,
+  rankOf,
   speedWith,
   weightName,
   type AbilityId,
@@ -25,6 +26,7 @@ import {
   type Team,
   type WeaponId,
 } from '@blockshot/shared';
+import { RankBadge, rankInk } from '../ui/badges';
 import type { HudPlayer } from '../game/hud/hudState';
 import type { RoomView } from '../game/roomView';
 import { SIDES, teamVar } from '../game/hud/teamStyle';
@@ -219,6 +221,25 @@ interface TeamPickerProps {
   players?: HudPlayer[];
   onTeam: (t: SideTeam) => void;
 }
+/** Your rank: the badge, its name in the tier's colour and how far the next step is. */
+function RankChip({ points }: { points: number }) {
+  const r = rankOf(points);
+  return (
+    <div className="rank-chip">
+      <RankBadge points={points} size={56} />
+      <div>
+        <b style={{ color: rankInk(r.tier) }}>{r.label}</b>
+        <span className="meta">
+          {points} pts{r.next !== null ? ` · ${r.next - points} para subir` : ''}
+        </span>
+        <i className="rank-bar">
+          <i style={{ width: `${Math.round(r.progress * 100)}%` }} />
+        </i>
+      </div>
+    </div>
+  );
+}
+
 function TeamPicker({ myTeam, players = [], onTeam }: TeamPickerProps) {
   // Shown at once on click; the server's answer (myTeam) takes over when it arrives
   const [pending, setPending] = useState<SideTeam | null>(null);
@@ -290,6 +311,7 @@ export const FIXED_LOADOUT: Partial<Record<ModeId, string>> = {
   gungame: 'En Escalada de armas el modo reparte las armas: tu elección vale para otras partidas.',
   race: 'En Carrera de saltos solo se lleva la secundaria y el cuchillo.',
   insta: 'En Disparo único todos llevan railgun: tu elección vale para otras partidas.',
+  traitor: 'En Traidores solo se lleva la secundaria y el cuchillo.',
 };
 
 interface CharacterSelectProps {
@@ -306,6 +328,8 @@ interface CharacterSelectProps {
   myTeam?: Team;
   players?: HudPlayer[];
   onTeam?: (t: SideTeam) => void;
+  /** your rank points (none before the server sends them) */
+  rankPoints?: number;
 }
 
 export default function CharacterSelect({
@@ -320,6 +344,7 @@ export default function CharacterSelect({
   myTeam,
   players,
   onTeam,
+  rankPoints,
 }: CharacterSelectProps) {
   const [look, setLook] = useState<Look>(() => current ?? loadClass());
   const [tab, setTab] = useState<Tab>('primary');
@@ -455,6 +480,7 @@ export default function CharacterSelect({
               {info.map} · {MODES.find((m) => m.id === mode)?.name ?? mode}
             </span>
           </div>
+          {rankPoints !== undefined && <RankChip points={rankPoints} />}
           {canSwitchTeam(mode) && myTeam && onTeam ? (
             <TeamPicker myTeam={myTeam} players={players} onTeam={onTeam} />
           ) : null}

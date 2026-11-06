@@ -1363,12 +1363,18 @@ export function buildCharacter(
   const holdGun = (gun: GunModel) => {
     hand.clear();
     hand.add(gun);
-    const long = gun.userData.muzzleZ < LONG_GUN_MUZZLE_Z;
+    const lh = gun.userData.leftHand;
+    const long = !!lh || gun.userData.muzzleZ < LONG_GUN_MUZZLE_Z;
     const shift = HIP_CARRY.has(gun.userData.id) ? HIP_CARRY_SHIFT : v3(0, 0, 0);
     hand.position.copy(GUN_MOUNT).add(shift);
-    // Left hand on the handguard of long guns (as far as the arm reaches), under the right one on short guns
-    const z = GUN_MOUNT.z + gun.userData.muzzleZ * 0.45 * gun.scale.z;
-    const left = long ? v3(0.1, -0.08, Math.round(z * 20) / 20) : SHORT_GUN_LEFT_HAND.clone();
+    // Left hand on the handguard or foregrip of long guns (as far as the arm reaches), under the right one on short
+    // guns; rounded so the arms' geometry cache keeps few poses
+    const r = (n: number) => Math.round(n * 50) / 50;
+    const left = lh
+      ? v3(0.1, r(GUN_MOUNT.y + lh.y * gun.scale.y), r(GUN_MOUNT.z + lh.z * gun.scale.z))
+      : long
+        ? v3(0.1, -0.08, Math.round((GUN_MOUNT.z + gun.userData.muzzleZ * 0.45 * gun.scale.z) * 20) / 20)
+        : SHORT_GUN_LEFT_HAND.clone();
     poseArms(left.add(shift), RIGHT_HAND.clone().add(shift));
   };
 
@@ -1383,7 +1389,8 @@ export interface HandPose {
   back: V3;
   fore: V3;
 }
-const GRIP = v3(0, -0.105, 0.1);
+/** Where the right fist holds every gun (gun space): gunAssets.ts puts each model's pistol grip here. */
+export const GRIP = v3(0, -0.105, 0.1);
 const KNIFE_GRIP = v3(0, -0.1, 0.105);
 /**
  * How the view model holds the knife (viewModel.ts), like a sword: the blade carries on from the forearm,
@@ -1394,8 +1401,9 @@ export const KNIFE_YAW = 0.3;
 export const KNIFE_ROLL = 0.5;
 /** The knife's forearm, in view space: back towards the camera, down and to the right. */
 const KNIFE_FOREARM = v3(0.2, -0.3, 0.5);
+const KNIFE_LEFT: HandPose = { at: v3(-0.26, 0.04, 0.02), back: v3(-0.4, 1, 0), fore: v3(-0.4, -0.8, 0.5) };
 /** Long enough to leave the screen from any pose. */
-const FP_ARM_LEN = 0.8;
+const FP_ARM_LEN = 0.5;
 
 /** The knife hand: the forearm is set in view space and taken back through the knife's pitch, yaw and roll. */
 function knifePose(): HandPose {
@@ -1406,27 +1414,26 @@ function knifePose(): HandPose {
 }
 
 /** Right hand round the pistol grip, its back to the right, the forearm out to the bottom-right corner. */
-const RIGHT_POSE: HandPose = { at: GRIP, back: v3(1, 0.3, 0), fore: v3(1, -0.35, 0.3) };
+const RIGHT_POSE: HandPose = { at: GRIP, back: v3(1, 0.3, 0), fore: v3(0.45, -0.85, 0.35) };
 
-const LEFT_FORE = v3(-1, -0.4, 0.55);
+const LEFT_FORE = v3(-0.7, -0.85, 0.5); // steep, so the forearm leaves the screen bottom soon instead of crossing it
 
 /** How the first-person arms hold `gun`: the right hand, and the left one (null: held in the right hand alone). */
 export function armPoses(gun: GunModel): { right: HandPose; left: HandPose | null } {
-  if (gun.userData.id === 'knife') return { right: knifePose(), left: null };
-  // The left forearm crosses to the bottom-left corner, as on every gun: under the handguard, palm up, on long
-  // guns; on handguns cupping the right fist from the left
-  const left: HandPose =
-    gun.userData.muzzleZ < LONG_GUN_MUZZLE_Z
+  // The knife: the left fist is up too, empty, at the bottom-left (as in Krunker)
+  if (gun.userData.id === 'knife') return { right: knifePose(), left: KNIFE_LEFT };
+  // Long guns: the left fist under the handguard (measured on the model), its forearm to the bottom-left corner.
+  // Handguns are held in the right hand alone, Krunker-style: the left fist rests low at the bottom-left
+  const lh = gun.userData.leftHand;
+  const left: HandPose | null = lh
+    ? { at: v3(lh.x - 0.01, lh.y, lh.z), back: v3(-0.5, -1, 0), fore: LEFT_FORE }
+    : gun.userData.muzzleZ < LONG_GUN_MUZZLE_Z
       ? {
           at: v3(-0.01, -0.07, Math.round(gun.userData.muzzleZ * 0.42 * 100) / 100),
           back: v3(-0.5, -1, 0),
           fore: LEFT_FORE,
         }
-      : {
-          at: v3(-0.01, -0.08, Math.round(gun.userData.muzzleZ * 0.5 * 100) / 100),
-          back: v3(-0.5, -1, 0),
-          fore: LEFT_FORE,
-        };
+      : null;
   return { right: RIGHT_POSE, left };
 }
 
@@ -1436,31 +1443,29 @@ export function armPoses(gun: GunModel): { right: HandPose; left: HandPose | nul
  */
 function buildFpArm(color: string, skin: string, camo: CamoId, side: number): THREE.Group {
   const g = new THREE.Group();
-  const len = FP_ARM_LEN;
+  const bare = creatureOf(skin)?.skin ?? FP_SKIN;
   addKit(
     g,
-    `fparm:${side}`,
-    skinMaterials(color, skin, camo) as BodyMaterials,
+    `fparm:${side}:${bare}`,
+    { ...(skinMaterials(color, skin, camo) as BodyMaterials), skin: fpSkin(bare) },
     (k) => {
-      // Fist: back of the hand, four fingers curled under, the thumb across
-      k.box(0.085, 0.07, 0.1, 0, 0.01, 0, 'glove');
-      for (let i = 0; i < 4; i++) k.box(0.02, 0.05, 0.035, -0.03 + i * 0.02, -0.03, -0.035, 'glove');
-      k.box(0.03, 0.03, 0.07, -side * 0.045, -0.015, -0.01, 'glove', 0, side * 0.3, 0);
-      k.box(0.075, 0.015, 0.035, 0, 0.05, -0.025, 'metal'); // knuckle pad
-      k.box(0.095, 0.085, 0.05, 0, 0, 0.07, 'gear'); // glove cuff
-      // Sleeve widening towards the elbow: drawn upright and laid back along +Z
-      k.transform = new THREE.Matrix4()
-        .makeTranslation(0, 0, 0.09)
-        .multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2));
-      k.taper(0.1, len - 0.09, 0.095, 0, (len - 0.09) / 2, 0, 'main', 1.15, 1);
-      k.transform = null;
-      k.box(0.022, 0.02, 0.022, 0, 0.055, 0.12, 'metal'); // watch
-      k.box(0.112, 0.104, 0.035, 0, 0, 0.3, 'accent'); // arm band
+      // Krunker-style: a bare blocky fist, a cuff and one chunky sleeve box running off the screen edge
+      k.box(0.115, 0.1, 0.12, 0, 0.005, 0, 'skin'); // fist
+      k.box(0.035, 0.035, 0.07, -side * 0.055, -0.01, -0.01, 'skin'); // thumb
+      k.box(0.135, 0.125, 0.06, 0, 0, 0.09, 'accent'); // cuff
+      k.box(0.15, 0.14, FP_ARM_LEN, 0, 0, 0.12 + FP_ARM_LEN / 2, 'main'); // sleeve
     },
     false,
   );
   return g;
 }
+const FP_SKIN = '#d9a066';
+const fpSkins = new Map<string, THREE.Material>();
+const fpSkin = (c: string) => {
+  let m = fpSkins.get(c);
+  if (!m) fpSkins.set(c, (m = std(c, { roughness: 0.65 })));
+  return m;
+};
 
 const _basis = new THREE.Matrix4();
 export class FpArm {
@@ -1751,7 +1756,7 @@ const GUNS: Record<WeaponId, (d: GunDraw) => void> = {
     d.bev(0.066, 0.1, 0.2, 0, -0.02, 0.3, 'v'); // stock
     d.box(0.07, 0.12, 0.024, 0, -0.024, 0.41, 'r');
   },
-  // Marksman rifle: tan chassis, long free-floated barrel, a low-power scope (the view zooms, no overlay)
+  // Marksman rifle: tan chassis, long free-floated barrel, a low-power scope (the HUD overlay does the aiming)
   dmr(d) {
     d.bev(0.058, 0.06, 0.32, 0, 0.026, -0.02, 'p'); // upper receiver
     d.bev(0.054, 0.05, 0.2, 0, -0.024, 0.02, 'p'); // lower receiver
@@ -2056,7 +2061,21 @@ const flashMaterial = (): THREE.MeshBasicMaterial =>
   });
 
 export interface GunModel extends THREE.Group {
-  userData: { id: WeaponId; muzzleZ: number; muzzleY: number; sightY: number; flash?: THREE.Mesh };
+  userData: {
+    id: WeaponId;
+    muzzleZ: number;
+    muzzleY: number;
+    sightY: number;
+    /** where along the gun the sight line is taken (front sight or reticle; gun space), for the aimed tilt */
+    sightZ?: number;
+    /** aimed, where along the gun the eye sits (gun space; viewModel.ts frames the sight from there) */
+    eyeZ?: number;
+    /** wears an optic (aimed through its window); without one it is aimed over its iron sights */
+    optic?: boolean;
+    flash?: THREE.Mesh;
+    /** where the left fist holds the handguard or foregrip (gun space), measured on the model (gunAssets.ts) */
+    leftHand?: THREE.Vector3;
+  };
 }
 
 export function buildGun(id: WeaponId, withFlash = false, tint = '#ffc93c'): GunModel {
@@ -2113,7 +2132,7 @@ export function makeNameTag(text: string, color: string | undefined, throughWall
     g.shadowBlur = 6;
     g.shadowOffsetY = 1;
     g.fillStyle = tint;
-    g.fillText(text, 128, 34);
+    g.fillText(text, 128, 34, 248); // long names (with the infected type) are squeezed, not cut
     g.shadowColor = 'transparent';
     g.fillStyle = 'rgba(9, 14, 21, 0.75)';
     g.fillRect(70, 60, 116, 8);

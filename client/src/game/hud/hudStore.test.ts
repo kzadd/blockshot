@@ -13,6 +13,7 @@ const base = (): HudState => ({
   sprinting: false,
   speedFx: 0,
   ability: null,
+  modeKey: null,
   accessory: null,
   shield: 0,
   shieldHit: false,
@@ -40,7 +41,7 @@ const base = (): HudState => ({
   damage: 0,
   respawnIn: 0,
   killerName: '',
-  players: [{ id: 'a', n: 'Ana', ab: 'smoke', k: 0, d: 0, tm: 0, pg: 10, st: 0, cp: 0, lv: 0, md: 0 }],
+  players: [{ id: 'a', n: 'Ana', ab: 'smoke', k: 0, d: 0, tm: 0, pg: 10, st: 0, cp: 0, lv: 0, md: 0, a: 1 }],
   spread: 0.01,
   aim: 0,
   dmgDirs: [],
@@ -61,8 +62,12 @@ const base = (): HudState => ({
   zones: null,
   round: null,
   bomb: null,
+  ice: null,
+  thaw: null,
+  traitor: null,
   replay: false,
   spectate: null,
+  watchSight: null,
 });
 
 describe('hud store', () => {

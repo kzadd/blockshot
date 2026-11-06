@@ -4,7 +4,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import type { WeaponId } from '@blockshot/shared';
 import { fitGunGear, wearKevlar } from '../game/render/gear';
 import { buildCharacter, type CharacterModel } from '../game/render/models';
-import { loadGun } from '../game/render/gunAssets';
+import { loadGun, THIRD_PERSON_GUN } from '../game/render/gunAssets';
 import type { Look } from './looks';
 
 // The approved proposal's studio ("Mejorado" in .impeccable/mocks/propuesta/proto.js), value for value: same
@@ -15,7 +15,6 @@ const MAX_PIXEL_RATIO = 1.5;
 const TURN_SECONDS = 8;
 const DRAG_SPEED = 0.012;
 const MAX_DT = 0.05;
-const GUN_SCALE = 1.05;
 const AIM_TILT = 0.12;
 /** Acabado tab: both guns up close, one above the other (sized for the class screen's upright stage). */
 const SHOWCASE_SCALE = 1.6;
@@ -274,7 +273,7 @@ export default function CharacterPreview({
       castShadows(model.group); // before the gun is held: like the proposal, the gun casts no shadow
       void loadGun(inHand, gunLook).then((gun) => {
         fitGunGear(gun, accessory);
-        gun.scale.setScalar(GUN_SCALE);
+        gun.scale.setScalar(THIRD_PERSON_GUN);
         model.holdGun(gun);
         model.aim.rotation.x = AIM_TILT;
         improve(model);

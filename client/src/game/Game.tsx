@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  MEDALS,
   MODE_BY_ID,
   STREAKS,
   canSwitchTeam,
@@ -23,6 +22,7 @@ import { sfx } from './audio/sound';
 import { Engine } from './engine/Engine';
 import HUD, { type FeedItem, type KillBanner } from './hud/HUD';
 import { hudStore, publishHud, resetHud, useHud } from './hud/hudStore';
+import Meeting from './hud/Meeting';
 import type { RoomView } from './roomView';
 import CharacterScreen from './screens/CharacterScreen';
 import DeathScreen, { type LastDeath } from './screens/DeathScreen';
@@ -78,6 +78,7 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
     locked: s.locked,
     damageKey: s.damageKey,
     playerCount: s.players.length,
+    meeting: !!s.traitor?.meeting,
   }));
   const live = useRef({ match, menu });
   live.current = { match, menu };
@@ -140,6 +141,11 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
     wasAlive.current = !!g?.alive;
   }, [g?.alive]);
 
+  // Traidores: a meeting frees the mouse to vote
+  useEffect(() => {
+    if (g?.meeting) document.exitPointerLock?.();
+  }, [g?.meeting]);
+
   // Soft shake when taking damage (can be turned off in Settings)
   const lastDamage = useRef(0);
   useEffect(() => {
@@ -161,8 +167,11 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
       const label = STREAKS[d.streak];
       if (label) push({ type: 'streak', name: d.killerName, team: d.killerTeam, label, n: d.streak });
       if (d.ended) push({ type: 'notice', text: `${d.killerName} acabó con la racha de ${d.victimName} (${d.ended})` });
-      if (d.victim === you) setLastDeath({ name: d.killerName, cls: d.killerClass, weapon: d.weapon, hp: d.killerHp });
-      if (d.killer === you) {
+      // killer === victim: an unscored death (the void, camping, the admin) named by killerName
+      const self = d.killer === d.victim;
+      if (d.victim === you)
+        setLastDeath({ name: d.killerName, cls: self ? null : d.killerClass, weapon: d.weapon, hp: d.killerHp, self });
+      if (d.killer === you && !self) {
         if (label || d.reward) sfx.streak();
         clearTimeout(bannerTimer);
         setBanner({
@@ -172,7 +181,7 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
           label,
           n: d.streak,
           reward: d.reward,
-          medals: d.medals.map((m) => MEDALS[m]),
+          medals: d.medals,
         });
         bannerTimer = setTimeout(() => setBanner(null), BANNER_MS);
       }
@@ -331,7 +340,7 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
   const ready = !!g;
   const dead = ready && !g.alive && g.everSpawned && !selecting && !match;
   const choosing = ready && !g.alive && selecting && !match;
-  const paused = ready && g.alive && !g.locked && !match && !menu;
+  const paused = ready && g.alive && !g.locked && !match && !menu && !g.meeting;
   useEffect(() => {
     if (g?.locked) setFresh(false);
   }, [g?.locked]);
@@ -373,6 +382,7 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
           onKeep={keep}
           onLeave={leave}
           onTeam={switchTeam}
+          you={you}
         />
       )}
 
@@ -404,6 +414,10 @@ export default function Game({ session, onLeave, onRoom }: GameProps) {
           onRanking={() => setMenu('ranking')}
           onTour={() => setMenu('tour')}
         />
+      )}
+
+      {ready && g.meeting && !match && (
+        <Meeting you={you} onVoted={() => hudStore.getState().hud?.alive && engine.current?.requestLock()} />
       )}
 
       {ready && (showScores || match) && (

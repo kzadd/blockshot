@@ -2,7 +2,7 @@
 // Every box collides and blocks bullets. The 3D look of each kind lives in the client.
 import { rng, round2, seedOf, type Vec3 } from '../core/math';
 import { rayAABB, type Collider } from '../physics/raycast';
-import { PLAYER } from '../player/player';
+import { PAD, PLAYER } from '../player/player';
 import { buildAutopista } from './builders/autopista';
 import { buildCiudad } from './builders/ciudad';
 import { buildMonasterio } from './builders/monasterio';
@@ -13,6 +13,10 @@ import { buildPuerto } from './builders/puerto';
 import { buildEstacion } from './builders/estacion';
 import { buildNevada } from './builders/nevada';
 import { buildCircuito } from './builders/circuito';
+import { buildSanatorio } from './builders/sanatorio';
+import { buildAduana } from './builders/aduana';
+import { buildVerbena } from './builders/verbena';
+import { buildTarta } from './builders/tarta';
 import { addParkour } from './parkour';
 import { PROP_COLORS } from './props';
 import { ROOF_KINDS, STRUCTURE_COLORS } from './structures';
@@ -311,6 +315,108 @@ const MAP_DEFS: Record<MapId, MapDef> = {
       crate2: '#6f5536',
     },
   },
+  sanatorio: {
+    name: 'Sanatorio',
+    tag: 'Nocturno',
+    desc: 'Sanatorio abandonado de noche: pasillos en anillo, salas pequeñas, primera planta en ruinas, escaleras y escalas. Zona segura en el quirófano y la torre del depósito como último escondite.',
+    build: buildSanatorio,
+    wallH: 9,
+    sky: '#3a3350',
+    colors: {
+      floor: '#3d403b',
+      wall: '#4f5157',
+      wall2: '#77736a',
+      plaster: '#8a8576',
+      brick: '#6e4b3f',
+      tile: '#6b706b',
+      stair: '#77746c',
+      roof: '#3f3a3a',
+      wood: '#5a4632',
+      metal: '#6c7780',
+      sandbag: '#8a7d5c',
+      rock: '#5d5a55',
+      railing: '#2a2d31',
+      crate: '#7a5d3a',
+      crate2: '#5b6b4a',
+      frame: '#3b2d22',
+      trim: '#9a958a',
+    },
+  },
+  aduana: {
+    name: 'Aduana',
+    tag: 'Dos objetivos',
+    desc: 'Puesto fronterizo: Rojo ataca desde la carretera del oeste por tres calles; Azul defiende el patio de carga (A) y la nave (B), cada uno con dos entradas estrechas.',
+    build: buildAduana,
+    wallH: 9,
+    sky: '#e9cfa8',
+    colors: {
+      floor: '#77746d',
+      wall: '#b3aa98',
+      bld1: '#d9b48f',
+      bld2: '#a9b8a4',
+      bld3: '#d8c48e',
+      bld4: '#b0a4c0',
+      concrete: '#a8a49a',
+      platform: '#8f8a80',
+      step: '#a39e93',
+      brick: '#a35f44',
+      roof: '#5a646c',
+      plaster: '#e3d6bd',
+      slab: '#7d7a74',
+      metal: '#c9a13a',
+      awning: '#c0503e',
+      cont1: '#b5513f',
+      cont2: '#3f6f8f',
+      cont3: '#5f8f4e',
+      crate: '#b98c50',
+      crate2: '#8d6a3f',
+      shutter: '#4f6f5a',
+    },
+  },
+  verbena: {
+    name: 'Verbena',
+    tag: 'Carrera de saltos',
+    desc: 'Feria sobre una piscina, en espiral hacia la torre del centro: piedras, aspas, losas que caen, martillos, escalera, empujadores, vigas estrechas y tres cornisas hasta la meta.',
+    build: buildVerbena,
+    wallH: 4,
+    sky: '#ffd9ec',
+    colors: {
+      floor: '#2a8fb8',
+      wall: '#f4f1ea',
+      water: '#38c6e8',
+      platform: '#ff5fa2',
+      step: '#ffd23a',
+      slab: '#9b6bff',
+      tile: '#4fd6a0',
+      cont1: '#ff8a3d',
+      cont2: '#4c9dff',
+      cont3: '#9be34a',
+      metal: '#ffffff',
+      awning: '#ff4f6d',
+    },
+  },
+  tarta: {
+    name: 'Tarta',
+    tag: 'Carrera de saltos',
+    desc: 'Tarta de cuatro pisos sobre un mar de nata, en zigzag y subiendo un piso en cada curva: martillos, empujadores, losas que caen, aspas, saltos largos y la guinda en lo alto.',
+    build: buildTarta,
+    wallH: 4,
+    sky: '#ffe9c4',
+    colors: {
+      floor: '#f6e7d8',
+      wall: '#fff6ee',
+      water: '#fbe3ec',
+      platform: '#ff7eb6',
+      step: '#e8364f',
+      slab: '#b98ae8',
+      tile: '#7ad8c8',
+      cont1: '#ffb347',
+      cont2: '#8ec5ff',
+      cont3: '#c8e86a',
+      metal: '#7a4a2e',
+      awning: '#ff6f91',
+    },
+  },
 };
 
 export const MAPS = (Object.entries(MAP_DEFS) as [MapId, MapDef][]).map(([id, m]) => ({
@@ -434,6 +540,12 @@ export function getColliders(map: Pick<GameMap, 'boxes'>): Collider[] {
   }));
 }
 
+const apex = (vy: number) => vy ** 2 / (2 * PLAYER.gravity);
+/** The most a player can rise above a box top: a jump pad's flight, then every wall jump, then a ledge pull (m). */
+export const CLIMB =
+  apex(Math.max(PAD.power, PLAYER.jump)) + PLAYER.wallJumps * apex(PLAYER.wallJumpUp) + PLAYER.mantleReach;
+const OUTER_WALLS = 4;
+
 const mapCache = new Map<string, GameMap>();
 export function getMap(mapId: string, sizeId: string): GameMap {
   const id = isMapId(mapId) ? mapId : DEFAULT_MAP;
@@ -494,8 +606,8 @@ export function getMap(mapId: string, sizeId: string): GameMap {
     return [l.x - dx * 0.8, l.z - dz * 0.8];
   });
   placeProps(boxes, [...points, ...ladderSpots, ...powerSpots.map(([x, z]): [number, number] => [x, z])], props);
-  // Places to climb in the open ground (not on the race course)
-  if (id !== 'circuito')
+  // Places to climb in the open ground (not on the race courses: the maps with checkpoints)
+  if (!checkpoints.length)
     addParkour(
       boxes,
       H,
@@ -546,6 +658,10 @@ export function getMap(mapId: string, sizeId: string): GameMap {
     l.y0 = floorBelow(boxes, l.x - dx * 0.3, l.y1 - 0.5, l.z - dz * 0.3);
   }
 
+  // The outer walls (boxes 1-4) stand above anything a player can reach, so nobody gets out of the map
+  const wallH = Math.max(def.wallH, Math.ceil(Math.max(...boxes.slice(OUTER_WALLS + 1).map((b) => b.y + b.h)) + CLIMB));
+  for (const b of boxes.slice(1, OUTER_WALLS + 1)) b.h = wallH;
+
   const cols = getColliders({ boxes });
   // Capture the flag bases: the westernmost spawn point (Red) and the easternmost (Blue)
   const side = (s: number) => [...points].sort((a, b) => s * (a[0] - b[0]) || Math.abs(a[1]) - Math.abs(b[1]))[0]!;
@@ -561,7 +677,7 @@ export function getMap(mapId: string, sizeId: string): GameMap {
     sizeName: MAP_SIZES[size].name,
     half: H,
     bounds: H - BOUNDS_MARGIN,
-    wallH: def.wallH,
+    wallH,
     sky: def.sky,
     colors: { ...PROP_COLORS, ...STRUCTURE_COLORS, ...def.colors },
     boxes,

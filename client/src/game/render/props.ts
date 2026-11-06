@@ -2,9 +2,26 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 
-// Small props for grenades and abilities, from Quaternius and Pichuliru on Poly Pizza (CC0, see ASSETS_CREDITS.md),
-// as meshopt GLBs in public/models/props. Clones share geometry and materials, so many of them cost little.
-export type PropName = 'grenade' | 'smokegren' | 'mine' | 'sacks' | 'shield' | 'medkit' | 'radio' | 'barrel' | 'crate';
+// Small props for grenades, abilities, the bomb and the accessories (low-poly models under CC BY 4.0, see
+// ASSETS_CREDITS.md), as meshopt GLBs in public/models/props. Clones share geometry and materials, so many cost little.
+export type PropName =
+  | 'grenade'
+  | 'smokegren'
+  | 'mine'
+  | 'sacks'
+  | 'shield'
+  | 'medkit'
+  | 'radio'
+  | 'bomb'
+  | 'kevlar'
+  | 'helmet'
+  | 'goggles'
+  | 'bandage'
+  | 'ammo'
+  | 'silencer'
+  | 'laser'
+  | 'barrel'
+  | 'crate';
 /** Props that are one of the world kits' models (public/models/world, Kenney; see ASSETS_CREDITS.md). */
 const FILE: Partial<Record<PropName, string>> = { barrel: '../world/s-barrel', crate: '../world/q-crate' };
 

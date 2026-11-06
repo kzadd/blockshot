@@ -1,37 +1,16 @@
 // Room control for the server's own PC (the teacher): kill or move a player, restart or end the match, or move
 // the room to another map and mode right now. Kicking lives in the gateway (it needs the player's socket).
 import { isTeamMode, teamName, type SideTeam, type Team, type VoteOption } from '@blockshot/shared';
+import { dieAlone } from '../combat/damage';
 import type { Player } from '../players/player';
 import { spawnPlayer } from '../players/spawn';
+import { soloScore } from '../modes/scoring';
 import { notice, type Room } from '../rooms/room';
 import { endMatch, restartMatch } from './match';
 import { applyOption } from './vote';
 
-/** Kills a player without anyone getting the kill (nothing is scored). */
-export function adminKill(room: Room, p: Player): void {
-  if (!p.alive) return;
-  Object.assign(p, { alive: false, hp: 0, armor: 0, streak: 0, deathTime: Date.now() });
-  p.inputs.length = 0;
-  room.channel.broadcast('kill', [
-    {
-      killer: p.id,
-      killerName: 'Admin',
-      killerTeam: 0,
-      killerClass: null,
-      killerHp: 0,
-      victim: p.id,
-      victimName: p.name,
-      victimTeam: p.team,
-      weapon: 'Admin',
-      head: false,
-      streak: 0,
-      ended: 0,
-      reward: undefined,
-      medals: [],
-    },
-  ]);
-  room.mode.onDeath?.(room, p); // a round mode may end the round now (a team wiped out)
-}
+/** Kills a player without anyone getting the kill (nothing is scored, not even the death). */
+export const adminKill = (room: Room, p: Player): void => dieAlone(room, p, 'Admin', false);
 
 /** Team modes: the player goes to the other team (respawning there if alive). The admin skips the balance rule. */
 export function adminSwitchTeam(room: Room, p: Player): void {
@@ -63,9 +42,7 @@ export function adminEnd(room: Room): void {
     const team: Team = room.teamScore[1] === room.teamScore[2] ? 0 : room.teamScore[1] > room.teamScore[2] ? 1 : 2;
     endMatch(room, team ? teamName(room.modeId, team) : 'Empate', team);
   } else {
-    // Último en pie ranks by rounds won, the rest by kills
-    const score = (p: Player) => (room.modeId === 'lms' ? p.caps : p.kills);
-    const best = ps.reduce<Player | null>((a, b) => (!a || score(b) > score(a) ? b : a), null);
+    const best = ps.reduce<Player | null>((a, b) => (!a || soloScore(room, b) > soloScore(room, a) ? b : a), null);
     endMatch(room, best?.name ?? '—');
   }
 }

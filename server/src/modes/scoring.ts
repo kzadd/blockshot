@@ -16,4 +16,8 @@ export function teamSideSpawns(_room: Room, p: Player, spawns: Spawn[]): Spawn[]
   return mine.length ? mine : spawns;
 }
 
+/** A player's score in a free-for-all mode's results: rounds or races won, the weapon reached, or kills. */
+export const soloScore = (room: Room, p: Player): number =>
+  room.modeId === 'lms' || room.modeId === 'race' ? p.caps : room.modeId === 'gungame' ? p.level : p.kills;
+
 export const asSide = (team: number): SideTeam | null => (team === 1 || team === 2 ? team : null);

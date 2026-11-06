@@ -5,10 +5,12 @@ import {
   ACCESSORY_IDS,
   BODY,
   HELMET,
+  INFECT,
   KEVLAR,
   LIMB_MULT,
   MODE_BY_ID,
   PLAYER,
+  TRAITOR,
   WEAPONS,
   WEAPON_HANDLING,
   staminaMult,
@@ -23,11 +25,13 @@ export const CONTROLS: [string[], string][] = [
   [['Clic izq.'], 'Disparar'],
   [['Clic der.'], 'Apuntar (mira telescópica con el francotirador)'],
   [['R'], 'Recargar'],
+  [['V'], 'Empujar a quien tengas justo delante (sin daño, también a tu equipo)'],
   [['G'], 'Granada (una por vida): mantén G para ver la trayectoria y dónde cae, suéltala para lanzar'],
   [
     ['E'],
     `Habilidad de tu clase (con recarga): ${ABILITY_IDS.map((id) => ABILITIES[id].name.toLowerCase()).join(', ')}`,
   ],
+  [['F'], 'Acción del modo: barricada o grito (Infectados); examinar un cuerpo o llamar a reunión (Traidores)'],
   [
     ['1', '2', '3', '4', 'Q', 'Rueda'],
     'Cambiar de arma (3: cuchillo, por la espalda mata de un golpe; 4: arma de poder)',
@@ -70,7 +74,7 @@ export const STEPS: [string, string][] = [
   ],
   [
     'Infectados',
-    'Uno empieza infectado: solo lleva cuchillo, pero corre más y aguanta más. Cada superviviente que cae se infecta. Los supervivientes ganan si aguantan hasta el final.',
+    `Uno de cada ${INFECT.perInfected} empieza como paciente cero: más grande y duro, con un grito (F) que frena a los supervivientes cercanos. Los infectados solo llevan cuchillo y reaparecen en ${INFECT.respawnMs / 1000} s; al morir eligen tipo (1, 2, 3): Corredor (muy rápido, poca vida), Tanque (lento, mucha vida) o Saltador (salta muy alto). Cada superviviente que cae se infecta. Los supervivientes levantan barricadas de tablas (F) que los infectados rompen a cuchillazos, y a veces se va la luz unos segundos. En los últimos ${INFECT.revealMs / 1000} s los infectados ven a todos en el minimapa; el último superviviente recibe un arma de poder, más vida y blindaje, y todos lo ven. Los supervivientes ganan si aguantan hasta el final.`,
   ],
   [
     'Dominio',
@@ -94,8 +98,21 @@ export const STEPS: [string, string][] = [
     'Rojo lleva la bomba y la planta quedándose 3 s en la zona A o B; explota a los 35 s. Azul la desactiva quedándose 6 s a su lado, o gana si se acaba el tiempo sin bomba plantada.',
   ],
   [
+    'Traidores',
+    `Todos parecen del mismo bando, pero en cada ronda hay traidores ocultos (uno por cada ${TRAITOR.perTraitor} jugadores): solo ellos lo saben y se ven entre sí. Todos llevan la secundaria y el cuchillo, y el cuchillo de un traidor mata de un golpe. Hay fuego amigo y nadie ve quién mató a quién. Junto a un cuerpo, F lo examina (de quién es y con qué lo mataron) y llama a una reunión; lejos de los cuerpos, F convoca tu reunión de emergencia (una por ronda). En la reunión nadie se mueve: voten a quién expulsar, o salten, en ${TRAITOR.meetingMs / 1000} s; el más votado queda fuera y se dice qué era. Ganan los inocentes si no queda ningún traidor o se acaba el tiempo; los traidores, si llegan a ser tantos como los inocentes. Matar a un inocente siendo inocente te quita ${TRAITOR.teamKill} punto.`,
+  ],
+  [
     'Si te eliminan',
     `Ves la repetición desde los ojos de quien te eliminó y reapareces a los ${PLAYER.respawnDelay / 1000} s. B cambia de clase; L, solo el equipo.`,
+  ],
+  ['Cuidado con el vacío', 'Caerte fuera del mapa te elimina (en la Carrera vuelves a tu punto de control).'],
+  [
+    'Nada de campear',
+    `Si pasas ${PLAYER.campWarnMs / 1000} s sin salir de una zona de ${PLAYER.campRadius} m te avisamos; a los ${PLAYER.campMs / 1000} s los rivales te ven en el minimapa y pierdes ${PLAYER.campDrain} de vida por segundo hasta que salgas de ella.`,
+  ],
+  [
+    'Carrera de saltos',
+    'Las balas y el cuchillo no hacen daño: empujan. Tira a los rivales de las plataformas a la lava.',
   ],
 ];
 

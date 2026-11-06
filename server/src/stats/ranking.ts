@@ -3,7 +3,7 @@
 // overwritten, and a new season keeps a copy of the old one.
 import fs from 'node:fs';
 import path from 'node:path';
-import { isOutfitColor, isWeaponId, type RankingRow, type Team, type WeaponId } from '@blockshot/shared';
+import { isOutfitColor, isWeaponId, rankPoints, type RankingRow, type Team, type WeaponId } from '@blockshot/shared';
 import type { Logger } from '../logger';
 import { isBot } from '../players/bot';
 import type { Room } from '../rooms/room';
@@ -107,6 +107,12 @@ export function recordMatch(room: Room, winnerName: string, winnerTeam: Team): v
     changed = true;
   }
   if (changed) save();
+}
+
+/** Rank points of a name in the ranking (0: never finished a match). */
+export function rankPointsOf(name: string): number {
+  const t = rows.get(name);
+  return t ? rankPoints(t) : 0;
 }
 
 /** Best first: most wins, then most kills, then fewest deaths. */

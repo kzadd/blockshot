@@ -3,8 +3,10 @@
 // health left wins it (a tie: nobody). First to the room's limit of rounds wins the match.
 import type { Player } from '../players/player';
 import { endMatch } from '../match/match';
+import { ZONE_PLANS } from '@blockshot/shared';
 import { notice, type Room } from '../rooms/room';
 import type { GameMode } from './gameMode';
+import { shrinkingZone } from './zone';
 import { roundPhases } from './roundPhases';
 
 const MIN_PLAYERS = 2;
@@ -30,7 +32,8 @@ export function createLastManStanding(room: Room): GameMode {
 
   // Only players who picked a class (out of the character screen) count: the others would never spawn
   const ready = () => [...room.players.values()].filter((p) => p.cls).length >= MIN_PLAYERS;
-  const phases = roundPhases(room, { ready, timeUp });
+  const phases = roundPhases(room, { ready, timeUp, started: (now) => zone.start(now) });
+  const zone = shrinkingZone(room, ZONE_PLANS.lms!, () => phases.playing());
 
   /** One left standing (the others killed, or gone): he wins the round. */
   function checkRound(now: number): void {
@@ -43,13 +46,15 @@ export function createLastManStanding(room: Room): GameMode {
     streakRewards: false,
     initialTeam: () => 0,
     canSpawn: () => !phases.playing(),
+    paused: () => !phases.playing(),
     onKill: () => checkRound(Date.now()),
     onDeath: () => checkRound(Date.now()),
     tick(_room, now) {
       phases.tick(now);
+      zone.tick(now);
       checkRound(now);
     },
     onMatchReset: () => phases.reset(),
-    snapshot: (_room, now) => ({ rd: phases.snapshot(now) }),
+    snapshot: (_room, now) => ({ rd: phases.snapshot(now), zn: zone.snapshot(now) }),
   };
 }

@@ -111,4 +111,11 @@ export const MODE_UI: Record<ModeId, ModeUi> = {
     points: 'Bombas',
     top: 'teams',
   },
+  traitor: {
+    sub: 'Hay traidores entre ustedes',
+    hint: (n) => units('traitor', n),
+    goal: (n) => `gana quien llegue a ${n} puntos (ganar la ronda: inocentes +1, traidores +2)`,
+    points: 'Puntos',
+    top: 'leader',
+  },
 };

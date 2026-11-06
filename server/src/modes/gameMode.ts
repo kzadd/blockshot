@@ -8,8 +8,12 @@ import type {
   SideTeam,
   Spawn,
   TagSnapshot,
+  TraitorSnapshot,
+  PlayerSnapshot,
   Team,
+  Vec3,
   Weapon,
+  ZoneSnapshot,
 } from '@blockshot/shared';
 import type { Player } from '../players/player';
 import type { Room } from '../rooms/room';
@@ -23,6 +27,8 @@ export interface ModeSnapshot {
   rd: RoundSnapshot | null;
   ic: IceSnapshot[] | null;
   bm: BombSnapshot | null;
+  zn: ZoneSnapshot | null;
+  tt: TraitorSnapshot | null;
 }
 
 /**
@@ -36,6 +42,8 @@ export interface GameMode {
   onKill(room: Room, shooter: Player, victim: Player, weapon: Weapon): void;
   /** a death nobody scores (the admin's «Matar»): round modes still check whether the round is over */
   onDeath?(room: Room, victim: Player): void;
+  /** true: nobody learns who killed whom (Traidores): only the victim hears of its death, without the killer */
+  readonly secretKills?: boolean;
   /** whether kill streaks give rewards (radar, armor) */
   readonly streakRewards: boolean;
   /** false: no power weapons appear on the map (InstaGib) */
@@ -54,8 +62,18 @@ export interface GameMode {
   speedFactor?(player: Player): number;
   /** max hp multiplier for a player (infected are tougher) */
   hpFactor?(player: Player): number;
+  /** a player is about to spawn (before its health is set from hpFactor) */
+  onSpawn?(room: Room, player: Player): void;
+  /** key F: the mode's own action, from the eye `o` along the look direction `d` (Infectados: barricade, scream) */
+  action?(room: Room, player: Player, o: Vec3, d: Vec3, now: number): void;
+  /** Traidores: a vote in the meeting (a player id, '' to skip) */
+  meetingVote?(room: Room, player: Player, id: string): void;
+  /** extra per-player data for the snapshot */
+  playerSnapshot?(player: Player, now: number): Partial<PlayerSnapshot>;
   /** reset mode state and teams when a new match starts */
   onMatchReset?(room: Room): void;
   /** extra data for the snapshot */
   snapshot?(room: Room, now: number): Partial<ModeSnapshot>;
+  /** true between rounds (waiting for players, the break): nothing to camp for, the anti-camping clock waits */
+  paused?(): boolean;
 }

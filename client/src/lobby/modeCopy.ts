@@ -17,6 +17,7 @@ export const MODE_ICON: Record<ModeId, string> = {
   insta: '<circle cx="12" cy="12" r="9"/><path d="M13 6l-4 7h4l-2 5"/>',
   freeze: '<path d="M12 2v20M3.3 7l17.4 10M3.3 17L20.7 7M9 4l3 2 3-2M9 20l3-2 3 2"/>',
   bomb: '<circle cx="11" cy="14" r="7"/><path d="M15 9l3-3M18 3v2M21 6h-2M20 4l-1 1"/>',
+  traitor: '<path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="12" cy="12" r="2.5"/>',
 };
 
 export const MODE_SUB: Record<ModeId, string> = {
@@ -33,28 +34,33 @@ export const MODE_SUB: Record<ModeId, string> = {
   insta: 'Railgun: un disparo, una baja',
   freeze: 'Descongela a tu equipo',
   bomb: 'Planta o desactiva',
+  traitor: 'Hay traidores entre ustedes',
 };
 
 /** The create form lists the modes in three families, in this order. */
 export const MODE_GROUPS: { name: string; modes: ModeId[] }[] = [
   { name: 'Clásicos', modes: ['ffa', 'teams', 'rounds', 'lms'] },
   { name: 'Objetivo', modes: ['ctf', 'dom', 'bomb', 'kc'] },
-  { name: 'Especiales', modes: ['gungame', 'insta', 'infect', 'freeze', 'race'] },
+  { name: 'Especiales', modes: ['gungame', 'insta', 'infect', 'freeze', 'race', 'traitor'] },
 ];
 
 export const MODE_HOW: Record<ModeId, string> = {
   ffa: 'Todos contra todos; gana el jugador con más eliminaciones y los jugadores reaparecen al morir.',
-  teams: 'Combate por equipos con reaparición; gana el equipo que acumule más bajas.',
+  teams:
+    'Combate por equipos con reaparición; gana el equipo que acumule más bajas. Cada poco la zona se cierra hacia el centro y luego se vuelve a abrir.',
   ctf: 'Captura la bandera del equipo enemigo y llévala hasta tu base, con la tuya en casa.',
   gungame: 'Progresión de armas: cada baja te otorga un arma diferente; gana quien mate con el cuchillo.',
   kc: 'Por equipos: cada baja suelta una placa y solo cuenta al recogerla; tu equipo puede negarla.',
   infect: 'Los infectados solo llevan cuchillo y contagian al matar; los supervivientes ganan si aguantan.',
   dom: 'Controla y mantén los puntos repartidos por el mapa para sumar puntos con el tiempo.',
-  rounds: 'Por equipos y sin reaparición durante la ronda: aniquila a todos los miembros del equipo rival.',
+  rounds:
+    'Por equipos y sin reaparición durante la ronda: aniquila a todos los miembros del equipo rival. A los 45 s la zona empieza a cerrarse hacia el centro.',
   race: 'Acrobacias y saltos: llega del punto de inicio al final del recorrido antes que nadie. Derriba a los rivales para mandarlos a su punto de control.',
-  lms: 'Todos contra todos, individual y sin reapariciones: la ronda es para el último superviviente.',
+  lms: 'Todos contra todos, individual y sin reapariciones: la ronda es para el último superviviente. A los 45 s la zona empieza a cerrarse hacia el centro.',
   insta: 'Todos contra todos donde cualquier impacto mata: railgun con munición infinita y cuchillo.',
   freeze:
     'Al eliminar a un rival queda congelado en el sitio hasta que un compañero lo descongele (3 s a su lado). Gana la ronda quien congele a todo el equipo rival.',
   bomb: 'Rojo debe plantar la bomba en A o B; Azul defiende o la desactiva. Una vida por ronda.',
+  traitor:
+    'Todos parecen del mismo bando, pero hay traidores ocultos. Examinen los cuerpos (F), llamen a reunión y voten a quién expulsar. Una vida por ronda.',
 };

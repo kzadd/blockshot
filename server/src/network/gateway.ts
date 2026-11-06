@@ -16,7 +16,7 @@ import {
   InputSchema,
   JoinRoomSchema,
   MAX_PING_MS,
-  PLAYER,
+  respawnDelayOf,
   PingSchema,
   QUICK_CHAT,
   QUICK_CHAT_COOLDOWN_MS,
@@ -26,12 +26,15 @@ import {
   SpawnSchema,
   SwitchSchema,
   TeamSetSchema,
+  TraitorVoteSchema,
   VoteSchema,
+  ZombiePickSchema,
   canSwitchTeam,
   clamp,
   isMapId,
   isModeId,
   fitMapMode,
+  isZombieType,
   v,
   type ClientToServerEvents,
   type ServerToClientEvents,
@@ -163,7 +166,7 @@ export function attachGateway(io: GameServer, rooms: RoomRegistry, log: Logger):
     on('room:join', 'lobby', JoinRoomSchema, (data, cb) => {
       if (!cb) return;
       const room = rooms.get(data.roomId);
-      const error = rooms.canJoin(room, data.password, cleanNickname(data.nickname));
+      const error = rooms.canJoin(room, data.password);
       if (error || !room) return (cb as (r: unknown) => void)({ ok: false, error });
       if (room.id === socket.data.roomId)
         return (cb as (r: unknown) => void)({ ok: false, error: 'Ya estás en esta sala.' });
@@ -185,7 +188,8 @@ export function attachGateway(io: GameServer, rooms: RoomRegistry, log: Logger):
       if (!c || c.room.matchOver) return;
       const { room, p } = c;
       if (p.alive || room.mode.canSpawn?.(room, p) === false) return;
-      if (p.deathTime && Date.now() - p.deathTime < PLAYER.respawnDelay - SPAWN_REQUEST_GRACE_MS) return;
+      if (p.deathTime && Date.now() - p.deathTime < respawnDelayOf(room.modeId, p.team) - SPAWN_REQUEST_GRACE_MS)
+        return;
       // The class and looks are checked part by part in spawnPlayer (classOf): missing or unknown → the default
       spawnPlayer(room, p, data);
     });
@@ -239,6 +243,21 @@ export function attachGateway(io: GameServer, rooms: RoomRegistry, log: Logger):
       useAbility(c.room, c.p, d.o, [d.d[0] / len, d.d[1] / len, d.d[2] / len], Date.now());
     });
 
+    // Key F: the mode's own action (Infectados: barricade or scream)
+    on('player:action', 'combat', AbilitySchema, (d) => {
+      const c = ctx();
+      if (!c?.p.alive || c.room.matchOver || !validOrigin(c.room, c.p, d.o)) return;
+      const len = Math.hypot(...d.d);
+      if (Math.abs(len - 1) > DIRECTION_LENGTH_TOLERANCE) return;
+      c.room.mode.action?.(c.room, c.p, d.o, [d.d[0] / len, d.d[1] / len, d.d[2] / len], Date.now());
+    });
+
+    // Infectados: the type to respawn as (anything unknown: back to rotating)
+    on('infect:pick', 'misc', ZombiePickSchema, (d) => {
+      const c = ctx();
+      if (c) c.p.zombiePick = isZombieType(d.z) ? d.z : null;
+    });
+
     on('player:shoot', 'combat', ShootSchema, (d) => {
       const c = ctx();
       if (c?.p.alive && !c.room.matchOver) handleShoot(c.room, c.p, d);
@@ -273,6 +292,12 @@ export function attachGateway(io: GameServer, rooms: RoomRegistry, log: Logger):
       if (c) castVote(c.room, c.p.id, d.i);
     });
 
+    // Traidores: a vote in the meeting (the mode checks the voter and the target are alive)
+    on('traitor:vote', 'misc', TraitorVoteSchema, (d) => {
+      const c = ctx();
+      if (c && !c.room.matchOver) c.room.mode.meetingVote?.(c.room, c.p, d.id);
+    });
+
     on('admin:stats', 'lobby', EmptySchema, (_d, cb) => {
       if (admin && cb) (cb as (rows: unknown) => void)(sessionStats(rooms.all()));
     });
@@ -291,11 +316,10 @@ export function attachGateway(io: GameServer, rooms: RoomRegistry, log: Logger):
       const { room, p } = t;
       const s = io.sockets.sockets.get(p.id);
       if (s) {
-        room.banned.add(p.name);
         s.leave(room.id);
         s.join(LOBBY_CHANNEL);
         s.data.roomId = null;
-        s.emit('kicked', 'El admin te ha sacado de la sala.');
+        s.emit('kicked', 'El admin te ha sacado de la sala (puedes volver a entrar).');
       }
       rooms.removePlayer(room, p.id); // a bot just goes
       log.info({ room: room.id, name: p.name }, 'player kicked');
@@ -340,8 +364,9 @@ export function attachGateway(io: GameServer, rooms: RoomRegistry, log: Logger):
         return;
       }
       if (t) return;
-      startTournament(c.room, d.rounds, c.p.id);
-      adminChangeRoom(c.room, { mapId: c.room.map.id, mode: 'ffa' }); // round 1 starts now, free for all
+      const mode = d.mode ?? 'ffa';
+      startTournament(c.room, d.rounds, c.p.id, mode);
+      adminChangeRoom(c.room, fitMapMode(c.room.map.id, mode)); // round 1 starts now, on a map that hosts the mode
     });
 
     on('admin:ranking:reset', 'lobby', EmptySchema, () => {

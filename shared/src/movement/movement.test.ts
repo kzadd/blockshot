@@ -8,6 +8,7 @@ import {
   BTN_JUMP_PRESSED,
   BTN_SHOT,
   BTN_SPRINT,
+  FALL_OUT_Y,
   FIXED_DT,
   createMoveState,
   stepMovement,
@@ -16,7 +17,8 @@ import {
   type MoveState,
 } from './movement';
 
-const FLOOR: Collider = { c: 'floor', min: [-100, -1, -100], max: [100, 0, 100] };
+// big enough for 20 s of bunny hopping (falling off it is the void now, no way back)
+const FLOOR: Collider = { c: 'floor', min: [-1000, -1, -1000], max: [1000, 0, 1000] };
 const WALK = 7;
 const ctxWith = (...extra: Collider[]): MoveContext => ({
   colliders: [FLOOR, ...extra],
@@ -262,12 +264,12 @@ describe('movement simulation', () => {
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
   });
 
-  it('puts the player back when falling out of the map', () => {
+  it('holds the player at the void when falling out of the map (the server kills it)', () => {
     const st = createMoveState(0, -19, 0);
-    const ctx: MoveContext = { ...ctxWith(), colliders: [], fallback: [3, 1, 4] };
+    const ctx: MoveContext = { ...ctxWith(), colliders: [] };
     run(st, ctx, 30, () => input());
-    expect(st.x).toBe(3);
-    expect(st.z).toBe(4);
+    expect(st.y).toBe(FALL_OUT_Y);
+    expect(st.vy).toBe(0);
   });
 
   it('climbs a ladder onto the roof holding forward, and down holding back', () => {

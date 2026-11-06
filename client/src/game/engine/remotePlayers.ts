@@ -10,6 +10,7 @@ import {
   isOutfitColor,
   isTeamMode,
   loadoutOf,
+  ZOMBIES,
   type AbilityId,
   type AccessoryId,
   type CamoId,
@@ -20,6 +21,7 @@ import {
   type SkinId,
   type Team,
   type WeaponId,
+  type ZombieKind,
 } from '@blockshot/shared';
 import { prop } from '../render/props';
 import { palette, teamColor } from '../../settings/palette';
@@ -31,15 +33,21 @@ import {
   type GunModel,
   type NameTag,
 } from '../render/models';
-import { loadGun } from '../render/gunAssets';
+import { loadGun, THIRD_PERSON_GUN } from '../render/gunAssets';
 import { LASER_RANGE, LaserBeam, fitGunGear, laserOrigin, wearKevlar } from '../render/gear';
 import { damp, dampAngle } from './util';
 
 const INFECTED_COLOR = '#6fcf3a';
+/** Infectados: each infected type in its own shade (and size, ZOMBIES.scale) */
+const ZOMBIE_TINT: Record<ZombieKind, string> = {
+  runner: '#a8e05a',
+  tank: '#4c6e2c',
+  leaper: '#c9cf3e',
+  alpha: '#9c3a2e',
+};
 /** Snapshots kept per player: 4.5 s at 20 Hz, enough to replay how you died. */
 const BUFFER_SIZE = 90;
 const NAME_TAG_Y = 2.3;
-const REMOTE_GUN_SCALE = 1.05;
 /** Muzzle flash of remote guns (ms) and the shot origin when the gun is not drawn yet. */
 const REMOTE_FLASH_MS = 60;
 const MUZZLE_Y_STANDING = 1.35;
@@ -77,10 +85,10 @@ function glintMat(): THREE.SpriteMaterial {
   return glintMaterial;
 }
 
-/** Tanque's shield: the pack's riot shield held in front of the body (the model faces -z), feet to chest. */
+/** The Escudo ability's ballistic shield held in front of the body, feet to chest. */
 const SHIELD_Y = 0.25;
 const SHIELD_Z = -0.6;
-const SHIELD_SIZE: [number, number, number] = [0.95, 0.08, 1.55];
+const SHIELD_SIZE: [number, number, number] = [0.95, 1.55, 0.14];
 const BUBBLE_OPACITY = 0.14;
 const BUBBLE_PULSE = 0.08;
 const BUBBLE_PULSE_SPEED = 0.008;
@@ -110,6 +118,8 @@ export interface Sample {
   rx: number;
   sl: number;
   cr: number;
+  /** 1: aiming */
+  ad: number;
 }
 
 export interface Outfit {
@@ -160,6 +170,8 @@ export interface Remote {
   ax: AccessoryId | null;
   /** its laser's beam, while it carries one */
   laser: LaserBeam | null;
+  /** Infectados: the infected type it is drawn as */
+  zt?: ZombieKind;
 }
 
 /**
@@ -196,6 +208,10 @@ export class RemotePlayers {
   readonly all = new Map<string, Remote>();
   /** Freeze tag: frozen players stay drawn where they fell (inside their ice block) */
   frozen: ReadonlySet<string> = new Set();
+  /** Traidores: bodies lie where they fell (drawn like the frozen, flat on the floor) */
+  bodies: ReadonlySet<string> = new Set();
+  /** Traidores: the other traitors, for a traitor (their name tag says so, through walls) */
+  marked: ReadonlySet<string> = new Set();
   private readonly tmp = new THREE.Vector3();
 
   constructor(
@@ -253,7 +269,13 @@ export class RemotePlayers {
         this.all.set(p.id, r);
       }
       const changed =
-        r.charId !== p.ab || r.skin !== p.sk || r.co !== p.co || r.cm !== p.cm || r.fn !== p.fn || r.team !== p.tm;
+        r.charId !== p.ab ||
+        r.skin !== p.sk ||
+        r.co !== p.co ||
+        r.cm !== p.cm ||
+        r.fn !== p.fn ||
+        r.team !== p.tm ||
+        r.zt !== p.zt;
       if (p.ab && changed) this.build(r, p);
       if (r.model && (changed || r.ax !== p.ax)) this.dress(r, p.ax ?? null);
       r.name = p.n;
@@ -267,7 +289,7 @@ export class RemotePlayers {
       if (!r.model || !r.charId) continue;
       // A player that just (re)spawned jumps to its new place instead of sliding there
       if (r.alive && !r.wasAlive) r.buffer.length = 0;
-      r.buffer.push({ t: now, x: p.x, y: p.y, z: p.z, ry: p.ry, rx: p.rx, sl: p.sl, cr: p.cr });
+      r.buffer.push({ t: now, x: p.x, y: p.y, z: p.z, ry: p.ry, rx: p.rx, sl: p.sl, cr: p.cr, ad: p.ad ?? 0 });
       if (r.buffer.length > BUFFER_SIZE) r.buffer.shift();
       r.tag?.userData.setHp(Math.min(1, p.h / (p.mh || BODY.hp)));
       const cls = classFromIndex(p.wc);
@@ -280,6 +302,7 @@ export class RemotePlayers {
       }
       r.wasAlive = r.alive;
       r.model.group.visible = r.alive || this.frozen.has(r.id);
+      r.model.group.rotation.z = !r.alive && this.bodies.has(r.id) ? Math.PI / 2 : 0;
     }
     for (const id of [...this.all.keys()]) if (!seen.has(id)) this.remove(id);
   }
@@ -287,13 +310,23 @@ export class RemotePlayers {
   private build(r: Remote, p: PlayerSnapshot): void {
     if (!p.ab) return;
     if (r.model) this.scene.remove(r.model.group);
-    const { color, skin, camo } = outfitFor(this.mode, p.sk, p.tm, p.co, p.cm);
+    const outfit = outfitFor(this.mode, p.sk, p.tm, p.co, p.cm);
+    const { skin, camo } = outfit;
+    const color = p.zt ? ZOMBIE_TINT[p.zt] : outfit.color;
     r.model = buildCharacter(p.ab, skin, color, camo);
+    r.model.group.scale.setScalar(p.zt ? ZOMBIES[p.zt].scale : 1);
+    r.zt = p.zt;
     r.color = color;
     // Team modes: name in the team colour (teammates are seen through walls); otherwise the enemy colour
     const teams = isTeamMode(this.mode);
-    const mate = teams && p.tm === this.myTeam();
-    const tag = makeNameTag(p.n, teams ? teamColor(p.tm, palette().enemy) : palette().enemy, mate);
+    // (Traidores: everybody looks like an ally; a traitor sees the other traitors marked)
+    const traitor = this.marked.has(p.id);
+    const mate = (teams && p.tm === this.myTeam()) || traitor;
+    const tag = makeNameTag(
+      p.zt ? `${p.n} · ${ZOMBIES[p.zt].name}` : traitor ? `${p.n} · Traidor` : p.n,
+      teams ? teamColor(p.tm, palette().enemy) : this.mode === 'traitor' && !traitor ? palette().ally : palette().enemy,
+      mate,
+    );
     tag.position.y = NAME_TAG_Y;
     r.model.group.add(tag);
     r.tag = tag;
@@ -304,8 +337,7 @@ export class RemotePlayers {
     r.model.group.add(r.bubble);
     // The model lies flat (long side along z): stood up on its bottom edge
     r.shield = new THREE.Group().add(prop('shield', SHIELD_SIZE));
-    r.shield.children[0]!.rotation.x = -Math.PI / 2;
-    r.shield.children[0]!.position.y = SHIELD_SIZE[2] / 2;
+    r.shield.children[0]!.rotation.y = Math.PI; // the model stands facing +Z: turned to face the front
     r.shield.position.set(0, SHIELD_Y, SHIELD_Z);
     r.shield.visible = false;
     r.model.group.add(r.shield);
@@ -344,7 +376,7 @@ export class RemotePlayers {
     if (!r.model) return;
     const hold = (g: GunModel) => {
       fitGunGear(g, r.ax);
-      g.scale.setScalar(REMOTE_GUN_SCALE);
+      g.scale.setScalar(THIRD_PERSON_GUN);
       r.model?.holdGun(g);
       r.gun = g;
     };
@@ -403,6 +435,7 @@ export class RemotePlayers {
           rx: a.rx + (c.rx - a.rx) * k,
           sl: c.sl,
           cr: c.cr,
+          ad: c.ad,
         };
       }
     }

@@ -128,6 +128,39 @@ describe('league tournament', () => {
   });
 });
 
+describe('league tournament of any mode', () => {
+  it('team mode: the winning team takes the top places by kills, then the losers; the mode stays', () => {
+    const r = makeRoom('ffa');
+    const ps = ['Ana', 'Bea', 'Cris', 'Dani'].map((n) => r.join(n));
+    startTournament(r.room, 3, '', 'teams');
+    adminChangeRoom(r.room, { mapId: r.room.map.id, mode: 'teams' });
+    for (const p of ps) if (!p.alive) spawnPlayer(r.room, p);
+    const red = ps.filter((p) => p.team === 1);
+    const blue = ps.filter((p) => p.team === 2);
+    expect([red.length, blue.length]).toEqual([2, 2]);
+    red[0]!.kills = 1;
+    blue[0]!.kills = 9;
+    blue[1]!.kills = 8;
+    r.room.teamScore = { 1: 10, 2: 5 };
+    adminEnd(r.room); // Red wins
+    const end = r.channel.of('match:end').at(-1)!;
+    expect(end.tour?.rows.map((x) => x.name)).toEqual([red[0]!.name, red[1]!.name, blue[0]!.name, blue[1]!.name]);
+    expect(end.vote.length).toBeGreaterThan(0);
+    expect(end.vote.every((o) => o.mode === 'teams' && o.mapId !== r.room.map.id)).toBe(true);
+  });
+
+  it('Último en pie: places by rounds won', () => {
+    const r = makeRoom('lms');
+    const [a, b] = ['Ana', 'Bea'].map((n) => r.join(n));
+    startTournament(r.room, 3, '', 'lms');
+    for (const p of [a!, b!]) if (!p.alive) spawnPlayer(r.room, p);
+    Object.assign(a!, { kills: 9, caps: 0 });
+    Object.assign(b!, { kills: 0, caps: 2 });
+    adminEnd(r.room);
+    expect(r.channel.of('match:end').at(-1)!.tour?.rows[0]?.name).toBe('Bea');
+  });
+});
+
 describe('ranking file', () => {
   let dir: string;
   beforeEach(() => {

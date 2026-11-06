@@ -9,3 +9,6 @@ data
 
 # impeccable design tool caches
 **/.impeccable/hook.cache.json
+
+# Raw gun downloads (zips from Sketchfab, converted into client/public/models/guns)
+descargas-armas/

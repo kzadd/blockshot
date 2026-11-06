@@ -25,7 +25,7 @@ function context() {
   renderer.setSize(W, H, false);
   renderer.setClearColor(0x000000, 0);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.5;
+  renderer.toneMappingExposure = 2.2; // most real guns are black: lit up so they read on the dark cards
   const scene = new THREE.Scene();
   scene.add(new THREE.HemisphereLight(0xdfe6f0, 0x4a4540, 2.2));
   const key = new THREE.DirectionalLight(0xfff3e6, 2.4);

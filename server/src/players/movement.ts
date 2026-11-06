@@ -2,6 +2,11 @@
 // movement code at a fixed rate and tells each client where it really is (ack).
 import {
   BTN_AIM,
+  BTN_SHOVE,
+  FALL_OUT_Y,
+  PLAYER,
+  SHOVE,
+  round2,
   BODY,
   accessorySpeed,
   climbables,
@@ -14,7 +19,9 @@ import {
   staminaMult,
   stepMovement,
   type MoveInput,
+  type Vec3,
 } from '@blockshot/shared';
+import { dieAlone } from '../combat/damage';
 import type { Room } from '../rooms/room';
 import { recordPosition } from './history';
 import type { Player } from './player';
@@ -32,20 +39,54 @@ export function queueInputs(p: Player, cmds: readonly MoveInput[]): void {
   }
 }
 
-function stepPlayer(room: Room, p: Player, input: MoveInput): void {
+/**
+ * Knocks a player away along (dx, dz) with a little lift, no damage (SHOVE). Its own client gets the new velocity in
+ * the next ack, replaying its pending commands from there.
+ */
+export function pushPlayer(p: Player, dx: number, dz: number): void {
+  const len = Math.hypot(dx, dz) || 1;
+  p.move.vx += (dx / len) * SHOVE.push;
+  p.move.vz += (dz / len) * SHOVE.push;
+  p.move.vy = Math.max(p.move.vy, SHOVE.lift);
+  p.move.grounded = false;
+}
+
+/** The shove key (V): the nearest player (any team) within reach in front is pushed away; once every cooldownMs. */
+export function shove(room: Room, p: Player, now: number): void {
+  if (now < p.shoveAt) return;
+  p.shoveAt = now + SHOVE.cooldownMs;
+  const fx = -Math.sin(p.ry);
+  const fz = -Math.cos(p.ry);
+  let best: Player | null = null;
+  let bestD = SHOVE.range;
+  for (const q of room.players.values()) {
+    const dx = q.x - p.x;
+    const dz = q.z - p.z;
+    const d = Math.hypot(dx, dz);
+    if (q === p || !q.alive || d > bestD || Math.abs(q.y - p.y) > PLAYER.height) continue;
+    if (d > 0 && (dx * fx + dz * fz) / d < SHOVE.cone) continue;
+    best = q;
+    bestD = d;
+  }
+  if (!best || best.zombie === 'tank') return; // Infectados' Tanque does not budge
+  pushPlayer(best, fx, fz);
+  const at: Vec3 = [round2(best.x), round2(best.y + PLAYER.eye), round2(best.z)];
+  room.channel.to(p.id, 'hitmarker', [{ head: false, kill: false, dmg: 0, at, id: best.id }]);
+}
+
+function stepPlayer(room: Room, p: Player, input: MoveInput, now: number): void {
   if (!p.cls) return;
   if (movesOrJumps(input)) p.idle = false;
   // The weapon actually held decides the speed: the slot inside the input is only the client's prediction
   const weaponId = p.loadout[p.slot];
   const w = weaponId ? WEAPONS[weaponId] : null;
   const walk = BODY.speed * (w?.weight ?? 1) * accessorySpeed(p.cls.accessory) * (room.mode.speedFactor?.(p) ?? 1);
-  const spawn = room.map.spawns[0];
   stepMovement(p.move, input, FIXED_DT, {
     colliders: room.colliders,
     walk,
     adsMove: w?.adsMove ?? 1,
-    fallback: spawn ? [spawn[0], spawn[1], spawn[2]] : [0, 0, 0],
     dash: p.cls.ability === 'dash',
+    leap: p.zombie === 'leaper',
     staminaMult: staminaMult(w?.weight ?? 1),
     ...climbables(room.map),
   });
@@ -59,6 +100,7 @@ function stepPlayer(room: Room, p: Player, input: MoveInput): void {
   p.cr = m.crouching && !m.sliding ? 1 : 0;
   p.lastSeq = input.seq;
   p.aiming = (input.b & BTN_AIM) !== 0;
+  if (input.b & BTN_SHOVE) shove(room, p, now);
 }
 
 /**
@@ -74,10 +116,12 @@ export function simulateRoom(room: Room, dt: number, now: number): void {
     }
     p.simBudget = Math.min(MAX_SIM_BUDGET_S, p.simBudget + dt);
     while (p.inputs.length && p.simBudget >= FIXED_DT) {
-      stepPlayer(room, p, p.inputs.shift()!);
+      stepPlayer(room, p, p.inputs.shift()!, now);
       p.simBudget -= FIXED_DT;
     }
     recordPosition(p, now);
+    // Fell into the void: a death (the race sends you back to your checkpoint well before, over the lava)
+    if (p.y <= FALL_OUT_Y && room.modeId !== 'race') dieAlone(room, p, 'Vacío');
   }
 }
 

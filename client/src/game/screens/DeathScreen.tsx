@@ -1,4 +1,18 @@
-import { ABILITIES, PLAYER, classLabel, isTeamMode, type ModeId, type PlayerClass } from '@blockshot/shared';
+import { useEffect, useState } from 'react';
+import {
+  ABILITIES,
+  EXPELLED,
+  HIDDEN_KILLER,
+  ZOMBIES,
+  ZOMBIE_TYPES,
+  classLabel,
+  isTeamMode,
+  respawnDelayOf,
+  type ModeId,
+  type PlayerClass,
+  type ZombieType,
+} from '@blockshot/shared';
+import { socket } from '../../network/socket';
 import { Icon } from '../../ui/icons';
 import { Feed, RoomInfo, type FeedItem } from '../hud/HUD';
 import { useHud } from '../hud/hudStore';
@@ -12,7 +26,19 @@ export interface LastDeath {
   cls: PlayerClass | null;
   weapon: string;
   hp: number;
+  /** nobody killed you: `name` says what did (Vacío, Campeo, Zona, Admin) */
+  self?: boolean;
 }
+
+/** Headline of an unscored death, by what the server names as its cause. */
+const SELF_DEATH: Record<string, string> = {
+  Vacío: 'Caíste al vacío',
+  Campeo: 'Te mató el campeo',
+  Zona: 'Te atrapó la zona',
+  Admin: 'Te eliminó el admin',
+  [HIDDEN_KILLER]: 'Te eliminaron: no sabes quién fue',
+  [EXPELLED]: 'Te expulsaron en la votación',
+};
 
 const MS_PER_S = 1000;
 
@@ -35,6 +61,8 @@ export default function DeathScreen({ lastDeath, current, feed, you, mode, info,
     round: s.round,
     replay: s.replay,
     spectate: s.spectate,
+    myTeam: s.myTeam,
+    alpha: s.players.some((p) => p.id === you && p.zt === 'alpha'),
   }));
   if (!h) return null;
   const killer = lastDeath?.cls ?? null;
@@ -59,7 +87,7 @@ export default function DeathScreen({ lastDeath, current, feed, you, mode, info,
   return (
     <div className="layer stage">
       <div className="death-bg" />
-      {h.replay && lastDeath && (
+      {h.replay && lastDeath && !lastDeath.self && (
         <div className="replay-tag">
           <Icon name="video" size={14} />
           Repetición · así te vio <b>{lastDeath.name}</b>
@@ -68,7 +96,9 @@ export default function DeathScreen({ lastDeath, current, feed, you, mode, info,
       {/* During the replay the card steps aside to the bottom-left corner: the killer's view stays clear */}
       <div className={`death ${h.replay ? 'replaying' : ''}`}>
         <h2>
-          {lastDeath ? (
+          {lastDeath?.self ? (
+            (SELF_DEATH[lastDeath.name] ?? lastDeath.name)
+          ) : lastDeath ? (
             <>
               Te eliminó <span className="k">{lastDeath.name}</span>
             </>
@@ -96,11 +126,18 @@ export default function DeathScreen({ lastDeath, current, feed, you, mode, info,
               <b key={h.sec}>{Math.max(1, h.sec)}</b>
             </div>
             <div className="pbar fill">
-              <i key={h.deathKey} style={{ animationDuration: `${PLAYER.respawnDelay}ms` }} />
+              <i key={h.deathKey} style={{ animationDuration: `${respawnDelayOf(mode, h.myTeam)}ms` }} />
             </div>
           </>
         )}
-        {me && (
+        {mode === 'infect' &&
+          h.myTeam === 2 &&
+          (h.alpha ? (
+            <p className="zombie-pick-note">Eres paciente cero: vuelves igual, con el grito (F)</p>
+          ) : (
+            <ZombiePick />
+          ))}
+        {me && mode !== 'infect' && (
           <div className="as">
             Reapareces con <span className="chip-char">{classLabel(me)}</span>
           </div>
@@ -112,6 +149,45 @@ export default function DeathScreen({ lastDeath, current, feed, you, mode, info,
       <Feed feed={feed} you={you} mode={mode} />
       <RoomInfo info={info} />
     </div>
+  );
+}
+
+/** The infected type picked here, kept for the whole session (the server keeps it for the next respawns too). */
+let zombiePick: ZombieType | null = null;
+
+/** Infectados: the type to come back as (keys 1-3 or a click; the same one again goes back to taking turns). */
+function ZombiePick() {
+  const [pick, setPick] = useState(zombiePick);
+  const choose = (z: ZombieType) => {
+    zombiePick = zombiePick === z ? null : z;
+    setPick(zombiePick);
+    socket.emit('infect:pick', { z: zombiePick ?? '' });
+  };
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      const i = ['Digit1', 'Digit2', 'Digit3'].indexOf(e.code);
+      if (i >= 0 && !e.repeat) choose(ZOMBIE_TYPES[i]!);
+    };
+    window.addEventListener('keydown', down);
+    return () => window.removeEventListener('keydown', down);
+  }, []);
+  return (
+    <>
+      <div className="zombie-pick">
+        {ZOMBIE_TYPES.map((z, i) => (
+          <button key={z} className={pick === z ? 'on' : ''} onClick={() => choose(z)}>
+            <b>
+              <span className="key">{i + 1}</span>
+              {ZOMBIES[z].name}
+            </b>
+            <small>{ZOMBIES[z].desc}</small>
+          </button>
+        ))}
+      </div>
+      <p className="zombie-pick-note">
+        {pick ? `Reapareces como ${ZOMBIES[pick].name}` : 'Sin elegir: vas cambiando de tipo en cada vida'}
+      </p>
+    </>
   );
 }
 

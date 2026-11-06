@@ -67,6 +67,18 @@ describe('lobby', () => {
     expect(await bot('D').join('nope')).toEqual({ ok: false, error: 'La sala ya no existe.' });
   });
 
+  it('a kicked player leaves the room but may join it again', async () => {
+    const a = bot('Profe'); // test sockets are local: the admin
+    const res = await a.create({});
+    if (!res.ok) throw new Error('create failed');
+    const b = bot('Alumno');
+    expect((await b.join(res.room.id)).ok).toBe(true);
+    a.s.emit('admin:kick', { id: b.id });
+    await b.until(() => b.count('kicked') > 0, 2000, 'kicked');
+    expect((await list(a)).find((x) => x.id === res.room.id)?.players).toBe(1);
+    expect((await b.join(res.room.id)).ok).toBe(true);
+  });
+
   it('deletes a room when everybody leaves', async () => {
     const a = bot('Solo');
     const res = await a.create({});

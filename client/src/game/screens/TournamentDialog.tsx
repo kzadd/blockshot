@@ -1,7 +1,7 @@
-// League tournament: any player can start one (N rounds of free for all, points per place). Only whoever started
+// League tournament: any player can start one (N rounds of the mode they pick, points per place). Only whoever started
 // it and the admin can stop it. Shown on its own from the pause menu and inside the admin panel.
 import { useEffect, useState } from 'react';
-import { TOUR_ROUNDS, type RoomInfo } from '@blockshot/shared';
+import { MODES, MODE_BY_ID, TOUR_ROUNDS, type ModeId, type RoomInfo } from '@blockshot/shared';
 import { socket } from '../../network/socket';
 import { Icon } from '../../ui/icons';
 
@@ -15,6 +15,7 @@ interface PanelProps {
 
 export function TournamentPanel({ room, you, admin, onStart }: PanelProps) {
   const [rounds, setRounds] = useState<number>(TOUR_ROUNDS[1]);
+  const [mode, setMode] = useState<ModeId>(room.mode);
   const tour = room.tour;
   return (
     <section>
@@ -48,17 +49,24 @@ export function TournamentPanel({ room, you, admin, onStart }: PanelProps) {
               </button>
             ))}
           </div>
+          <select value={mode} onChange={(e) => setMode(e.target.value as ModeId)} aria-label="Modo del torneo">
+            {MODES.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </select>
           <button
             className="btn sm"
             onClick={() => {
-              socket.emit('tournament:set', { rounds });
+              socket.emit('tournament:set', { rounds, mode });
               onStart?.();
             }}
           >
             <Icon name="award" />
             Empezar torneo
           </button>
-          <small className="meta">Todos contra todos · cada puesto suma puntos (10, 8, 6…)</small>
+          <small className="meta">{MODE_BY_ID[mode].name} en cada ronda · cada puesto suma puntos (10, 8, 6…)</small>
         </>
       )}
     </section>

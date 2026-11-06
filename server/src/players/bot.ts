@@ -10,6 +10,7 @@ import {
   DOM,
   FREEZE,
   PLAYER,
+  respawnDelayOf,
   PRIMARIES,
   SIDEARMS,
   WEAPONS,
@@ -39,6 +40,8 @@ export const BOT_PREFIX = 'bot:';
 export const MAX_BOTS = 4;
 /** The bot changes strafing direction every STRAFE_MS ± half. */
 const STRAFE_MS = 1200;
+/** A bot this close to the zone's edge heads back in. */
+const ZONE_EDGE = 4;
 /** Chest height of the target, from its feet (m). */
 const CHEST = 1.1;
 const SIGHT_RANGE = 80;
@@ -58,6 +61,8 @@ const LOB_RANGE = 18;
 const ENGAGE_RANGE = 25;
 /** The objective is looked up again this often (ms). */
 const OBJECTIVE_MS = 250;
+/** Traidores: a bot walks to another spawn point this often (ms). */
+const WANDER_MS = 15000;
 /** Kill confirmed: tags closer than this are worth a detour (m). */
 const TAG_DETOUR = 30;
 /** Close enough to an objective point to stop walking (m). */
@@ -134,6 +139,8 @@ interface Aim {
 function findTargets(room: Room, bot: Player, eye: Vec3) {
   let seen: Aim | null = null;
   let near: Aim | null = null;
+  // Traidores: bots are harmless innocents (they would gun down everybody, and nobody could tell who)
+  if (room.modeId === 'traitor') return { seen, near };
   for (const t of room.players.values()) {
     if (!t.alive || t.id === bot.id || sameTeam(room, t, bot)) continue;
     const dx = t.x - eye[0];
@@ -186,10 +193,22 @@ const at = (p: { x: number; y: number; z: number }): Vec3 => [p.x, p.y, p.z];
  * nearby tag. Null when the mode has nothing to do (then it hunts the nearest rival).
  */
 function objectiveOf(room: Room, bot: Player): { goal: Vec3; radius: number } | null {
+  // Traidores: wander, a different spawn point every WANDER_MS (each bot its own)
+  if (room.modeId === 'traitor') {
+    const n = room.map.spawns.length;
+    const seed = [...bot.id].reduce((h, c) => h + c.charCodeAt(0), 0);
+    const s = room.map.spawns[(seed + Math.floor(Date.now() / WANDER_MS)) % n];
+    return s ? { goal: [s[0], s[1], s[2]], radius: AT_GOAL } : null;
+  }
+  const snap = room.mode.snapshot?.(room, Date.now());
+  // Outside the shrinking zone (or about to be): back towards its centre before anything else
+  if (snap?.zn) {
+    const [x, y, z, r] = snap.zn;
+    if (Math.hypot(bot.x - x, bot.z - z) > r - ZONE_EDGE) return { goal: [x, y, z], radius: r / 2 };
+  }
   const team = asSide(bot.team);
   if (!team) return null;
   const enemy = team === 1 ? 2 : 1;
-  const snap = room.mode.snapshot?.(room, Date.now());
   if (snap?.fl) {
     const mine = snap.fl[team];
     const theirs = snap.fl[enemy];
@@ -274,7 +293,7 @@ function think(room: Room, bot: Player, now: number): void {
   const level = BOT_LEVELS[brain.level];
 
   if (!bot.alive) {
-    const ready = !bot.deathTime || now - bot.deathTime >= PLAYER.respawnDelay;
+    const ready = !bot.deathTime || now - bot.deathTime >= respawnDelayOf(room.modeId, bot.team);
     if (!room.matchOver && ready && room.mode.canSpawn?.(room, bot) !== false) {
       spawnPlayer(room, bot, { ...randomClass(), skin: 'base' });
       brain.seq = 0;

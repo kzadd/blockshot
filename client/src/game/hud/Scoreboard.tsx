@@ -1,6 +1,7 @@
 import {
   ABILITIES,
   WEAPONS,
+  ZOMBIES,
   gunLadder,
   isTeamMode,
   teamName,
@@ -8,8 +9,10 @@ import {
   type SideTeam,
   type WeaponId,
 } from '@blockshot/shared';
+import { RankBadge } from '../../ui/badges';
 import { ABILITY_ICON, Icon } from '../../ui/icons';
 import { MODE_UI } from '../modeUi';
+import { oneLife } from '../objectiveView';
 import type { RoomView } from '../roomView';
 import type { HudPlayer } from './hudState';
 import { SIDES, TEAM_TXT, teamVar } from './teamStyle';
@@ -27,9 +30,11 @@ interface TableProps {
   ladder?: WeaponId[] | null;
   /** Bomb mode: who carries the bomb */
   carrier?: string | null;
+  /** one life per round, round on: who is out ('frozen' in freeze tag), the rest are still standing */
+  out?: ((p: HudPlayer) => 'dead' | 'frozen' | null) | null;
 }
 
-function Table({ players, me, numbered, caps, ladder, carrier }: TableProps) {
+function Table({ players, me, numbered, caps, ladder, carrier, out }: TableProps) {
   return (
     <table className="sb-table">
       <thead>
@@ -61,51 +66,71 @@ function Table({ players, me, numbered, caps, ladder, carrier }: TableProps) {
         </tr>
       </thead>
       <tbody>
-        {players.map((p, i) => (
-          <tr key={p.id} className={`${p.id === me ? 'me' : ''} ${i === 0 ? 'first' : ''}`}>
-            {numbered && <td className="pos">{i + 1}</td>}
-            <td>
-              {p.n}
-              {p.id === me && <span className="tag-sol you">TÚ</span>}
-              {p.id === carrier && (
-                <span title="Lleva la bomba">
-                  {' '}
-                  <Icon name="bomb" size={14} />
-                </span>
-              )}
-            </td>
-            <td>
-              {p.ab ? (
-                <span className="chip-char">
-                  <Icon name={ABILITY_ICON[p.ab]} size={12} /> {ABILITIES[p.ab].name}
-                </span>
-              ) : (
-                '—'
-              )}
-            </td>
-            {caps && <td className="num k">{p.cp ?? 0}</td>}
-            {ladder && (
+        {players.map((p, i) => {
+          const gone = out?.(p);
+          return (
+            <tr key={p.id} className={`${p.id === me ? 'me' : ''} ${i === 0 ? 'first' : ''} ${gone ? 'out' : ''}`}>
+              {numbered && <td className="pos">{i + 1}</td>}
               <td>
-                {Math.min(p.lv + 1, ladder.length)}/{ladder.length} ·{' '}
-                {WEAPONS[ladder[Math.min(p.lv, ladder.length - 1)]!].name}
+                {gone && (
+                  <span className="sb-out" title={gone === 'frozen' ? 'Congelado' : 'Eliminado'}>
+                    <Icon name={gone === 'frozen' ? 'snow' : 'skull'} size={13} />
+                  </span>
+                )}
+                {p.rp !== undefined && <RankBadge points={p.rp} size={22} />}
+                {p.n}
+                {p.id === me && <span className="tag-sol you">TÚ</span>}
+                {p.id === carrier && (
+                  <span title="Lleva la bomba">
+                    {' '}
+                    <Icon name="bomb" size={14} />
+                  </span>
+                )}
               </td>
-            )}
-            <td className="num k">{p.k}</td>
-            <td className="num">{p.d}</td>
-            <td className={`num ${p.st >= HOT_STREAK ? 'fire' : ''}`}>
-              {p.st >= HOT_STREAK ? (
-                <>
-                  <Icon name="flame" size={14} />
-                  {p.st}
-                </>
-              ) : (
-                p.st
+              <td>
+                {p.zt ? (
+                  <span className="chip-char">{ZOMBIES[p.zt].name}</span>
+                ) : p.ab ? (
+                  <span className="chip-char">
+                    <Icon name={ABILITY_ICON[p.ab]} size={12} /> {ABILITIES[p.ab].name}
+                  </span>
+                ) : (
+                  '—'
+                )}
+              </td>
+              {caps && <td className="num k">{p.cp ?? 0}</td>}
+              {ladder && (
+                <td>
+                  {Math.min(p.lv + 1, ladder.length)}/{ladder.length} ·{' '}
+                  {WEAPONS[ladder[Math.min(p.lv, ladder.length - 1)]!].name}
+                </td>
               )}
-            </td>
-            <td className="num">{p.md || '—'}</td>
-            <td className={`num ping ${p.pg > BAD_PING_MS ? 'bad' : ''}`}>{p.pg || '—'}</td>
-          </tr>
-        ))}
+              <td className="num k">{p.k}</td>
+              <td className="num">{p.d}</td>
+              <td className={`num ${p.st >= HOT_STREAK ? 'fire' : ''}`}>
+                {p.st >= HOT_STREAK ? (
+                  <>
+                    <Icon name="flame" size={14} />
+                    {p.st}
+                  </>
+                ) : (
+                  p.st
+                )}
+              </td>
+              <td className="num sb-medals">
+                {p.md ? (
+                  <>
+                    <Icon name="award" size={14} />
+                    {p.md}
+                  </>
+                ) : (
+                  '—'
+                )}
+              </td>
+              <td className={`num ping ${p.pg > BAD_PING_MS ? 'bad' : ''}`}>{p.pg || '—'}</td>
+            </tr>
+          );
+        })}
       </tbody>
     </table>
   );
@@ -119,9 +144,23 @@ interface ScoreboardProps {
   mode: ModeId;
   teamScore: Record<SideTeam, number> | null;
   carrier?: string | null;
+  /** round on (rd.p === 1): the scoreboard tells who is still standing */
+  live?: boolean;
+  /** Freeze tag: frozen players' ids */
+  frozen?: readonly string[];
 }
 
-export default function Scoreboard({ players, me, info, scoreLimit, mode, teamScore, carrier }: ScoreboardProps) {
+export default function Scoreboard({
+  players,
+  me,
+  info,
+  scoreLimit,
+  mode,
+  teamScore,
+  carrier,
+  live,
+  frozen = [],
+}: ScoreboardProps) {
   const ladder = MODE_UI[mode].top === 'ladder' ? gunLadder(scoreLimit) : null;
   const teams = isTeamMode(mode);
   const caps = MODE_UI[mode].points;
@@ -132,12 +171,17 @@ export default function Scoreboard({ players, me, info, scoreLimit, mode, teamSc
   );
   const infect = MODE_UI[mode].top === 'infect';
   const goal = MODE_UI[mode].goal(scoreLimit);
+  // One life a round: greyed rows and «N vivos» so spectators know who is left
+  const lives = oneLife(mode) && !!live;
+  const out = lives ? (p: HudPlayer) => (p.a ? null : frozen.includes(p.id) ? 'frozen' : 'dead') : null;
+  const standing = (list: HudPlayer[]) => `${list.filter((p) => p.a).length}/${list.length} en pie`;
   return (
     <div className="scoreboard">
       <div className="sb-head">
         <h2>{info.name}</h2>
         <span>
           {info.map} · {info.size} · {goal}
+          {lives && !teams && ` · ${standing(sorted)}`}
         </span>
       </div>
       <div className="sb-scroll">
@@ -149,7 +193,7 @@ export default function Scoreboard({ players, me, info, scoreLimit, mode, teamSc
                 <span>
                   {infect
                     ? `${sorted.filter((p) => p.tm === t).length} ${sorted.filter((p) => p.tm === t).length === 1 ? 'jugador' : 'jugadores'}`
-                    : `${teamScore?.[t] ?? 0} / ${scoreLimit}`}
+                    : `${lives ? `${standing(sorted.filter((p) => p.tm === t))} · ` : ''}${teamScore?.[t] ?? 0} / ${scoreLimit}`}
                 </span>
               </div>
               {!infect && (
@@ -157,11 +201,11 @@ export default function Scoreboard({ players, me, info, scoreLimit, mode, teamSc
                   <i style={{ width: `${((teamScore?.[t] ?? 0) / scoreLimit) * 100}%` }} />
                 </div>
               )}
-              <Table players={sorted.filter((p) => p.tm === t)} me={me} caps={caps} carrier={carrier} />
+              <Table players={sorted.filter((p) => p.tm === t)} me={me} caps={caps} carrier={carrier} out={out} />
             </div>
           ))
         ) : (
-          <Table players={sorted} me={me} numbered ladder={ladder} caps={caps} />
+          <Table players={sorted} me={me} numbered ladder={ladder} caps={caps} out={out} />
         )}
       </div>
     </div>

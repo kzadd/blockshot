@@ -2,6 +2,7 @@
 // runs the very same code to predict its own player, so both agree step by step.
 import type { Vec3 } from '../core/math';
 import { DASH } from '../abilities/abilities';
+import { LEAP } from '../modes/infect';
 import { LADDER, ZIPLINE } from '../maps/objects';
 import type { MapZipline } from '../maps/types';
 import { PAD, PLAYER } from '../player/player';
@@ -22,6 +23,8 @@ export const BTN_FIRE = 32;
 export const BTN_SHOT = 64;
 /** the ability key went down (Rayo's dash is part of the movement) */
 export const BTN_DASH = 128;
+/** shove key (V): push whoever stands right in front of you (no damage) */
+export const BTN_SHOVE = 256;
 
 /** One simulation step of player input (Command pattern): what the player wanted to do. */
 export interface MoveInput {
@@ -100,8 +103,8 @@ export interface MoveContext {
   walk: number;
   /** speed multiplier while aiming with the held weapon */
   adsMove: number;
-  /** where to put the player back if it falls out of the map */
-  fallback: Vec3;
+  /** unused: falling into the void (FALL_OUT_Y) is now a death the server decides */
+  fallback?: Vec3;
   /** the character's ability is the dash */
   dash?: boolean;
   /** stamina cost multiplier of the held weapon (staminaMult of its weight; 1 when missing) */
@@ -109,6 +112,8 @@ export interface MoveContext {
   /** climbing volumes in front of the map's ladders (ladderVolume) */
   ladders?: readonly Collider[];
   ziplines?: readonly MapZipline[];
+  /** Infectados' Saltador: higher jumps, wall jumps with no stamina and off the same wall again (LEAP) */
+  leap?: boolean;
 }
 
 /** Things that happened during a step (sounds and camera effects for the client). */
@@ -141,7 +146,8 @@ const JUMP_MAX_VY = 0.01;
 /** Sprinting only counts as moving above this speed (stamina). */
 const SPRINT_MIN_SPEED = 1;
 const SPRINT_BLOCK_S = 0.4;
-const FALL_OUT_Y = -20;
+/** Below this the player has fallen into the void: the step holds it here and the server kills it. */
+export const FALL_OUT_Y = -20;
 /** Small gaps that keep boxes from touching after a collision. */
 const STEP_UP_GAP = 0.001;
 const SKIN = 1e-4;
@@ -586,7 +592,10 @@ export function stepMovement(st: MoveState, input: MoveInput, dt: number, ctx: M
   // Jump (with coyote time after a ledge and a remembered key press)
   if (wantJump && st.coyote > 0 && st.vy <= JUMP_MAX_VY) {
     // keeps the momentum: slide + jump = very fast. Tired (not enough stamina), it is a lower jump
-    st.vy = PLAYER.jump * (spendStamina(st, PLAYER.jumpCost * tire, PLAYER.jumpRestDelay, tire) ? 1 : PLAYER.tiredJump);
+    st.vy =
+      PLAYER.jump *
+      (ctx.leap ? LEAP.jump : 1) *
+      (spendStamina(st, PLAYER.jumpCost * tire, PLAYER.jumpRestDelay, tire) ? 1 : PLAYER.tiredJump);
     st.grounded = false;
     st.coyote = 0;
     st.jumpBuffer = 0;
@@ -602,8 +611,8 @@ export function stepMovement(st: MoveState, input: MoveInput, dt: number, ctx: M
     const onLadder = f !== 0 && !!ctx.ladders?.some((l) => touching(st, l));
     if (!ledge && !onLadder && held(BTN_JUMP_PRESSED) && st.wallJumps > 0 && st.wallJumpCd <= 0) {
       // Urban Terror: you climb by bouncing between two walls (or round a corner), never twice off the same wall
-      const n = wallNormals(st, cols).find(([nx, nz]) => nx * st.wallNx + nz * st.wallNz < SAME_WALL);
-      if (n && spendStamina(st, PLAYER.wallJumpCost * tire, PLAYER.jumpRestDelay, tire)) {
+      const n = wallNormals(st, cols).find(([nx, nz]) => ctx.leap || nx * st.wallNx + nz * st.wallNz < SAME_WALL);
+      if (n && (ctx.leap || spendStamina(st, PLAYER.wallJumpCost * tire, PLAYER.jumpRestDelay, tire))) {
         // Urban Terror (PM_WallJump): mostly up. The speed you had is kept (minus what went into the wall) and a
         // push is added: off the wall plus along it the way you steer, wallJumpPush m/s each, so it goes diagonally
         const into = st.vx * n[0] + st.vz * n[1];
@@ -672,7 +681,7 @@ export function stepMovement(st: MoveState, input: MoveInput, dt: number, ctx: M
     if (overlaps(cols, st.x, st.y + STEP_UP_GAP, st.z, PLAYER.height)) st.crouching = true;
     else st.height = PLAYER.height;
   }
-  if (st.y < FALL_OUT_Y) [st.x, st.y, st.z] = ctx.fallback;
+  if (st.y < FALL_OUT_Y) Object.assign(st, { y: FALL_OUT_Y, vx: 0, vy: 0, vz: 0 });
 
   // Timers
   st.jumpBuffer = Math.max(0, st.jumpBuffer - dt);

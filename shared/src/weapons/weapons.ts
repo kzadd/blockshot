@@ -138,6 +138,8 @@ export const WEAPONS: Record<WeaponId, Weapon> = {
     range: 300,
     recoil: 0.032,
     zoom: 2.6,
+    // A telescopic sight like the bolt rifles (overlay, glint), but semi-auto: no bolt to cycle
+    scope: true,
     sound: 'dmr',
     weight: 0.98,
     adsSpeed: 10,

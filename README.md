@@ -69,9 +69,10 @@ pasan por Husky: lint-staged (ESLint + Prettier) y commitlint (conventional comm
    - **Escalada de armas:** todos llevan la misma arma y cada baja da la siguiente; gana quien elimine con el cuchillo.
    - **Confirmar bajas** (Rojo contra Azul): cada baja suelta una placa; si la recoge el equipo del que mató suma un
      punto, si la recoge un compañero de la víctima la niega. Gana el primer equipo en llegar a las placas elegidas.
-   - **Infectados:** con 2 jugadores empieza una cuenta atrás de 10 s y uno se convierte en infectado (solo cuchillo,
-     +30 % de vida y +15 % de velocidad). Cada superviviente que cae se infecta. Ganan los infectados si no queda nadie;
-     los supervivientes, si aguantan los minutos elegidos (2, 3 o 5).
+   - **Infectados:** con 2 jugadores empieza una cuenta atrás de 10 s y uno de cada 4 se convierte en infectado (solo
+     cuchillo, el doble de vida, +25 % de velocidad y reaparece al segundo). Cada superviviente que muere se infecta.
+     En los últimos 30 s los infectados ven a todos en el minimapa, y el último superviviente recibe un arma de poder.
+     Ganan los infectados si no queda nadie; los supervivientes, si aguantan los minutos elegidos (2, 3 o 5).
    - **Dominio** (Rojo contra Azul): tres zonas, A, B y C. Quédate en una sin rivales dentro para capturarla; cada 2 s
      tu equipo suma un punto por zona. Gana el primero en llegar a los puntos elegidos (100, 150 o 250).
    - **Supervivencia** (Rojo contra Azul, vale para 1 contra 1): no se reaparece durante la ronda; gana la ronda el equipo que
@@ -81,7 +82,14 @@ pasan por Husky: lint-staged (ESLint + Prettier) y commitlint (conventional comm
    - **Congelados** (Rojo contra Azul): quien cae queda congelado hasta que un compañero pase 3 s a su lado; gana
      la ronda el equipo que congele a todos los rivales.
    - **Bomba:** Rojo planta la bomba en A o B y Azul defiende o la desactiva. Una vida por ronda.
-   - **Carrera de saltos:** solo en Circuito; acrobacias y saltos del inicio a la meta, con armas para derribar rivales.
+   - **Carrera de saltos:** solo en sus tres recorridos (Circuito, Verbena y Tarta); acrobacias y saltos del inicio a la meta. Las balas y el cuchillo no hacen
+     daño: empujan, para tirar a los rivales a la lava.
+
+   **Torneo:** desde la pausa cualquiera empieza una liga de 3, 5 o 7 rondas del modo que elija; cada puesto suma
+   puntos (en los modos por equipos, primero los del equipo ganador). **Caer al vacío** elimina (en la Carrera vuelves a
+   tu punto de control). **Campear no compensa:** tras 10 s sin salir de una zona de 8 m llega un aviso; a los 15 s los
+   rivales te ven en el minimapa y pierdes 10 de vida por segundo hasta que salgas. El admin puede **sacar** a alguien
+   de la sala (puede volver a entrar).
 
    Al terminar, durante 12 s se ve el resultado y se **vota** la siguiente partida entre tres mapas y modos (si nadie
    vota, se repite la misma). En los modos por equipos, los equipos se **equilibran** solos según la partida anterior.
@@ -103,7 +111,7 @@ pasan por Husky: lint-staged (ESLint + Prettier) y commitlint (conventional comm
 | Tab               | Marcador                                                                                           |
 | B                 | Cambiar de clase o de equipo (solo estando muerto)                                                 |
 | T                 | Cambiar de equipo (por equipos; espera 5 s entre cambios y no vale en pleno combate)               |
-| V y 1–8           | Chat rápido: frases fijas (las tácticas solo las ve tu equipo)                                     |
+| V                 | Empujar a quien tengas justo delante (sin daño, también a tu equipo)                               |
 | O                 | Ajustes: mira (6 estilos, color, tamaño…), sensibilidad, campo de visión y volumen                 |
 | H / F1            | Manual del juego (controles, clases, armas y trucos)                                               |
 | Esc               | Pausa (soltar el ratón); otro Esc vuelve al juego                                                  |
@@ -214,8 +222,13 @@ client/src/
   baja, `tick`…), una línea en `server/src/modes/index.ts`, su entrada en `MODES` (`shared/src/modes`) y su
   presentación en `client/src/game/modeUi.ts`.
 - **Ajustes y mira:** valores por defecto en `client/src/settings/settingsStore.ts`; se guardan en el navegador.
-- **Mapas:** hay diez (Patio, Autopista, Monasterio, Pueblo, Casco Viejo, Obra, Puerto, Circuito, Estación y Nevada),
-  todos de un solo tamaño (80 × 80 m, `H` = 40), hechos a mano. Cada mapa es una función en
+- **Mapas:** hay catorce (Patio, Autopista, Monasterio, Pueblo, Casco Viejo, Obra, Puerto, Circuito, Estación, Nevada,
+  Sanatorio, Aduana, Verbena y Tarta). Circuito, Verbena y Tarta son recorridos de obstáculos solo para la Carrera de
+  saltos (piezas comunes en `shared/src/maps/builders/course.ts`; `racecourses.test.ts` comprueba con el movimiento
+  real que cada tramo se puede pasar). Sanatorio (de noche, pasillos y una zona segura) está hecho para Infectados y solo admite
+  Infectados, Todos contra todos y Último en pie; Aduana (Rojo ataca desde el oeste, sitios A y B al este) está hecha
+  para Bomba y solo admite Bomba, Supervivencia y Por equipos (`MAP_ONLY` en `shared/src/modes/modes.ts`). Todos son
+  de un solo tamaño (80 × 80 m, `H` = 40), hechos a mano. Cada mapa es una función en
   `shared/src/maps/builders/` que recibe `H` (mitad del lado) y coloca cajas
   con `B(x, y, z, ancho, alto, fondo, tipo)` (x/z = centro, y = base) y spawns con `S(x, z)`. Para añadir uno, escribe
   su función y regístrala en `MAP_DEFS` (`shared/src/maps/maps.ts`). Todo lo que sea caja tiene colisión y bloquea

@@ -60,11 +60,18 @@ describe('último en pie', () => {
     const r = makeRoom('lms', 5);
     const a = r.join('Ana');
     const b = r.join('Bea');
+    // Both stand at the zone's centre: the shrinking zone must not decide it
+    const toCentre = () => {
+      const [x, y, z] = snap(r).zn!;
+      for (const p of [a, b]) r.place(p, x, z, y);
+    };
     nextRound(r);
+    toCentre();
     b.hp = 40;
     play(r, ROUNDS.roundMs);
     expect([a.caps, b.caps]).toEqual([1, 0]);
     nextRound(r);
+    toCentre();
     play(r, ROUNDS.roundMs);
     expect([a.caps, b.caps]).toEqual([1, 0]);
     expect(r.channel.notices()).toContain('Ronda 2: nadie en pie');
@@ -189,6 +196,7 @@ describe('bomba', () => {
     play(r, BOMB.fuseMs - 1000);
     kill(r, blue, red);
     expect(r.room.teamScore).toEqual({ 1: 0, 2: 0 });
+    expect(r.channel.notices().some((t) => t.includes('desactívenla para ganar'))).toBe(true);
     play(r, 1200);
     expect(r.room.teamScore).toEqual({ 1: 1, 2: 0 });
     expect(r.channel.notices()).toContain('¡La bomba ha explotado!');

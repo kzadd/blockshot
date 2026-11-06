@@ -6,8 +6,8 @@ import { uiScale } from '../../ui/ui';
 /** What the minimap needs from the game, computed by the engine. */
 export interface MinimapView {
   me: { x: number; z: number; yaw: number } | null;
-  /** players to draw; alpha fades enemies after they shoot */
-  dots: { x: number; z: number; mate: boolean; alpha: number }[];
+  /** players to draw; alpha fades enemies after they shoot; alert: revealed rival (camping, infected hunt), pulsing */
+  dots: { x: number; z: number; mate: boolean; alpha: number; alert?: boolean }[];
   tags: { x: number; z: number; team: SideTeam }[];
   flags: { x: number; z: number; team: SideTeam }[];
   /** Domination zones: letter in the owner's colour */
@@ -18,6 +18,8 @@ export interface MinimapView {
   power: { x: number; z: number } | null;
   /** Bomb mode: the bomb (carried, dropped or planted) */
   bomb: { x: number; z: number } | null;
+  /** the shrinking zone: outside is shaded */
+  ring?: { x: number; z: number; r: number } | null;
 }
 export interface MinimapSource {
   minimap(now: number): MinimapView;
@@ -30,6 +32,7 @@ const BACKGROUND_ALPHA = 0.5;
 /** Roofs are see-through so the rooms under them can be read. */
 const ROOF_ALPHA = 0.35;
 const DOT_R = 5.5;
+const ALERT_PULSE_MS = 900;
 const INK = '#12171c';
 
 // North-up minimap: you (yellow arrow), allies always in green, enemies in red only after shooting
@@ -101,9 +104,36 @@ export default function Minimap({
       g.drawImage(base, 0, 0);
       g.setTransform(k, 0, 0, k, 0, 0);
 
+      // Shrinking zone: shade outside the circle, and its edge
+      if (view.ring) {
+        const x = toPx(view.ring.x);
+        const y = toPx(view.ring.z);
+        const r = view.ring.r * world;
+        g.beginPath();
+        g.rect(0, 0, SIZE, SIZE);
+        g.arc(x, y, r, 0, Math.PI * 2);
+        g.fillStyle = 'rgba(255, 90, 31, 0.22)';
+        g.fill('evenodd');
+        g.beginPath();
+        g.arc(x, y, r, 0, Math.PI * 2);
+        g.lineWidth = 2;
+        g.strokeStyle = '#ff5a1f';
+        g.stroke();
+      }
+
       for (const d of view.dots) {
         g.globalAlpha = d.alpha;
         dot(toPx(d.x), toPx(d.z), d.mate ? palette().ally : palette().enemy);
+        if (d.alert) {
+          // A ring that keeps growing and fading round a revealed rival
+          const t = (now % ALERT_PULSE_MS) / ALERT_PULSE_MS;
+          g.globalAlpha = 1 - t;
+          g.beginPath();
+          g.arc(toPx(d.x), toPx(d.z), DOT_R + 2 + t * 8, 0, Math.PI * 2);
+          g.lineWidth = 2;
+          g.strokeStyle = palette().enemy;
+          g.stroke();
+        }
       }
       g.globalAlpha = 1;
 

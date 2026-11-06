@@ -13,10 +13,12 @@ interface Props {
   onKeep: () => void;
   onLeave: () => void;
   onTeam: (t: SideTeam) => void;
+  /** your id: your rank shows in the header */
+  you: string;
 }
 
 // The class screen fed with the live game state (respawn countdown, team, players per team)
-export default function CharacterScreen({ info, current, mode, onPick, onKeep, onLeave, onTeam }: Props) {
+export default function CharacterScreen({ info, current, mode, onPick, onKeep, onLeave, onTeam, you }: Props) {
   const h = useHud((s) => ({
     everSpawned: s.everSpawned,
     respawnIn: s.respawnIn,
@@ -37,6 +39,7 @@ export default function CharacterScreen({ info, current, mode, onPick, onKeep, o
       myTeam={h.myTeam}
       players={h.players}
       onTeam={onTeam}
+      rankPoints={h.players.find((p) => p.id === you)?.rp}
     />
   );
 }

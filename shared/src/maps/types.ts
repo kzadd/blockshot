@@ -136,7 +136,20 @@ export interface MapBuildContext {
 export type MapColors = Partial<Record<BoxKind, string>> & { floor: string; wall: string };
 
 export type MapId =
-  'patio' | 'autopista' | 'monasterio' | 'pueblo' | 'ciudad' | 'obra' | 'puerto' | 'estacion' | 'nevada' | 'circuito';
+  | 'patio'
+  | 'autopista'
+  | 'monasterio'
+  | 'pueblo'
+  | 'ciudad'
+  | 'obra'
+  | 'puerto'
+  | 'estacion'
+  | 'nevada'
+  | 'circuito'
+  | 'sanatorio'
+  | 'aduana'
+  | 'verbena'
+  | 'tarta';
 export type SizeId = 's' | 'm' | 'l';
 
 export interface MapDef {

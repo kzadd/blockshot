@@ -2,12 +2,14 @@ import { useEffect, useRef, useState, type RefObject } from 'react';
 import {
   ABILITIES,
   ACCESSORIES,
+  BOMB,
   SHIELD,
   MEDALS,
   SITE_NAMES,
   ZONE_NAMES,
   STREAK_REWARDS,
   WEAPONS,
+  ZOMBIES,
   gunLadder,
   isTeamMode,
   teamName,
@@ -15,13 +17,16 @@ import {
   type FlagSnapshot,
   type GameMap,
   type KillEvent,
+  type MedalId,
   type ModeId,
   type Team,
 } from '@blockshot/shared';
 import Crosshair from '../../settings/Crosshair';
 import { useSettings } from '../../settings/settingsStore';
+import { MedalIcon } from '../../ui/badges';
 import { ABILITY_ICON, ACCESSORY_ICON, Icon } from '../../ui/icons';
 import { MODE_UI } from '../modeUi';
+import { BOMB_ATTACKERS } from '../objectiveView';
 import type { RoomView } from '../roomView';
 import type { HudPlayer } from './hudState';
 import { useHud } from './hudStore';
@@ -42,7 +47,7 @@ export interface KillBanner {
   label: string | undefined;
   n: number;
   reward: string | undefined;
-  medals: string[];
+  medals: MedalId[];
 }
 
 const ARMOR_MAX = Object.values(STREAK_REWARDS).find((r) => r.id === 'armor')?.amount ?? 50;
@@ -84,9 +89,7 @@ export function Feed({ feed, you, mode }: { feed: FeedItem[]; you: string; mode:
               {f.head && <HeadIcon />}
               <b style={{ color: color(f.victimTeam) }}>{f.victimName}</b>
               {f.medals.map((m) => (
-                <span key={m} className="medal">
-                  {MEDALS[m]}
-                </span>
+                <MedalIcon key={m} id={m} size={18} />
               ))}
             </div>
           );
@@ -139,6 +142,49 @@ function TeamChip() {
     </div>
   );
 }
+
+/**
+ * Traidores: your secret role, always on screen under the minimap (red with your partners as a traitor, blue as an
+ * innocent), and big in the middle for a few seconds when the round deals it.
+ */
+function TraitorRole() {
+  const tr = useHud((s) => s.traitor);
+  const role = tr?.role ?? null;
+  const [splash, setSplash] = useState(false);
+  useEffect(() => {
+    if (role === null) return undefined;
+    setSplash(true);
+    const t = setTimeout(() => setSplash(false), ROLE_SPLASH_MS);
+    return () => clearTimeout(t);
+  }, [role]);
+  if (!tr || role === null) return null;
+  const traitor = role;
+  const title = traitor ? 'Traidor' : 'Inocente';
+  const hint = traitor
+    ? tr.mates.length
+      ? `Con ${tr.mates.join(', ')}. Elimina a los inocentes sin que te descubran`
+      : 'Elimina a los inocentes sin que te descubran'
+    : 'Descubre a los traidores y expúlsalos en la votación';
+  return (
+    <>
+      <div className={`role-card ${traitor ? 'bad' : 'good'}`}>
+        <Icon name={traitor ? 'skull' : 'shield'} size={22} />
+        <div>
+          <small>Tu rol</small>
+          <b>{title}</b>
+        </div>
+      </div>
+      {splash && (
+        <div className={`role-splash ${traitor ? 'bad' : 'good'}`} role="status">
+          <small>Eres</small>
+          <b>{title}</b>
+          <span>{hint}</span>
+        </div>
+      )}
+    </>
+  );
+}
+const ROLE_SPLASH_MS = 4500;
 
 /** In game the room details live in the scoreboard (Tab): only a bad connection is shown. */
 function NetWarning() {
@@ -366,15 +412,35 @@ function TopCenter({ mode, scoreLimit, you }: { mode: ModeId; scoreLimit: number
     zones: s.zones,
     round: s.round,
     bomb: s.bomb,
+    modeKey: s.modeKey,
+    traitor: s.traitor,
   }));
   if (!h) return null;
   const players = h.players;
   const top = MODE_UI[mode].top;
-  const round = h.round && (
-    <span className="top-sub round-st">
-      {roundStatus(h.round)}
-      {h.bomb && ` · ${bombStatus(h.bomb, players, you)}`}
+  const tr = h.traitor;
+  const round = tr ? (
+    // Traidores: the round, my secret role (and the other traitors) and key F
+    <span className="top-sub round-st infect-sub">
+      {h.round && roundStatus(h.round)}
+      {tr.role !== null && (
+        <b className={tr.role ? 'tr-traitor' : 'iz'}>
+          {tr.role ? `Traidor${tr.mates.length ? ` · con ${tr.mates.join(', ')}` : ''}` : 'Inocente'}
+        </b>
+      )}
+      {h.modeKey && (
+        <span>
+          <span className="key">F</span> {h.modeKey.name}
+        </span>
+      )}
     </span>
+  ) : (
+    h.round && (
+      <span className="top-sub round-st">
+        {roundStatus(h.round)}
+        {h.bomb && ` · ${bombStatus(h.bomb, players, you)}`}
+      </span>
+    )
   );
   if (top === 'infect') {
     // Infected: how many are left on each side and the time left (or until the first infected)
@@ -386,18 +452,42 @@ function TopCenter({ mode, scoreLimit, you }: { mode: ModeId; scoreLimit: number
         : inf.st
           ? clock(inf.t)
           : `Infección en ${Math.ceil(inf.t / MS_PER_S)} s`;
+    // Below: your infected type, key F (barricade / scream) and the blackout warning; the last survivor's banner
+    const zt = players.find((p) => p.id === you)?.zt;
+    const key = h.modeKey;
+    const last = inf?.la ? players.find((p) => p.id === inf.ls) : undefined;
     return (
-      <div className="hud-top infect-bar">
-        <span className="sv">
-          {count(1)} {count(1) === 1 ? 'superviviente' : 'supervivientes'}
-          {h.myTeam === 1 ? ' · TÚ' : ''}
-        </span>
-        <span className="pill clock">{status}</span>
-        <span className="iz">
-          {count(2)} {count(2) === 1 ? 'infectado' : 'infectados'}
-          {h.myTeam === 2 ? ' · TÚ' : ''}
-        </span>
-      </div>
+      <>
+        <div className="hud-top infect-bar">
+          <span className="sv">
+            {count(1)} {count(1) === 1 ? 'superviviente' : 'supervivientes'}
+            {h.myTeam === 1 ? ' · TÚ' : ''}
+          </span>
+          <span className="pill clock">{status}</span>
+          <span className="iz">
+            {count(2)} {count(2) === 1 ? 'infectado' : 'infectados'}
+            {h.myTeam === 2 ? ' · TÚ' : ''}
+          </span>
+        </div>
+        {(zt || key || inf?.bo) && (
+          <span className="top-sub round-st infect-sub">
+            {zt && <b className="iz">{ZOMBIES[zt].name}</b>}
+            {key && (
+              <span className={key.left > 0 ? 'cd' : ''}>
+                <span className="key">F</span> {key.name}
+                {key.left > 0 && ` · ${Math.ceil(key.left / MS_PER_S)} s`}
+              </span>
+            )}
+            {inf?.bo === 1 && <b className="warn">¡Apagón!</b>}
+          </span>
+        )}
+        {last && (
+          <div className="infect-last" role="status">
+            <small>Último superviviente</small>
+            <b>{last.n}</b>
+          </div>
+        )}
+      </>
     );
   }
   const teamScore = h.teamScore;
@@ -573,36 +663,6 @@ function SmokeFog() {
   return k ? <div className="smoke-fog" style={{ opacity: k }} /> : null;
 }
 
-/**
- * The sight while fully aimed: a holographic hexagon with a marker in the middle, floating over the gun (which sits
- * just below it, Valorant-style); the telescopic sight on the marksman rifle.
- */
-function AdsSight({ weapon }: { weapon: string }) {
-  const shotKey = useHud((s) => s.shotKey);
-  return (
-    <div className={`ads-sight ${weapon === 'dmr' ? 'scope' : 'holo'}`}>
-      <div key={shotKey} className="ads-reticle">
-        {weapon === 'dmr' ? (
-          <>
-            <i className="dot" />
-            <i className="frame" />
-          </>
-        ) : (
-          <svg className="hex" viewBox="-115 -80 230 160" aria-hidden="true">
-            {/* Four corner pieces: the frame is broken at the middle of every side */}
-            <polyline points="-20,-75 -70,-75 -110,-35 -110,-14" />
-            <polyline points="20,-75 70,-75 110,-35 110,-14" />
-            <polyline points="-20,75 -70,75 -110,35 -110,14" />
-            <polyline points="20,75 70,75 110,35 110,14" />
-            {/* The cross inside */}
-            <path className="cross" d="M-15 0H-6M6 0H15M0 -15V-6M0 6V15" />
-          </svg>
-        )}
-      </div>
-    </div>
-  );
-}
-
 /** Radial streaks at the screen edges: their strength follows the speed above sprinting (slides, hops). */
 function SpeedLines() {
   const fx = useHud((s) => s.speedFx);
@@ -710,8 +770,10 @@ function Banner({ banner }: { banner: KillBanner | null }) {
       )}
       {banner.medals.length > 0 && (
         <span className="line2 medals">
-          <Icon name="award" size={14} />
-          {banner.medals.join(' · ')}
+          {banner.medals.map((m) => (
+            <MedalIcon key={m} id={m} size={22} />
+          ))}
+          {banner.medals.map((m) => MEDALS[m]).join(' · ')}
         </span>
       )}
       {banner.reward && (
@@ -737,6 +799,52 @@ function CarryingFlag({ you }: { you: string }) {
         Llevas la bandera
       </span>
       <small>{h.ownHome ? 'Llévala a tu base' : 'Tu bandera no está en tu base: recupérala para capturar'}</small>
+    </div>
+  );
+}
+
+/** Bomb and freeze tag: what to do now, under the score (the box the flag carrier gets), with the progress. */
+function ObjectiveHint({ you }: { you: string }) {
+  const h = useHud((s) => ({ bomb: s.bomb, myTeam: s.myTeam, thaw: s.thaw, ice: s.ice }));
+  if (!h) return null;
+  const { bomb: b, thaw } = h;
+  let icon: 'bomb' | 'snow' = 'bomb';
+  let title: string;
+  let hint: string;
+  let pct = 0;
+  if (b?.st === 0 && b.c === you) {
+    const s = SITE_NAMES[b.s];
+    title = b.pp && s ? `Plantando en ${s}… ${b.pp} %` : 'Tienes la bomba';
+    hint = `Quédate ${BOMB.plantMs / MS_PER_S} s dentro de la zona A o B para plantarla`;
+    pct = b.pp;
+  } else if (b?.st === 2 && h.myTeam && h.myTeam !== BOMB_ATTACKERS) {
+    title = b.dp ? `Desactivando… ${b.dp} %` : `Bomba plantada en ${SITE_NAMES[b.s] ?? '?'}`;
+    hint = `Quédate a su lado ${BOMB.defuseMs / MS_PER_S} s para desactivarla`;
+    pct = b.dp;
+  } else if (thaw) {
+    icon = 'snow';
+    title = `Descongelando a ${thaw.name}… ${thaw.pct} %`;
+    hint = 'No te separes hasta que se descongele';
+    pct = thaw.pct;
+  } else {
+    const mates = h.ice?.filter(([id, , , , t]) => t === h.myTeam && id !== you).length ?? 0;
+    if (!mates) return null;
+    icon = 'snow';
+    title = mates === 1 ? 'Un compañero congelado' : `${mates} compañeros congelados`;
+    hint = 'Quédate a su lado para descongelarlo';
+  }
+  return (
+    <div className="ctf-carry obj-hint">
+      <span>
+        <Icon name={icon} size={18} />
+        {title}
+      </span>
+      <small>{hint}</small>
+      {pct > 0 && (
+        <div className="pbar">
+          <i style={{ width: `${pct}%` }} />
+        </div>
+      )}
     </div>
   );
 }
@@ -775,6 +883,7 @@ export default function HUD({ engine, map, mode, scoreLimit, you, feed, banner }
         <div className="hud-left">
           <Minimap engine={engine} map={map} radar={h.radar} />
           <TeamChip />
+          <TraitorRole />
           <NetWarning />
         </div>
       )}
@@ -791,17 +900,33 @@ export default function HUD({ engine, map, mode, scoreLimit, you, feed, banner }
             <Scope />
           ) : (
             <>
-              {h.sight ? <AdsSight weapon={h.sight} /> : <AimCrosshair />}
+              <AimCrosshair />
               <CenterMarks />
               <Banner banner={banner} />
             </>
           )}
           {!scoped && <CarryingFlag you={you} />}
+          {!scoped && <ObjectiveHint you={you} />}
           {!scoped && <SpawnProtection />}
           <Health />
           <Ammo />
         </>
       )}
+      {!alive && <WatchedSight />}
+    </div>
+  );
+}
+
+/** Dead, seeing through someone's eyes (death replay, spectating): their crosshair or scope as they had it (aimed,
+ * the view model's own sight does the rest). */
+function WatchedSight() {
+  const settings = useSettings();
+  const w = useHud((s) => s.watchSight);
+  if (!w) return null;
+  if (w.scoped) return <Scope />;
+  return (
+    <div style={{ opacity: Math.max(0, 1 - w.aim * AIM_FADE) }}>
+      <Crosshair cfg={settings.crosshair} />
     </div>
   );
 }

@@ -229,6 +229,9 @@ interface Theme extends Partial<Record<BoxKind, Look>> {
   sun: number;
   sky: string;
   scenery: (batch: Batch, map: GameMap, rand: Rand, models: WorldModels) => void;
+  /** Dusk and night maps: light strength (1 = full day) and where the sun (or moon) stands, low over the horizon */
+  dim?: number;
+  sunAt?: [number, number, number];
 }
 
 const THEMES: Record<MapId, Theme> = {
@@ -378,6 +381,66 @@ const THEMES: Record<MapId, Theme> = {
     sun: 0xffd2a0,
     sky: '#f0a868',
     scenery: volcano,
+  },
+  sanatorio: {
+    floor: ['paving', 3],
+    wall: ['concrete', 4],
+    wall2: ['rock', 3],
+    plaster: ['plaster', 3],
+    tile: ['tiles', 1.5],
+    roof: ['tiles', 2],
+    ground: ['grass', 4, '#2f3a2c'],
+    sun: 0x9fb4e8,
+    sky: '#0c1226',
+    scenery: town,
+    dim: 0.75, // 0.5 was too dark indoors in class
+    sunAt: [-40, 22, -30],
+  },
+  aduana: {
+    floor: ['asphalt', 5],
+    wall: ['concrete', 3],
+    concrete: ['concrete', 2],
+    platform: ['concrete', 2],
+    step: ['concrete', 2],
+    ground: ['sand', 6, '#b9a582'],
+    sun: 0xffe2b8,
+    sky: '#7fa6cf',
+    scenery: city,
+    sunAt: [40, 32, -18],
+  },
+  verbena: {
+    floor: ['tiles', 2],
+    wall: ['plaster', 3],
+    platform: ['diamond', 2],
+    step: ['diamond', 2],
+    slab: ['diamond', 2],
+    tile: ['tiles', 1.5],
+    cont1: ['diamond', 2],
+    cont2: ['diamond', 2],
+    cont3: ['diamond', 2],
+    metal: ['metalPanel', 2],
+    water: [null],
+    ground: ['grass', 4, '#6fae4f'],
+    sun: 0xfff4e0,
+    sky: '#7fc4ff',
+    scenery: town,
+  },
+  tarta: {
+    floor: ['plaster', 3],
+    wall: ['plaster', 3],
+    platform: ['tiles', 1.5],
+    step: ['tiles', 1.5],
+    slab: ['tiles', 1.5],
+    tile: ['tiles', 1.5],
+    cont1: ['tiles', 1.5],
+    cont2: ['tiles', 1.5],
+    cont3: ['tiles', 1.5],
+    metal: ['planks', 1],
+    water: [null],
+    ground: ['sand', 6, '#f3d9c6'],
+    sun: 0xfff1e6,
+    sky: '#9fd0ff',
+    scenery: (batch, map, rand) => hills(batch, map, rand, '#f5b8d0'),
   },
 };
 const CAR_COLORS = ['#c0503e', '#3d6e9e', '#e8e4dc', '#2b2f36', '#c9a13a', '#4f7a45'];
@@ -720,13 +783,13 @@ function addSky(scene: THREE.Scene, map: GameMap, theme: Theme): void {
   sky.renderOrder = -1;
   scene.add(sky);
 
-  // Sun
+  // Sun (or moon, on a night map)
   const sun = new THREE.Mesh(
     new THREE.CircleGeometry(R * 0.04, 24),
-    new THREE.MeshBasicMaterial({ color: 0xfff6dc, fog: false }),
+    new THREE.MeshBasicMaterial({ color: theme.dim ? theme.sun : 0xfff6dc, fog: false }),
   );
   sun.position
-    .set(0.45, 0.75, 0.3)
+    .set(...(theme.sunAt ?? [0.45, 0.75, 0.3]))
     .normalize()
     .multiplyScalar(R * 0.9);
   sun.lookAt(0, 0, 0);
@@ -745,7 +808,7 @@ function addSky(scene: THREE.Scene, map: GameMap, theme: Theme): void {
       const puff = new THREE.Sprite(
         new THREE.SpriteMaterial({
           map: fxFrame(FX.puff[(i + k) % FX.puff.length]!),
-          color: 0xffffff,
+          color: theme.dim ? 0x4a5068 : 0xffffff,
           transparent: true,
           opacity: 0.75,
           depthWrite: false,
@@ -1006,9 +1069,10 @@ export function buildWorld(scene: THREE.Scene, map: GameMap, shadowMap = 2048): 
   scene.background = new THREE.Color(map.sky);
   scene.fog = new THREE.Fog(map.sky, H * 1.9, H * 5);
 
-  scene.add(new THREE.HemisphereLight(SKY_LIGHT, GROUND_LIGHT, HEMI_INTENSITY));
-  const sun = new THREE.DirectionalLight(theme.sun, SUN_INTENSITY);
-  sun.position.set(30, 50, 20);
+  const dim = theme.dim ?? 1;
+  scene.add(new THREE.HemisphereLight(SKY_LIGHT, GROUND_LIGHT, HEMI_INTENSITY * dim));
+  const sun = new THREE.DirectionalLight(theme.sun, SUN_INTENSITY * dim);
+  sun.position.set(...(theme.sunAt ?? [30, 50, 20]));
   sun.castShadow = true;
   sun.shadow.mapSize.set(shadowMap, shadowMap);
   Object.assign(sun.shadow.camera, { left: -H - 8, right: H + 8, top: H + 8, bottom: -H - 8, near: 1, far: H * 4 });

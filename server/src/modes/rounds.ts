@@ -1,11 +1,12 @@
 // Rounds: Red against Blue (1 v 1 works too) with no respawning during a round. The last team standing wins
 // the round; when time runs out, the team with more players alive (then more health) wins it. First to the
 // room's limit of rounds wins the match. While a team is empty the game waits and anyone may respawn.
-import type { SideTeam } from '@blockshot/shared';
+import { ZONE_PLANS, type SideTeam } from '@blockshot/shared';
 import { smallerTeam } from '../players/teams';
 import type { Room } from '../rooms/room';
 import type { GameMode } from './gameMode';
 import { endTeamRound, roundPhases, teamsReady } from './roundPhases';
+import { shrinkingZone } from './zone';
 import { teamSideSpawns } from './scoring';
 
 export function createRounds(room: Room): GameMode {
@@ -23,7 +24,9 @@ export function createRounds(room: Room): GameMode {
   const phases = roundPhases(room, {
     ready: () => teamsReady(room),
     timeUp: (now) => endTeamRound(room, phases, timeUpWinner(), now),
+    started: (now) => zone.start(now),
   });
+  const zone = shrinkingZone(room, ZONE_PLANS.rounds!, () => phases.playing());
 
   /** A team with nobody alive (killed, or its last one left) loses the round. */
   function checkRound(now: number): void {
@@ -39,14 +42,16 @@ export function createRounds(room: Room): GameMode {
     initialTeam: smallerTeam,
     filterSpawns: teamSideSpawns,
     canSpawn: () => !phases.playing(),
+    paused: () => !phases.playing(),
     teamsLocked: () => phases.playing(),
     onKill: () => checkRound(Date.now()),
     onDeath: () => checkRound(Date.now()),
     tick(_room, now) {
       phases.tick(now);
+      zone.tick(now);
       checkRound(now);
     },
     onMatchReset: () => phases.reset(),
-    snapshot: (_room, now) => ({ rd: phases.snapshot(now) }),
+    snapshot: (_room, now) => ({ rd: phases.snapshot(now), zn: zone.snapshot(now) }),
   };
 }

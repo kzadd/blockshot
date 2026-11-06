@@ -412,7 +412,7 @@
   text-transform: none;
 }
 
-/* 1 · Mapa: ten aerial shots, five by two */
+/* 2 · Mapa: the aerial shots of the maps that host the mode, five a row */
 .pz .mk-maps {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -452,18 +452,6 @@
   text-transform: uppercase;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
 }
-.pz .mk-map em {
-  position: absolute;
-  top: 0.3rem;
-  right: 0.3rem;
-  padding: 0.1rem 0.35rem;
-  background: rgba(14, 16, 20, 0.85);
-  color: var(--mut);
-  font: 600 0.62rem/1.3 var(--body);
-  font-style: normal;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
 .pz .mk-map.on {
   border-color: var(--act);
   box-shadow: inset 0 0 0 1px var(--act);
@@ -472,7 +460,7 @@
   filter: none;
 }
 
-/* 2 · Modo: three families side by side, icon and name only (the detail lives in the room card) */
+/* 1 · Modo: three families side by side, icon and name only (the detail lives in the room card) */
 .pz .mk-modes {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1470,4 +1458,59 @@
 .pz .gear-tile .ld-pic img {
   max-height: 3.4rem;
   object-fit: contain;
+}
+
+/* ---- Rank (class screen header, ranking card and table): badge + name in the tier's colour + points ---- */
+.pz .bar .rank-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+.pz .bar .rank-chip > div {
+  display: grid;
+  gap: 0.2rem;
+}
+.pz .bar .rank-chip b {
+  display: block;
+  font: 700 1.15rem/1 var(--display);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.pz .bar .rank-chip .meta {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--mut);
+}
+.pz .bar .rank-bar {
+  display: block;
+  width: 9rem;
+  height: 4px;
+  background: var(--line);
+}
+.pz .bar .rank-bar i {
+  display: block;
+  height: 100%;
+  background: var(--act);
+}
+.pz .rk {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.pz .rk > span {
+  display: grid;
+  line-height: 1.1;
+}
+.pz .rk b {
+  font-family: var(--display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.pz .rk small {
+  font-size: 0.75rem;
+  color: var(--mut);
+  font-family: var(--body, inherit);
+}
+.pz .me-card dd .rk b {
+  font-size: 1.2rem;
 }

@@ -108,6 +108,7 @@ export function createFreezeTag(room: Room): GameMode {
     },
     // Frozen players wait for a teammate; anyone else (just joined, between rounds) may respawn
     canSpawn: (_room, p) => !(phases.playing() && out.has(p.id)),
+    paused: () => !phases.playing(),
     teamsLocked: () => phases.playing(),
     onKill(r, _shooter, victim) {
       this.onDeath!(r, victim);

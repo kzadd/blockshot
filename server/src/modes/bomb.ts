@@ -24,6 +24,8 @@ interface Bomb {
   plant: number;
   defuse: number;
   explodeAt: number;
+  /** Red wiped out after the plant: Blue has been told it must still defuse */
+  lastStand?: boolean;
 }
 
 const PCT = 100;
@@ -62,6 +64,10 @@ export function createBomb(room: Room): GameMode {
     if (!red && !blue && !planted) endRound(null, now);
     else if (!blue) endRound(1, now);
     else if (!red && !planted) endRound(2, now);
+    else if (!red && bomb && !bomb.lastStand) {
+      bomb.lastStand = true;
+      notice(room, 'Los atacantes han caído, pero la bomba sigue activa: ¡desactívenla para ganar!');
+    }
   }
 
   /** The bomb goes to a random living Red player (start of the round, or nobody had it). */
@@ -128,6 +134,7 @@ export function createBomb(room: Room): GameMode {
     initialTeam: smallerTeam,
     filterSpawns: teamSideSpawns,
     canSpawn: () => !phases.playing(),
+    paused: () => !phases.playing(),
     teamsLocked: () => phases.playing(),
     onKill: () => checkRound(Date.now()),
     onDeath: () => checkRound(Date.now()),

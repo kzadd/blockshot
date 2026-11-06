@@ -50,6 +50,10 @@ export class NetClient {
   ability(o: Vec3, d: Vec3): void {
     this.socket.emit('player:ability', { o, d });
   }
+  /** key F: the mode's action */
+  action(o: Vec3, d: Vec3): void {
+    this.socket.emit('player:action', { o, d });
+  }
 
   grenade(o: Vec3, d: Vec3): void {
     this.socket.emit('player:grenade', { o, d });

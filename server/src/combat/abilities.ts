@@ -3,6 +3,7 @@
 // call popSmoke when their fuse ends.
 import {
   ABILITIES,
+  BARRICADE,
   MEDKIT_COMBAT_MS,
   MEDKIT_HP,
   MINE,
@@ -41,6 +42,8 @@ export interface Deployable {
   /** ms: it goes away (or, for a mine, it is armed from armAt) */
   until: number;
   armAt: number;
+  /** barricade: health left (only the other team's hits take it) */
+  hp?: number;
 }
 
 let seq = 0;
@@ -54,11 +57,12 @@ const MINE_HIT_R = 0.45;
 /** A mine only notices bodies this close vertically. */
 const MINE_REACH_Y = 1.5;
 
-/** Box of a cover wall. */
-export function wallBox(d: Pick<Deployable, 'pos' | 'along'>): Collider {
+/** Box of a cover wall or a barricade. */
+export function wallBox(d: Pick<Deployable, 'pos' | 'along'> & { kind?: DeployableKind }): Collider {
   const [x, y, z] = d.pos;
-  const [hx, hz] = d.along === 0 ? [WALL.w / 2, WALL.t / 2] : [WALL.t / 2, WALL.w / 2];
-  return { c: 'concrete', min: [x - hx, y, z - hz], max: [x + hx, y + WALL.h, z + hz] };
+  const s = d.kind === 'plank' ? BARRICADE : WALL;
+  const [hx, hz] = d.along === 0 ? [s.w / 2, s.t / 2] : [s.t / 2, s.w / 2];
+  return { c: d.kind === 'plank' ? 'crate' : 'concrete', min: [x - hx, y, z - hz], max: [x + hx, y + s.h, z + hz] };
 }
 
 /** Map boxes, standing barrels and crates, plus the cover walls standing now (worldObjects.ts). */
@@ -123,16 +127,20 @@ export function useAbility(room: Room, p: Player, o: Vec3, d: Vec3, now: number)
   return true;
 }
 
-/** A wall square to the look direction, in front of the player, on the floor there and not on anybody. */
-function placeWall(room: Room, p: Player, d: Vec3, now: number): boolean {
+/**
+ * A wall square to the look direction, in front of the player, on the floor there and not on anybody. A barricade
+ * (`plank`) may cut into the map (it plugs a door: its ends go into the frame), a cover wall may not.
+ */
+export function placeWall(room: Room, p: Player, d: Vec3, now: number, kind: 'wall' | 'plank' = 'wall'): boolean {
+  const s = kind === 'plank' ? BARRICADE : WALL;
   const alongX = Math.abs(d[2]) >= Math.abs(d[0]); // looking along z: the wall runs along x
   const fx = alongX ? 0 : Math.sign(d[0]);
   const fz = alongX ? Math.sign(d[2]) : 0;
-  const x = p.x + fx * WALL.dist;
-  const z = p.z + fz * WALL.dist;
+  const x = p.x + fx * s.dist;
+  const z = p.z + fz * s.dist;
   const y = floorBelow(room.map.boxes, x, p.y + WALL_MAX_STEP, z);
   if (Math.abs(y - p.y) > WALL_MAX_STEP) return false;
-  const box = wallBox({ pos: [x, y, z], along: alongX ? 0 : 1 });
+  const box = wallBox({ pos: [x, y, z], along: alongX ? 0 : 1, kind });
   const lift = 0.05; // resting on the floor is fine
   const hits = (c: Pick<Collider, 'min' | 'max'>) =>
     box.min[0] < c.max[0] &&
@@ -141,25 +149,44 @@ function placeWall(room: Room, p: Player, d: Vec3, now: number): boolean {
     box.max[1] > c.min[1] &&
     box.min[2] < c.max[2] &&
     box.max[2] > c.min[2];
-  if (room.colliders.some(hits)) return false;
+  if (kind === 'wall' && room.colliders.some(hits)) return false;
   for (const q of room.players.values()) {
     if (!q.alive) continue;
     const r = PLAYER.radius;
     if (hits({ min: [q.x - r, q.y, q.z - r], max: [q.x + r, q.y + PLAYER.height, q.z + r] })) return false;
   }
-  // One wall at a time
-  room.deployables = room.deployables.filter((w) => !(w.kind === 'wall' && w.owner === p.id));
+  // One wall (and one barricade) at a time
+  room.deployables = room.deployables.filter((w) => !(w.kind === kind && w.owner === p.id));
   add(room, {
-    kind: 'wall',
+    kind,
     owner: p.id,
     team: p.team,
     pos: [x, y, z],
     along: alongX ? 0 : 1,
-    until: now + WALL.durationMs,
+    until: now + (kind === 'plank' ? BARRICADE.lifeMs : WALL.durationMs),
     armAt: 0,
+    ...(kind === 'plank' && { hp: BARRICADE.hp }),
   });
   refreshColliders(room);
   return true;
+}
+
+/** A shot by `by` ended at `point`: a rival barricade there takes `dmg` (the Tanque's ×tankMult) and breaks at 0. */
+export function hitPlank(room: Room, by: Player, point: Vec3, dmg: number): void {
+  const pad = 0.06;
+  const pl = room.deployables.find((d) => {
+    if (d.kind !== 'plank' || d.team === by.team) return false;
+    const b = wallBox(d);
+    return [0, 1, 2].every((i) => point[i]! >= b.min[i]! - pad && point[i]! <= b.max[i]! + pad);
+  });
+  if (!pl) return;
+  const hit = dmg * (by.zombie === 'tank' ? BARRICADE.tankMult : 1);
+  pl.hp = (pl.hp ?? 0) - hit;
+  const at: Vec3 = [round2(point[0]), round2(point[1]), round2(point[2])];
+  room.channel.to(by.id, 'hitmarker', [{ head: false, kill: false, dmg: Math.round(hit), at }]);
+  if (pl.hp > 0) return;
+  room.deployables = room.deployables.filter((d) => d !== pl);
+  refreshColliders(room);
 }
 
 /** A smoke canister's fuse ended: the cloud appears where it lies. */
@@ -246,7 +273,7 @@ export function tickAbilities(room: Room, now: number): void {
     }
   }
   if (!gone.size) return;
-  const wall = [...gone].some((d) => d.kind === 'wall');
+  const wall = [...gone].some((d) => d.kind === 'wall' || d.kind === 'plank');
   room.deployables = room.deployables.filter((d) => !gone.has(d));
   if (wall) refreshColliders(room);
 }

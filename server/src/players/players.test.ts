@@ -1,11 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { FIXED_DT, MAX_QUEUED_INPUTS, MAX_SIM_BUDGET_S, type MoveInput } from '@blockshot/shared';
+import {
+  BTN_SHOVE,
+  FIXED_DT,
+  MAX_QUEUED_INPUTS,
+  MAX_SIM_BUDGET_S,
+  SHOVE,
+  WEAPONS,
+  type MoveInput,
+} from '@blockshot/shared';
+import { applyDamage } from '../combat/damage';
 import { bestPlays } from '../match/match';
 import { makeRoom } from '../testing/fakeRoom';
-import { queueInputs, simulateRoom } from './movement';
+import { queueInputs, sendAcks, simulateRoom } from './movement';
 import { pickSpawn, spawnPlayer } from './spawn';
 
-const cmd = (seq: number, f = 1): MoveInput => ({ seq, f, s: 0, yaw: 0, pitch: 0, b: 0, slot: 0 });
+const cmd = (seq: number, f = 1, b = 0): MoveInput => ({ seq, f, s: 0, yaw: 0, pitch: 0, b, slot: 0 });
 
 describe('input queue', () => {
   it('ignores repeated or old commands and caps the queue', () => {
@@ -72,6 +81,61 @@ describe('input queue', () => {
     simulateRoom(room, FIXED_DT, Date.now());
     expect(p.inputs).toHaveLength(0);
     expect(p.z).toBe(20);
+  });
+});
+
+describe('pushes and the void', () => {
+  it('the shove key (V) pushes whoever stands right in front, teammates too, no damage, once a second', () => {
+    const { room, join, channel } = makeRoom('teams');
+    const a = join('A', 5, 30);
+    const b = join('B', 5, 29); // 1 m in front (yaw 0 looks towards -z)
+    b.team = a.team;
+    const c = join('C', 5, 31.5); // behind: never shoved
+    queueInputs(a, [cmd(0, 0, BTN_SHOVE)]);
+    simulateRoom(room, FIXED_DT, 1000);
+    expect(b.move.vz).toBeCloseTo(-SHOVE.push);
+    expect(b.move.vy).toBe(SHOVE.lift);
+    expect(c.move.vz).toBe(0);
+    expect(b.hp).toBe(b.maxHp);
+    expect(channel.of('hitmarker', a.id)[0]).toMatchObject({ id: b.id, dmg: 0, kill: false });
+    // its own client gets the push in the ack
+    sendAcks(room);
+    expect(channel.of('player:ack', b.id).at(-1)?.s.vz).toBeCloseTo(-SHOVE.push);
+    // cooldown: a second press right away does nothing
+    b.move.vz = 0;
+    queueInputs(a, [cmd(1, 0, BTN_SHOVE)]);
+    simulateRoom(room, FIXED_DT, 1000 + SHOVE.cooldownMs / 2);
+    expect(b.move.vz).toBe(0);
+    queueInputs(a, [cmd(2, 0, BTN_SHOVE)]);
+    simulateRoom(room, FIXED_DT, 1000 + SHOVE.cooldownMs);
+    expect(b.move.vz).toBeLessThan(0);
+  });
+
+  it('falling into the void is a death (the kill feed says so); not in the race', () => {
+    const { room, join, place, channel } = makeRoom('ffa');
+    const a = join('A');
+    place(a, room.map.half + 5, 0, -19); // outside the walls, under the floor
+    a.move.grounded = false;
+    for (let i = 0; i < 30 && a.alive; i++) {
+      queueInputs(a, [cmd(i, 0)]);
+      simulateRoom(room, FIXED_DT, Date.now());
+    }
+    expect(a.alive).toBe(false);
+    expect(a.deaths).toBe(1);
+    expect(channel.of('kill')[0]).toMatchObject({ victim: a.id, weapon: 'Vacío' });
+  });
+
+  it('in the race shots push instead of hurting: no damage, no kill feed, the hitmarker still shows', () => {
+    const { room, join, channel } = makeRoom('race', 2, 'circuito');
+    const a = join('A', 0, 10);
+    const b = join('B', 0, 5);
+    for (let i = 0; i < 3; i++) applyDamage(room, a, b, 999, true, WEAPONS.pistol, [0, 1, 5]);
+    expect(b.alive).toBe(true);
+    expect(b.hp).toBe(b.maxHp);
+    expect(b.move.vz).toBeCloseTo(-3 * SHOVE.push); // away from the shooter
+    expect(b.move.vy).toBe(SHOVE.lift);
+    expect(channel.of('kill')).toHaveLength(0);
+    expect(channel.of('hitmarker', a.id)).toHaveLength(3);
   });
 });
 

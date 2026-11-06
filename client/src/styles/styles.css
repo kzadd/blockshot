@@ -1760,97 +1760,6 @@ kbd.down,
   background: radial-gradient(circle at center, rgb(196, 198, 202) 0 35%, rgb(178, 180, 186) 100%);
 }
 
-/* The marksman rifle's scope drawn by the HUD while aimed (the 3D gun steps aside): a thin, see-through reticle */
-.ads-sight {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  animation: bsFadeIn 90ms ease-out;
-}
-.ads-reticle {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  animation: bsSightKick 140ms ease-out;
-}
-.ads-reticle .dot {
-  position: absolute;
-  width: 4px;
-  height: 4px;
-  margin: -2px 0 0 -2px;
-  background: #111;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35);
-}
-.ads-reticle .frame {
-  position: absolute;
-  border-radius: 50%;
-}
-/* Holographic sight (Valorant-like): a thin glowing hexagon and a small marker, the gun just below */
-.ads-sight.holo .hex {
-  position: absolute;
-  width: 230px;
-  height: 160px;
-  margin: -80px 0 0 -115px;
-  overflow: visible;
-}
-.ads-sight.holo polyline {
-  fill: none;
-  stroke: #ffd23a;
-  stroke-width: 3.5;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-  filter: drop-shadow(0 0 4px rgba(255, 196, 40, 0.8));
-}
-.ads-sight.holo .cross {
-  fill: none;
-  stroke: #fff;
-  stroke-width: 2;
-  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.9));
-}
-/* Marksman scope: a big clear lens with thin cross hairs, the edges only shaded */
-.ads-sight.scope {
-  background: radial-gradient(
-    circle at center,
-    transparent 0 40vmin,
-    rgba(5, 7, 10, 0.55) 44vmin,
-    rgba(5, 7, 10, 0.8) 100%
-  );
-}
-.ads-sight.scope .frame {
-  width: 80vmin;
-  height: 80vmin;
-  margin: -40vmin 0 0 -40vmin;
-  border: 3px solid rgba(10, 12, 16, 0.85);
-}
-.ads-sight.scope .ads-reticle::before,
-.ads-sight.scope .ads-reticle::after {
-  content: '';
-  position: absolute;
-  background: rgba(10, 12, 16, 0.85);
-}
-.ads-sight.scope .ads-reticle::before {
-  width: 76vmin;
-  height: 1.5px;
-  margin: -0.75px 0 0 -38vmin;
-  -webkit-mask: linear-gradient(to right, #000 0 46%, transparent 46% 54%, #000 54%);
-  mask: linear-gradient(to right, #000 0 46%, transparent 46% 54%, #000 54%);
-}
-.ads-sight.scope .ads-reticle::after {
-  width: 1.5px;
-  height: 76vmin;
-  margin: -38vmin 0 0 -0.75px;
-  -webkit-mask: linear-gradient(to bottom, #000 0 46%, transparent 46% 54%, #000 54%);
-  mask: linear-gradient(to bottom, #000 0 46%, transparent 46% 54%, #000 54%);
-}
-@keyframes bsSightKick {
-  from {
-    transform: translateY(-6px);
-  }
-  to {
-    transform: none;
-  }
-}
-
 /* Dominio: las tres zonas bajo el marcador de equipos; el relleno es el avance de la captura */
 .top-sub {
   position: absolute;
@@ -2134,6 +2043,16 @@ kbd.down,
 .ctf-carry small {
   font: 500 12.5px var(--body);
   color: var(--txt-4);
+}
+
+/* Bomb / freeze tag: the same box, under the round line, with the plant, defuse or thaw progress under the hint */
+.obj-hint {
+  top: 128px;
+}
+.obj-hint .pbar {
+  align-self: stretch;
+  height: 4px;
+  margin-top: 4px;
 }
 
 /* ================================================================ MUERTE */
@@ -2506,6 +2425,18 @@ kbd.down,
 }
 .sb-table .ping.bad {
   color: var(--danger-txt);
+}
+
+/* One life a round: who is out (dead or frozen) is greyed, with a skull or a snowflake */
+.sb-table tr.out td {
+  color: var(--txt-3);
+}
+.sb-table tr.out td > * {
+  opacity: 0.6;
+}
+.sb-out {
+  margin-right: 6px;
+  vertical-align: -2px;
 }
 
 /* Fin de partida: ganador, tu resultado, cuenta atrás y las mejores jugadas */
@@ -2909,4 +2840,239 @@ kbd.down,
   .game.shake-b .hud {
     animation: none !important;
   }
+}
+
+.rank-badge,
+.medal-icon {
+  vertical-align: middle;
+  flex: none;
+}
+.rank-badge {
+  margin-right: 6px;
+}
+.feed-item .medal-icon {
+  margin-left: 2px;
+}
+.sb-medals .icon,
+.sb-medals svg {
+  margin-right: 3px;
+  vertical-align: -2px;
+}
+
+/* Infectados: type, key F and blackout warning under the top bar; the last survivor's announcement */
+.infect-sub {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.infect-sub .iz {
+  color: #8fe060;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.infect-sub .cd {
+  color: var(--txt-2);
+}
+.infect-sub .warn {
+  color: var(--eq-rojo-txt);
+  animation: bsPulse 500ms infinite;
+}
+.infect-last {
+  position: absolute;
+  left: 50%;
+  top: 22%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 28px;
+  max-width: calc(100vw - 32px);
+  background: rgba(29, 36, 44, 0.92);
+  border: 1px solid var(--eq-rojo-txt);
+  box-shadow: 0 4px 0 rgba(8, 11, 14, 0.6);
+  text-align: center;
+  animation: bsFadeIn 300ms ease-out;
+  pointer-events: none;
+}
+.infect-last small {
+  font: 700 13px var(--body);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--eq-rojo-txt);
+}
+.infect-last b {
+  font: 34px var(--title);
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+.infect-sub .key,
+.zombie-pick .key {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  background: var(--key);
+  color: var(--accent-ink);
+  font: 700 12px var(--display);
+  box-shadow: inset 0 -2px 0 var(--key-edge);
+}
+/* Death screen (Infectados): the infected type to come back as */
+.zombie-pick {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  pointer-events: auto;
+}
+.zombie-pick button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 150px;
+  padding: 6px 8px;
+  background: var(--plate);
+  border: 1px solid var(--plate-line);
+  color: var(--txt-1);
+  text-align: left;
+  cursor: pointer;
+}
+.zombie-pick button.on {
+  border-color: #8fe060;
+  box-shadow: inset 0 0 0 1px #8fe060;
+}
+.zombie-pick b {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 600 13px var(--body);
+  text-transform: uppercase;
+}
+.zombie-pick small {
+  font: 12px var(--body);
+  color: var(--txt-2);
+}
+.zombie-pick-note {
+  font: 12px var(--body);
+  color: var(--txt-2);
+}
+
+/* Traidores: the secret role under the top bar, and the meeting's vote over the game */
+.infect-sub .tr-traitor {
+  color: var(--eq-rojo-txt);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.meeting {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(8, 11, 14, 0.55);
+  pointer-events: auto;
+  z-index: 20;
+}
+.meeting-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: min(560px, 100%);
+  padding: 18px 22px;
+  background: rgba(29, 36, 44, 0.96);
+  border: 1px solid var(--plate-line);
+  box-shadow: 0 4px 0 rgba(8, 11, 14, 0.6);
+  text-align: center;
+  animation: bsFadeIn 200ms ease-out;
+}
+.meeting-card h2 {
+  margin: 0;
+  font: 28px var(--title);
+  text-transform: uppercase;
+}
+.meeting-clock {
+  color: var(--accent);
+}
+.meeting-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+.meeting-list .btn {
+  gap: 6px;
+  overflow-wrap: anywhere;
+}
+.meeting-voted {
+  display: inline-flex;
+  color: #8fe060;
+}
+.meeting-card small {
+  font: 12px var(--body);
+  color: var(--txt-2);
+}
+
+/* Traidores: your role under the minimap, and big in the middle when the round deals it */
+.role-card {
+  --r: #4c9dff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--r) 35%, transparent), transparent 85%), var(--plate);
+  border: 1px solid var(--plate-line);
+  box-shadow: inset 3px 0 0 var(--r);
+  color: var(--r);
+}
+.role-card.bad,
+.role-splash.bad {
+  --r: #ff3b30;
+}
+.role-card small {
+  display: block;
+  font: 600 10px var(--body);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--txt-2);
+}
+.role-card b {
+  font: 20px/1 var(--title);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.role-splash {
+  --r: #4c9dff;
+  position: absolute;
+  left: 50%;
+  top: 30%;
+  transform: translateX(-50%);
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 18px 40px;
+  background: color-mix(in srgb, var(--plate) 85%, transparent);
+  border: 1px solid var(--r);
+  box-shadow: 0 0 40px color-mix(in srgb, var(--r) 45%, transparent);
+  text-align: center;
+  pointer-events: none;
+  animation: bsFadeIn 200ms ease-out;
+}
+.role-splash small {
+  font: 600 13px var(--body);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--txt-2);
+}
+.role-splash b {
+  font: 56px/1 var(--title);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--r);
+}
+.role-splash span {
+  font: 500 14px var(--body);
+  color: var(--txt-1, #e9ecef);
+  max-width: 34ch;
 }

@@ -84,7 +84,7 @@ export function rebuildColliders(room: Room): void {
       room.map,
       w && { barrels: downSet(w.barrelBack), crates: downSet(w.crateBack), tiles: downSet(w.tileBack) },
     ),
-    ...room.deployables.filter((d) => d.kind === 'wall').map(wallBox),
+    ...room.deployables.filter((d) => d.kind === 'wall' || d.kind === 'plank').map(wallBox),
   ];
 }
 

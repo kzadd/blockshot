@@ -3,7 +3,7 @@
 // (two rows of Quaternius's sandbags that rise from the floor). Walls also go into the client's colliders, so its
 // movement prediction bumps into them like the server does; the collider is the same box as before.
 import * as THREE from 'three';
-import { SMOKE, WALL, type Collider, type DeployableSnapshot } from '@blockshot/shared';
+import { BARRICADE, SMOKE, WALL, type Collider, type DeployableSnapshot } from '@blockshot/shared';
 import { FX, fxFrame } from '../render/fxAtlas';
 import { preloadProps, prop } from '../render/props';
 
@@ -31,6 +31,11 @@ interface Obj {
   light?: THREE.Mesh;
 }
 
+/** Infectados' barricade: rough boards across the gap (gaps between them, each a little crooked). */
+const PLANKS = 6;
+const PLANK_TILT = 0.06;
+const plankGeo = new THREE.BoxGeometry(BARRICADE.w, (BARRICADE.h / PLANKS) * 0.78, BARRICADE.t);
+const plankMat = new THREE.MeshStandardMaterial({ color: 0x8a5a33, roughness: 0.9 });
 const lightGeo = new THREE.SphereGeometry(0.045, 8, 6);
 const lightOn = new THREE.MeshBasicMaterial({ color: '#ff3b3b' });
 const lightOff = new THREE.MeshBasicMaterial({ color: '#4a1414' });
@@ -113,12 +118,29 @@ export class AbilityObjects {
     }
     if (kind === 'mine') {
       const light = new THREE.Mesh(lightGeo, lightOn);
-      light.position.y = 0.17;
+      light.position.y = 0.13; // on the pressure plate
       group.add(prop('mine', MINE_SIZE), light);
       return { kind, group, born: now, collider: null, light };
     }
+    const s = kind === 'plank' ? BARRICADE : WALL;
+    const [w, d] = along === 0 ? [s.w, s.t] : [s.t, s.w];
+    const collider: Collider = {
+      c: kind === 'plank' ? 'crate' : 'concrete', // (the same as the server's: wood or concrete hits)
+      min: [x - w / 2, y, z - d / 2],
+      max: [x + w / 2, y + s.h, z + d / 2],
+    };
+    if (kind === 'plank') {
+      for (let i = 0; i < PLANKS; i++) {
+        const board = new THREE.Mesh(plankGeo, plankMat);
+        board.position.y = ((i + 0.5) * BARRICADE.h) / PLANKS;
+        board.rotation.set(0, along === 0 ? 0 : Math.PI / 2, (Math.random() - 0.5) * 2 * PLANK_TILT);
+        board.castShadow = board.receiveShadow = true;
+        group.add(board);
+      }
+      group.scale.y = 0.05;
+      return { kind, group, born: now, collider };
+    }
     // Cover wall: two rows of sandbags filling the collider's box, rising from the floor
-    const [w, d] = along === 0 ? [WALL.w, WALL.t] : [WALL.t, WALL.w];
     for (let row = 0; row < 2; row++) {
       const bags = prop('sacks', [WALL.w, WALL.h / 2, WALL.t]);
       bags.position.y = (row * WALL.h) / 2;
@@ -128,12 +150,7 @@ export class AbilityObjects {
       group.add(bags);
     }
     group.scale.y = 0.05;
-    return {
-      kind,
-      group,
-      born: now,
-      collider: { c: 'concrete', min: [x - w / 2, y, z - d / 2], max: [x + w / 2, y + WALL.h, z + d / 2] },
-    };
+    return { kind, group, born: now, collider };
   }
 
   update(dt: number, now: number): void {
@@ -150,7 +167,7 @@ export class AbilityObjects {
         }
       } else if (o.kind === 'mine' && o.light) {
         o.light.material = Math.floor(age / MINE_BLINK_MS) % 2 ? lightOff : lightOn;
-      } else if (o.kind === 'wall') {
+      } else if (o.kind === 'wall' || o.kind === 'plank') {
         o.group.scale.y = Math.min(1, 0.05 + age / WALL_RISE_MS);
       }
     }

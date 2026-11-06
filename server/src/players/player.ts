@@ -9,6 +9,8 @@ import {
   type SkinId,
   type Team,
   type WeaponId,
+  type ZombieKind,
+  type ZombieType,
 } from '@blockshot/shared';
 
 export interface AmmoState {
@@ -110,6 +112,8 @@ export interface Player {
   abilityAt: number;
   /** Tanque's shield is up until then (ms) */
   shieldUntil: number;
+  /** when the shove key (V) works again (ms) */
+  shoveAt: number;
   /** aiming (right button) on the last command */
   aiming: boolean;
   /** last quick chat phrase (ms) */
@@ -118,6 +122,12 @@ export interface Player {
   picks: Partial<Record<WeaponId, number>>;
   /** spawned at least once this match (the ranking and the league count only those who played) */
   played: boolean;
+  /** Infectados: this life's infected type (null: survivor), the type picked for the next respawns (null: rotating),
+   * when the key F works again (ms) and until when the scream slows this survivor (ms) */
+  zombie: ZombieKind | null;
+  zombiePick: ZombieType | null;
+  modeAt: number;
+  slowUntil: number;
 }
 
 const DEFAULT_MAX_HP = 100;
@@ -184,7 +194,12 @@ export function createPlayer(id: string, name: string, team: Team): Player {
     grenades: 0,
     abilityAt: 0,
     shieldUntil: 0,
+    shoveAt: 0,
     aiming: false,
+    zombie: null,
+    zombiePick: null,
+    modeAt: 0,
+    slowUntil: 0,
   };
 }
 

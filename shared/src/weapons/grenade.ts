@@ -78,11 +78,14 @@ export function stepGrenade(
 }
 
 /**
- * Grenades carried at spawn: none in gun game (the ladder is the point), InstaGib (railgun only) nor for the infected;
+ * Grenades carried at spawn: none in gun game (the ladder is the point), InstaGib (railgun only), Traidores (a blast
+ * does not tell who threw it) nor for the infected;
  * otherwise one, plus the extra ammo accessory's.
  */
 export const grenadesFor = (mode: ModeId, team: Team, acc?: AccessoryId | null): number =>
-  mode === 'gungame' || mode === 'insta' || (mode === 'infect' && team === 2) ? 0 : 1 + accessoryGrenades(acc);
+  mode === 'gungame' || mode === 'insta' || mode === 'traitor' || (mode === 'infect' && team === 2)
+    ? 0
+    : 1 + accessoryGrenades(acc);
 
 /** Kill feed / damage entry for grenade kills (it is not in any loadout). */
 export const GRENADE_WEAPON: Weapon = { ...WEAPONS.pistol, name: 'Granada', damage: GRENADE.maxDamage, headMult: 1 };

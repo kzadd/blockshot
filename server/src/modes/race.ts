@@ -9,8 +9,8 @@ import type { GameMode } from './gameMode';
 const CP_BELOW = 0.5;
 const CP_ABOVE = 3;
 
-// Carrera (Fall Guys with guns): everybody races the course through its checkpoints; falling into the lava or
-// being killed sends you back to the last one you reached. The first to the finish wins the race (a point, shown in
+// Carrera (Fall Guys with guns): everybody races the course through its checkpoints; falling into the lava sends you
+// back to the last one you reached. Shots and the knife do no damage here: they push (combat/damage.ts). The first to the finish wins the race (a point, shown in
 // the scoreboard's own column) and everybody starts the next one; the first to the race limit wins the match.
 export function createRace(): GameMode {
   /** checkpoints reached by each player in the current race */
@@ -26,7 +26,7 @@ export function createRace(): GameMode {
     streakRewards: false,
     initialTeam: () => 0,
     onKill() {
-      // Kills do not score: they only cost the victim the way back from their checkpoint
+      // Nobody is killed in the race (hits push): nothing to score
     },
     filterSpawns(room, p, spawns): Spawn[] {
       const n = reached.get(p.id) ?? 0;

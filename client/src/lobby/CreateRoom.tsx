@@ -3,9 +3,9 @@ import {
   MAPS,
   MAP_SIZES,
   MODE_BY_ID,
-  RACE_MAP,
   ROOM_MAX_PLAYERS,
   ROOM_MIN_PLAYERS,
+  mapFits,
   type MapId,
   type ModeId,
   type SizeId,
@@ -14,7 +14,7 @@ import { mapImage } from './mapImage';
 import { MODE_GROUPS, MODE_HOW, MODE_ICON, MODE_SUB } from './modeCopy';
 
 // «Crear sala» in one screen, no scrolling: the choices on the left in the order they depend on each other
-// (map → mode → rules), the room as it will be on the right with the button that creates it.
+// (mode → the maps that host it → rules), the room as it will be on the right with the button that creates it.
 
 export interface RoomForm {
   name: string;
@@ -68,18 +68,10 @@ export default function CreateRoom({ form, setForm, hidden, connected, nickname,
   const crowded = form.max > size.players * CROWDED_FACTOR;
   const placeholder = `SALA DE ${(nickname || 'tu clase').toUpperCase()}`;
 
-  const pickMap = (id: MapId) => {
-    // Circuito only hosts Carrera (and back to a normal mode when leaving it)
-    const next = id === RACE_MAP ? 'race' : form.mode === 'race' ? 'ffa' : form.mode;
-    setForm({
-      ...form,
-      mapId: id,
-      mode: next,
-      scoreLimit: next === form.mode ? form.scoreLimit : MODE_BY_ID[next].def,
-    });
-  };
+  const maps = MAPS.filter((m) => mapFits(m.id, form.mode));
   const pickMode = (id: ModeId) => {
-    const mapId = id === 'race' ? RACE_MAP : form.mapId === RACE_MAP ? MAPS[0]!.id : form.mapId;
+    // Keep the map if it hosts the new mode, else the first one that does
+    const mapId = mapFits(form.mapId, id) ? form.mapId : (MAPS.find((m) => mapFits(m.id, id)) ?? MAPS[0]!).id;
     setForm({ ...form, mode: id, mapId, scoreLimit: MODE_BY_ID[id].def });
   };
 
@@ -102,26 +94,7 @@ export default function CreateRoom({ form, setForm, hidden, connected, nickname,
   return (
     <form className="lt mk" hidden={hidden} onSubmit={onSubmit}>
       <div className="mk-steps">
-        <Step n={1} title="Mapa">
-          <div className="mk-maps" role="group" aria-label="Mapa">
-            {MAPS.map((m) => (
-              <button
-                type="button"
-                key={m.id}
-                className={`mk-map ${form.mapId === m.id ? 'on' : ''}`}
-                aria-pressed={form.mapId === m.id}
-                title={m.desc}
-                onClick={() => pickMap(m.id)}
-              >
-                <img src={mapImage(m.id)} alt="" />
-                <span>{m.name}</span>
-                {m.id === RACE_MAP && <em>Solo Carrera</em>}
-              </button>
-            ))}
-          </div>
-        </Step>
-
-        <Step n={2} title="Modo">
+        <Step n={1} title="Modo">
           <div className="mk-modes">
             {MODE_GROUPS.map((g) => (
               <div className="mk-group" role="group" aria-label={g.name} key={g.name}>
@@ -140,6 +113,24 @@ export default function CreateRoom({ form, setForm, hidden, connected, nickname,
                   </button>
                 ))}
               </div>
+            ))}
+          </div>
+        </Step>
+
+        <Step n={2} title="Mapa">
+          <div className="mk-maps" role="group" aria-label="Mapa">
+            {maps.map((m) => (
+              <button
+                type="button"
+                key={m.id}
+                className={`mk-map ${form.mapId === m.id ? 'on' : ''}`}
+                aria-pressed={form.mapId === m.id}
+                title={m.desc}
+                onClick={() => setForm({ ...form, mapId: m.id })}
+              >
+                <img src={mapImage(m.id)} alt="" />
+                <span>{m.name}</span>
+              </button>
             ))}
           </div>
         </Step>

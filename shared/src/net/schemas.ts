@@ -3,7 +3,7 @@
 import * as v from 'valibot';
 import { OUTFIT_COLOR_HEXES } from '../characters/characters';
 import { CAMOS, FINISHES } from '../characters/looks';
-import { VOTE_OPTIONS } from '../modes/modes';
+import { MODES, VOTE_OPTIONS } from '../modes/modes';
 import { QUICK_CHAT } from '../modes/quickChat';
 import { TOUR_ROUNDS } from '../modes/tournament';
 
@@ -65,7 +65,11 @@ export const AdminTargetSchema = v.object({ id: text });
 /** Server PC only: move the room to this map and mode now (checked by the server). */
 export const AdminRoomSchema = v.object({ mapId: text, mode: text });
 export const AdminLockSchema = v.object({ locked: v.boolean() });
-export const TournamentSchema = v.object({ rounds: v.picklist([0, ...TOUR_ROUNDS]) });
+/** rounds 0 stops the league; `mode`: every round's mode (free for all when missing) */
+export const TournamentSchema = v.object({
+  rounds: v.picklist([0, ...TOUR_ROUNDS]),
+  mode: v.optional(v.picklist(MODES.map((m) => m.id))),
+});
 
 const int = v.pipe(v.number(), v.integer());
 /** At most this many commands per batch (0.5 s worth): more means a flooding or broken client. */
@@ -96,10 +100,15 @@ export const ShootSchema = v.object({
 export const GrenadeSchema = v.object({ o: vec3, d: vec3 });
 /** key E: eye and look direction (where the smoke is thrown / the wall goes) */
 export const AbilitySchema = GrenadeSchema;
+/** Infectados: the infected type to respawn as (checked with isZombieType) */
+export const ZombiePickSchema = v.object({ z: v.pipe(v.string(), v.maxLength(16)) });
 
 export const BotAddSchema = v.optional(v.object({ level: v.optional(v.picklist(['easy', 'normal', 'hard'])) }));
 
 export const VoteSchema = v.object({ i: v.pipe(int, v.minValue(0), v.maxValue(VOTE_OPTIONS - 1)) });
+
+/** Traidores: the meeting vote, a player id ('' skips; the server checks it is someone alive) */
+export const TraitorVoteSchema = v.object({ id: v.pipe(v.string(), v.maxLength(64)) });
 
 export const QuickChatSchema = v.object({ i: v.pipe(int, v.minValue(0), v.maxValue(QUICK_CHAT.length - 1)) });
 

@@ -82,7 +82,7 @@ export class RoomRegistry {
 
   create(data: CreateRoomInput, nickname: string): Room {
     const password = typeof data.password === 'string' ? data.password.slice(0, PASSWORD_MAX) : '';
-    // Carrera and Circuito only go together
+    // A mode that only plays on its own maps (Carrera) moves the room to one of them
     const fit = fitMapMode(isMapId(data.mapId) ? data.mapId : 'patio', isModeId(data.mode) ? data.mode : 'ffa');
     const mapId = fit.mapId;
     const size = isSizeId(data.size) ? data.size : 'm';
@@ -116,7 +116,6 @@ export class RoomRegistry {
       // Filled right below (resetWorld also builds the colliders)
       world: undefined as never,
       closed: false,
-      banned: new Set(),
       tournament: null,
       lobbyChanged: () => this.events.changed(),
     };
@@ -127,9 +126,8 @@ export class RoomRegistry {
   }
 
   /** Checks the room can be joined; returns an error message for the client otherwise. */
-  canJoin(room: Room | undefined, password: string | undefined, nickname = ''): string | null {
+  canJoin(room: Room | undefined, password: string | undefined): string | null {
     if (!room) return 'La sala ya no existe.';
-    if (room.banned.has(nickname)) return 'El admin te ha expulsado de esta sala.';
     if (room.closed) return 'El admin ha cerrado la sala: espera a que la abra.';
     if (room.players.size >= room.max) return 'La sala está llena.';
     if (room.passHash && hash(String(password ?? '')) !== room.passHash) return 'Contraseña incorrecta.';

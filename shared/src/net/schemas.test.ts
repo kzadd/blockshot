@@ -3,7 +3,16 @@ import { OUTFIT_COLORS, SKINS, isOutfitColor, isSkinId } from '../characters/cha
 import { isWeaponId } from '../weapons/weapons';
 import { isMapId, isSizeId } from '../maps/maps';
 import { isModeId } from '../modes/modes';
-import { CreateRoomSchema, InputSchema, MAX_INPUTS_PER_MESSAGE, ShootSchema, SpawnSchema, v } from './schemas';
+import {
+  CreateRoomSchema,
+  InputSchema,
+  MAX_INPUTS_PER_MESSAGE,
+  ShootSchema,
+  SpawnSchema,
+  TournamentSchema,
+  TraitorVoteSchema,
+  v,
+} from './schemas';
 
 const ok = (schema: v.GenericSchema, data: unknown) => v.safeParse(schema, data).success;
 const cmd = { seq: 1, f: 1, s: 0, yaw: 0.5, pitch: 0, b: 3, slot: 0 };
@@ -49,6 +58,20 @@ describe('message schemas', () => {
     expect(ok(SpawnSchema, { ability: 3 })).toBe(false);
     expect(ok(SpawnSchema, { primary: 7 })).toBe(false);
     expect(ok(SpawnSchema, { secondary: 'x'.repeat(500) })).toBe(false);
+  });
+
+  it('a Traidores vote is a short id (or empty to skip), nothing else', () => {
+    expect(ok(TraitorVoteSchema, { id: 'abc' })).toBe(true);
+    expect(ok(TraitorVoteSchema, { id: '' })).toBe(true);
+    expect(ok(TraitorVoteSchema, { id: 3 })).toBe(false);
+    expect(ok(TraitorVoteSchema, { id: 'x'.repeat(65) })).toBe(false);
+    expect(ok(TraitorVoteSchema, null)).toBe(false);
+  });
+
+  it('a tournament takes a known mode, or none (free for all)', () => {
+    expect(ok(TournamentSchema, { rounds: 3, mode: 'infect' })).toBe(true);
+    expect(ok(TournamentSchema, { rounds: 5 })).toBe(true);
+    expect(ok(TournamentSchema, { rounds: 3, mode: 'nope' })).toBe(false);
   });
 
   it('still accepts an older client that sends a character id (ignored)', () => {

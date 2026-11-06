@@ -11,11 +11,11 @@ import {
   FIXED_DT,
   movesOrJumps,
   HITBOX,
-  INFECT,
   PLAYER,
   VIEW_DELAY_MS,
   WEAPONS,
   WEAPON_HANDLING,
+  type WeaponId,
   GRENADE,
   SHIELD,
   stepGrenade,
@@ -28,13 +28,17 @@ import {
   grenadesFor,
   gunLadder,
   isTeamMode,
+  respawnDelayOf,
   loadoutOf,
   unlimitedAmmo,
   type Collider,
   type PlayerClass,
   type GameMap,
   type GrenadeSnapshot,
+  type IceSnapshot,
   type InfectSnapshot,
+  type TraitorSnapshot,
+  TRAITOR,
   type KillEvent,
   type ModeId,
   type MoveContext,
@@ -52,15 +56,16 @@ import type { GameSocket } from '../../network/socket';
 import { getSettings, subscribe, type Settings } from '../../settings/settingsStore';
 import { attachAudio } from '../audio/audioEvents';
 import { sfx } from '../audio/sound';
-import type { HudState, DamageMark, SoundMark, SpectateView } from '../hud/hudState';
+import type { HudState, DamageMark, SoundMark, SpectateView, WatchSight } from '../hud/hudState';
 import type { MinimapSource, MinimapView } from '../hud/Minimap';
 import type { Look } from '../../characters/looks';
 import { wearKevlar } from '../render/gear';
-import { loadGun } from '../render/gunAssets';
+import { loadGun, THIRD_PERSON_GUN } from '../render/gunAssets';
 import { buildCharacter, buildGun, type CharacterModel } from '../render/models';
 import { preloadProps, prop } from '../render/props';
 import { buildWorld } from '../render/world';
 import { AbilityObjects } from './abilities';
+import { InfectFx } from './infectFx';
 import { MapObjects } from './mapObjects';
 import { CameraRig } from './cameraRig';
 import { createDevStats, type FrameStats } from './devStats';
@@ -71,6 +76,7 @@ import { LocalPlayer } from './localPlayer';
 import { NetClient } from './netClient';
 import { Objectives } from './objectives';
 import { RemotePlayers, WALK_PHASE_PER_M, animateLegs, outfitFor } from './remotePlayers';
+import { thawTarget } from '../objectiveView';
 import { pickTarget, shouldSpectate } from './spectate';
 import { wallNormal } from './surface';
 import { damp, dampAngle, screenAngle } from './util';
@@ -274,6 +280,10 @@ export class Engine implements MinimapSource {
   private players: PlayerSnapshot[] = [];
   private teamScore: Record<SideTeam, number> | null = null;
   private infect: InfectSnapshot | null = null;
+  /** our own player in the last snapshot (the mode's speed factor, the infected type) */
+  private me: PlayerSnapshot | undefined;
+  /** Infectados: blackouts and the scream */
+  private readonly infectFx: InfectFx | null;
   private radar = false;
   /** our shield: when it ends (predicted from when the snapshot showed it) and when it last stopped a bullet */
   private shieldUntil = 0;
@@ -283,6 +293,11 @@ export class Engine implements MinimapSource {
   /** quick chat menu open (V): the number keys pick a phrase instead of a weapon */
   private grenades = 0;
   private round: RoundSnapshot | null = null;
+  /** Freeze tag: the statues (frozen players) */
+  private ice: IceSnapshot[] | null = null;
+  /** Traidores: bodies and the meeting (everybody's), and my role this round (mine alone; null: none) */
+  private traitor: TraitorSnapshot | null = null;
+  private role: { traitor: boolean; mates: string[] } | null = null;
   private selfLog: SelfPose[] = [];
   private shotLog: ShotLog[] = [];
   private replay: Replay | null = null;
@@ -296,6 +311,9 @@ export class Engine implements MinimapSource {
   private watchGun: string | null = null;
   private watchEye: number = PLAYER.eye;
   private watchLast: { x: number; z: number } | null = null;
+  /** The watched player's aim (death replay, spectating), and what the HUD draws for it this frame */
+  private watchAim = 0;
+  private watchView: WatchSight | null = null;
   private watchVm = false;
 
   constructor(
@@ -325,6 +343,7 @@ export class Engine implements MinimapSource {
     container.appendChild(r.domElement);
 
     buildWorld(this.scene, map, high ? HIGH_SHADOW_MAP : LOW_SHADOW_MAP);
+    this.infectFx = mode === 'infect' ? new InfectFx(this.scene, r, TONE_EXPOSURE) : null;
     this.rig = new CameraRig(getSettings().fov, aspect, map.half * 10);
     this.vm = new ViewModel(aspect);
     this.vm.initEnvironment(r);
@@ -462,19 +481,17 @@ export class Engine implements MinimapSource {
     this.weapons.equip(loadoutOf(this.mode, this.cls, this.level, this.limit, this.myTeam), unlimitedAmmo(this.mode));
   }
 
-  /** Movement rules for one command: the held weapon's weight and the mode's speed bonus. */
+  /** Movement rules for one command: the held weapon's weight and the mode's speed factor (from the server). */
   private moveContext(input: Pick<MoveInput, 'slot'>): MoveContext {
     const id = this.weapons.loadout[input.slot] ?? this.weapons.weaponId();
     const w = WEAPONS[id];
-    const infected = this.mode === 'infect' && this.myTeam === 2;
     const speed = this.cls ? BODY.speed : 0;
-    const spawn = this.map.spawns[0];
     return {
       colliders: this.colliders,
-      walk: speed * w.weight * accessorySpeed(this.cls?.accessory) * (infected ? INFECT.speed : 1),
+      walk: speed * w.weight * accessorySpeed(this.cls?.accessory) * (this.me?.sf ?? 1),
       adsMove: w.adsMove,
-      fallback: spawn ? [spawn[0], spawn[1], spawn[2]] : [0, 0, 0],
       dash: this.cls?.ability === 'dash',
+      leap: this.me?.zt === 'leaper',
       staminaMult: staminaMult(w.weight),
       ...climbables(this.map),
     };
@@ -489,6 +506,10 @@ export class Engine implements MinimapSource {
       if (this.alive && ack.life === this.life) this.local.reconcile(ack, (i) => this.moveContext(i));
     });
     net.on('shot', (d) => this.onRemoteShot(d.id, d.w, d.e, !!d.s));
+    net.on('scream', (d) => {
+      this.infectFx?.scream(this.rig.camera.position.distanceTo(new THREE.Vector3(...d.at)));
+      if (this.alive && d.hit.includes(this.myId)) this.rig.land(-BOOM_SHAKE);
+    });
     net.on('shield:hit', (d) => {
       if (d.id === this.myId) {
         this.shieldHitAt = performance.now();
@@ -513,7 +534,8 @@ export class Engine implements MinimapSource {
       this.hitRed = d.head || d.kill;
       this.weapons.confirmHit(this.hitTime);
       this.bus.emit('hit', { head: d.head, kill: d.kill });
-      this.effects.damageNumber(d.at, d.dmg, d.head, d.kill);
+      // (dmg 0: a push, a race hit or the V shove: no number)
+      if (d.dmg) this.effects.damageNumber(d.at, d.dmg, d.head, d.kill);
       // Tactical goggles: the rival hit shows on the minimap for a while
       const hitR = d.id && this.cls?.accessory === 'goggles' ? this.remotes.all.get(d.id) : undefined;
       if (hitR) hitR.markedUntil = this.hitTime + GOGGLES.markMs;
@@ -534,6 +556,11 @@ export class Engine implements MinimapSource {
         this.weapons.swapUntil = performance.now() + WEAPON_HANDLING.swapMs;
       }
       if (up) this.bus.emit('streak');
+    });
+    net.on('traitor:role', (d) => {
+      this.role = d;
+      this.remotes.marked = new Set(d.mates);
+      this.remotes.invalidate();
     });
     net.on('boom', (d) => this.onBoom(d.x, d.y, d.z));
     net.on('crate', (d) => {
@@ -573,10 +600,22 @@ export class Engine implements MinimapSource {
     });
   }
 
-  /** Keys that are not movement or weapons: ability (E) and grenade (G). */
+  /** Keys that are not movement or weapons: ability (E), the mode's action (F) and grenade (G). */
   private intercept(code: string): boolean {
     if (code === 'KeyE') {
       this.useAbility();
+      return true;
+    }
+    if (code === 'KeyF' && this.modeKey()) {
+      if (this.alive && !this.me?.fc) {
+        const cam = this.rig.camera;
+        const d = new THREE.Vector3();
+        cam.getWorldDirection(d);
+        this.flushInputs(); // the server must have us where we used it from
+        this.net.action([cam.position.x, cam.position.y, cam.position.z], [d.x, d.y, d.z]);
+        this.protUntil = 0;
+        sfx.thud(300, 0.12, 0.3);
+      }
       return true;
     }
     if (code === 'KeyG') {
@@ -680,11 +719,16 @@ export class Engine implements MinimapSource {
     this.sendAcc = 0;
   }
 
+  /** How long a death lasts before respawning (the infected come back sooner). */
+  private respawnDelay(): number {
+    return respawnDelayOf(this.mode, this.myTeam);
+  }
+
   /** Spawn now (first time, or after building the class once the countdown ended). */
   spawn(look: Look): void {
     this.autoChar = look;
     const now = performance.now();
-    if (this.alive || (this.deathAt && now - this.deathAt < PLAYER.respawnDelay)) return;
+    if (this.alive || (this.deathAt && now - this.deathAt < this.respawnDelay())) return;
     this.spawnReqAt = now;
     this.net.spawn(look);
   }
@@ -705,7 +749,7 @@ export class Engine implements MinimapSource {
   /** New match (or a new map after a vote): respawn almost at once with the same class. */
   respawnSoon(): void {
     this.killerName = '';
-    this.deathAt = performance.now() - PLAYER.respawnDelay + RESTART_RESPAWN_MS;
+    this.deathAt = performance.now() - this.respawnDelay() + RESTART_RESPAWN_MS;
   }
 
   /** Key E: the dash goes with the next movement command; the rest are asked to the server. */
@@ -728,8 +772,8 @@ export class Engine implements MinimapSource {
     if (gadget) this.vm.showGadget(gadget, performance.now() + (gadget === 'shield' ? SHIELD.durationMs : GADGET_MS));
   }
 
-  /** Fully aimed: the HUD draws the sight, a holographic hexagon floating over the gun like Valorant's (the marksman
-   * rifle's telescopic sight replaces the gun; the sniper has its own full-screen scope). */
+  /** Fully aimed: the HUD draws the sight, a holographic hexagon floating over the gun like Valorant's (scoped
+   * rifles have their own full-screen scope instead). */
   private adsSight(now: number): boolean {
     const w = this.weapons.weapon();
     return (
@@ -747,7 +791,7 @@ export class Engine implements MinimapSource {
     return this.players.find((p) => p.id === this.myId)?.ac ?? 0;
   }
 
-  private onState({ t, players, ts, fl, tg, inf, gr, dp, wo, pw, dz, rd, ic, bm }: StateSnapshot): void {
+  private onState({ t, players, ts, fl, tg, inf, gr, dp, wo, pw, dz, rd, ic, bm, zn, tt }: StateSnapshot): void {
     // The server's clock (for the moving obstacles), smoothed; the snapshot left it half a round trip ago
     const offset = t + this.net.rtt / 2 - performance.now();
     this.serverOffset = this.serverOffset === null ? offset : this.serverOffset + (offset - this.serverOffset) * 0.1;
@@ -760,9 +804,20 @@ export class Engine implements MinimapSource {
     this.players = players;
     this.objectives.zones = dz ?? null;
     this.objectives.bomb = bm ?? null;
+    this.objectives.ring = zn ?? null;
     this.objectives.syncIce(ic ?? null);
-    this.remotes.frozen = new Set((ic ?? []).map(([id]) => id));
+    this.ice = ic ?? null;
+    this.traitor = tt ?? null;
+    const bodies = (tt?.bd ?? []).map(([id]) => id);
+    this.remotes.bodies = new Set(bodies);
+    this.remotes.frozen = new Set([...(ic ?? []).map(([id]) => id), ...bodies]);
     this.round = rd ?? null;
+    // Traidores: a role lasts its round
+    if (this.role && rd?.p !== 1) {
+      this.role = null;
+      this.remotes.marked = new Set();
+      this.remotes.invalidate();
+    }
     this.syncGrenades(gr ?? []);
     // Cover walls, barrels or crates changed: the prediction must bump into the same things as the server
     const objs = this.mapObjs.sync(wo);
@@ -778,6 +833,7 @@ export class Engine implements MinimapSource {
     // Radar: you have it, or (team modes) a teammate does
     this.radar = players.some((p) => p.rd && (p.id === this.myId || (isTeamMode(this.mode) && p.tm === this.myTeam)));
     const me = players.find((p) => p.id === this.myId);
+    this.me = me;
     // Power weapon: the server gave us one, or ours is spent
     if (me && this.alive) {
       if (me.pw) this.weapons.addPower(me.pw, now);
@@ -858,7 +914,9 @@ export class Engine implements MinimapSource {
     ghost.holdGun(buildGun(this.weapons.weaponId(), true, color));
     const wid = this.weapons.weaponId();
     void loadGun(wid, { finish: this.finish, color, camo, withFlash: true }).then((g) => {
-      if (this.replay?.ghost === ghost) ghost.holdGun(g);
+      if (this.replay?.ghost !== ghost) return;
+      g.scale.setScalar(THIRD_PERSON_GUN);
+      ghost.holdGun(g);
     });
     ghost.group.visible = false;
     this.scene.add(ghost.group);
@@ -896,8 +954,12 @@ export class Engine implements MinimapSource {
       this.endReplay();
       return false;
     }
-    this.rig.replay(pose.x, pose.y + (pose.sl || pose.cr ? PLAYER.slideEye : PLAYER.eye), pose.z, pose.ry, pose.rx);
     const dt = Math.max(1e-3, (t - r.played) / MS_PER_S);
+    const killer = this.remotes.all.get(r.killerId);
+    // Aimed in as they were: the zoom, the gun up to the eye and the sight or scope on the HUD
+    const aim = killer?.weaponId ? this.followAim(dt, killer.weaponId, !!pose.ad) : null;
+    const eye = pose.sl || pose.cr ? PLAYER.slideEye : PLAYER.eye;
+    this.rig.replay(pose.x, pose.y + eye, pose.z, pose.ry, pose.rx, aim?.zoom);
     const me = this.selfAt(seen);
     if (r.ghost && me) {
       // Our body walks where we walked: legs swing with the distance covered
@@ -926,16 +988,15 @@ export class Engine implements MinimapSource {
     const kp = r.killerPose;
     const kSpeed = kp ? Math.hypot(pose.x - kp.x, pose.z - kp.z) / dt : 0;
     r.killerPose = { x: pose.x, z: pose.z };
-    const killer = this.remotes.all.get(r.killerId);
     if (killer?.weaponId) {
       const since = now - r.flashAt;
-      this.killVm.update(dt, now, true, {
+      this.killVm.update(dt, now, !aim?.scoped, {
         weapon: WEAPONS[killer.weaponId],
         speed: kSpeed,
         grounded: true,
         sliding: !!pose.sl,
         sprintLerp: 0,
-        aimLerp: 0,
+        aimLerp: aim?.aimLerp ?? 0,
         kick: Math.max(0, 1 - since / REPLAY_KICK_MS),
         reloadEnd: 0,
         swapUntil: 0,
@@ -1015,6 +1076,25 @@ export class Engine implements MinimapSource {
     this.ticks.push({ key: t + Math.random(), x, z, color, t });
   }
 
+  /**
+   * The watched player's aim (death replay, spectating): the sight comes up at their weapon's speed while the
+   * server says they aim, like it did on their screen. Also leaves what the HUD must draw (sight, scope, crosshair).
+   */
+  private followAim(dt: number, id: WeaponId, aiming: boolean): { aimLerp: number; zoom: number; scoped: boolean } {
+    const w = WEAPONS[id];
+    const want = aiming && !w.melee ? 1 : 0;
+    this.watchAim += (want - this.watchAim) * damp(w.adsSpeed ?? WEAPON_HANDLING.defaultAdsSpeed, dt);
+    const scoped = !!w.scope && this.watchAim > WEAPON_HANDLING.scopeReady;
+    const t = w.scope ? (scoped ? 1 : 0) : this.watchAim;
+    this.watchView = {
+      weapon: id,
+      scoped,
+      sight: !w.melee && !scoped && this.watchAim > ADS_SIGHT,
+      aim: this.watchAim,
+    };
+    return { aimLerp: this.watchAim, zoom: 1 + (w.zoom - 1) * t, scoped };
+  }
+
   // ============================================================ Spectating
   /** Dead with no respawn this round (round modes, frozen): the camera follows a living teammate. */
   private spectating(): boolean {
@@ -1067,8 +1147,9 @@ export class Engine implements MinimapSource {
     }
     const low = pose.sl || pose.cr;
     this.watchEye += ((low ? PLAYER.slideEye : PLAYER.eye) - this.watchEye) * damp(WATCH_EYE_FOLLOW, dt);
-    this.rig.replay(pose.x, pose.y + this.watchEye, pose.z, pose.ry, pose.rx);
-    // Their gun in our hands: it bobs with their speed and kicks with their shots
+    const aim = r.weaponId ? this.followAim(dt, r.weaponId, !!pose.ad) : null;
+    this.rig.replay(pose.x, pose.y + this.watchEye, pose.z, pose.ry, pose.rx, aim?.zoom);
+    // Their gun in our hands: it bobs with their speed, kicks with their shots and comes up when they aim
     if (!r.weaponId) return;
     if (r.weaponId !== this.watchGun) {
       this.killVm.setGun(r.weaponId, r.color, r.skin ?? 'base', r.cm, r.fn, r.ax);
@@ -1078,13 +1159,13 @@ export class Engine implements MinimapSource {
     const speed = last ? Math.hypot(pose.x - last.x, pose.z - last.z) / Math.max(dt, 1e-3) : 0;
     this.watchLast = { x: pose.x, z: pose.z };
     const w = WEAPONS[r.weaponId];
-    this.killVm.update(dt, now, true, {
+    this.killVm.update(dt, now, !aim?.scoped, {
       weapon: w,
       speed,
       grounded: true,
       sliding: !!pose.sl,
       sprintLerp: 0,
-      aimLerp: 0,
+      aimLerp: aim?.aimLerp ?? 0,
       kick: Math.max(0, 1 - (now - r.lastShot) / WATCH_KICK_MS),
       reloadEnd: 0,
       swapUntil: 0,
@@ -1179,13 +1260,14 @@ export class Engine implements MinimapSource {
       if (
         this.autoChar &&
         this.deathAt &&
-        now - this.deathAt >= PLAYER.respawnDelay &&
+        now - this.deathAt >= this.respawnDelay() &&
         now - this.spawnReqAt > SPAWN_RETRY_MS
       ) {
         // Automatic respawn with the chosen class
         this.spawnReqAt = now;
         this.net.spawn(this.autoChar);
       }
+      this.watchView = null; // set again below while watching someone's eyes
       if (this.playReplay(now)) {
         // the camera is in the killer's eyes
       } else if (this.spectating()) this.spectate(dt, now);
@@ -1198,8 +1280,8 @@ export class Engine implements MinimapSource {
     this.vm.update(
       dt,
       now,
-      // Aimed, the gun stays in view under the holographic sight; only the marksman rifle's scope replaces it
-      this.alive && !this.weapons.scoped() && !(this.adsSight(now) && this.weapons.weaponId() === 'dmr'),
+      // Aimed, the gun stays in view under the holographic sight; a scope replaces it
+      this.alive && !this.weapons.scoped(),
       this.alive
         ? {
             weapon: this.weapons.weapon(),
@@ -1233,6 +1315,7 @@ export class Engine implements MinimapSource {
       g.mesh.rotation.x += dt * GRENADE_TUMBLE;
     }
     this.abilityObjs.update(dt, performance.now());
+    this.infectFx?.update(dt, this.infect?.bo ?? 0, this.rig.camera);
     this.mapObjs.update(performance.now(), performance.now() + (this.serverOffset ?? 0));
     this.objectives.update(dt, now, this.objectiveSources());
 
@@ -1260,6 +1343,8 @@ export class Engine implements MinimapSource {
   private objectiveSources() {
     return {
       myId: this.myId,
+      myTeam: this.myTeam,
+      teamOf: (id: string) => this.players.find((p) => p.id === id)?.tm,
       carrierPose: (id: string) => {
         const g = this.remotes.all.get(id)?.model?.group;
         return g ? { position: g.position, rotationY: g.rotation.y } : null;
@@ -1268,20 +1353,25 @@ export class Engine implements MinimapSource {
   }
 
   // ============================================================ HUD
-  /** What the minimap draws: allies always, enemies for a moment after shooting (or always with radar). */
+  /** What the minimap draws: allies always, enemies for a moment after shooting (or always with radar), rivals
+   * caught camping always (pulsing), and every survivor for the infected in the last stretch. */
   minimap(now: number): MinimapView {
     const dots: MinimapView['dots'] = [];
+    const camping = new Set(this.players.filter((p) => p.camp === 1).map((p) => p.id));
+    const hunt = this.mode === 'infect' && this.infect?.rv === 1 && this.myTeam === 2;
     for (const r of this.remotes.all.values()) {
       if (!r.alive || !r.model) continue;
       const p = r.model.group.position;
       const mate = this.isMate(r.team === -1 ? 0 : r.team);
+      // (Infectados: the last survivor shows to everybody)
+      const alert = (!mate && (camping.has(r.id) || (hunt && r.team === 1))) || r.id === this.infect?.ls;
       // (silenced shots do not count: lastLoud)
       // (tactical goggles: a rival just hit shows as if it had shot)
-      const age = this.radar || (r.markedUntil ?? 0) > now ? 0 : now - (r.lastLoud || -1e9);
+      const age = this.radar || alert || (r.markedUntil ?? 0) > now ? 0 : now - (r.lastLoud || -1e9);
       if (!mate && age > SHOW_SHOT_MS) continue;
-      dots.push({ x: p.x, z: p.z, mate, alpha: mate ? 1 : 1 - age / SHOW_SHOT_MS });
+      dots.push({ x: p.x, z: p.z, mate, alpha: mate ? 1 : 1 - age / SHOW_SHOT_MS, alert });
     }
-    const { tags, flags, zones, bomb } = this.objectives.minimap(this.renderPos, this.objectiveSources());
+    const { tags, flags, zones, bomb, ring } = this.objectives.minimap(this.renderPos, this.objectiveSources());
     return {
       me: this.alive ? { x: this.renderPos.x, z: this.renderPos.z, yaw: this.input.yaw } : null,
       dots,
@@ -1289,6 +1379,7 @@ export class Engine implements MinimapSource {
       flags,
       zones,
       bomb,
+      ring,
       pickups: this.mapObjs.available(),
       power: this.mapObjs.powerAt(),
     };
@@ -1332,6 +1423,7 @@ export class Engine implements MinimapSource {
       sprinting: st.sprinting,
       speedFx: alive ? this.speedFx(st) : 0,
       ability: alive && this.cls ? { id: this.cls.ability, left: this.abilityLeft() } : null,
+      modeKey: alive ? this.modeKey() : null,
       shield: alive && this.shieldUntil ? Math.max(0, this.shieldUntil - now) : 0,
       shieldHit: now - this.shieldHitAt < SHIELD_FLASH_MS,
       adsSight: alive && this.adsSight(now) ? (this.weapons.loadout[this.weapons.slot] ?? null) : null,
@@ -1354,10 +1446,12 @@ export class Engine implements MinimapSource {
       hitMark: now - this.hitTime < HIT_MARK_MS,
       hitHead: this.hitHead,
       damage: Math.max(0, 1 - (now - this.damageTime) / DAMAGE_FLASH_MS),
-      respawnIn: alive || !this.deathAt ? 0 : Math.max(0, PLAYER.respawnDelay - (now - this.deathAt)),
+      respawnIn: alive || !this.deathAt ? 0 : Math.max(0, this.respawnDelay() - (now - this.deathAt)),
       killerName: this.killerName,
-      players: this.players.map(({ id, n, ab, k, d, tm, pg, st: streak, cp, lv, md }) => ({
+      players: this.players.map(({ id, n, ab, k, d, tm, pg, st: streak, cp, lv, md, a: up, rp, zt }) => ({
         id,
+        zt,
+        a: up,
         n,
         ab,
         k,
@@ -1368,6 +1462,7 @@ export class Engine implements MinimapSource {
         cp,
         lv,
         md,
+        rp,
       })),
       spread: w ? this.weapons.spread(w, st) + this.weapons.kick * 0.02 : 0,
       aim: this.weapons.aimLerp,
@@ -1390,9 +1485,44 @@ export class Engine implements MinimapSource {
       zones: this.objectives.zones,
       round: this.round,
       bomb: this.objectives.bomb,
+      ice: this.ice,
+      thaw: this.thawView(),
+      traitor:
+        this.mode === 'traitor'
+          ? {
+              role: this.role?.traitor ?? null,
+              mates: (this.role?.mates ?? []).map((id) => this.players.find((p) => p.id === id)?.n ?? '…'),
+              meeting: this.traitor?.mt ?? null,
+            }
+          : null,
       replay: !!this.replay && now >= this.replay.start,
+      watchSight: alive ? null : this.watchView,
       spectate: this.spectateView(),
     };
+  }
+
+  /** Infectados' key F: a survivor's barricade or the Paciente cero's scream, and ms until it is ready. Traidores':
+   * examine the body at hand, or call the emergency meeting. */
+  private modeKey(): HudState['modeKey'] {
+    if (this.mode === 'traitor') {
+      if (this.round?.p !== 1 || this.traitor?.mt) return null;
+      const body = this.traitor?.bd.find(
+        ([, x, y, z]) =>
+          Math.hypot(x - this.renderPos.x, z - this.renderPos.z) <= TRAITOR.bodyRadius &&
+          Math.abs(y - this.renderPos.y) <= 2,
+      );
+      const name = body && this.players.find((p) => p.id === body[0])?.n;
+      return { name: body ? `Examinar a ${name ?? '…'}` : 'Reunión de emergencia', left: 0 };
+    }
+    if (this.mode !== 'infect' || this.me?.fc === undefined) return null;
+    return { name: this.myTeam === 1 ? 'Barricada' : 'Grito', left: this.me.fc };
+  }
+
+  /** Freeze tag: the frozen teammate I am thawing now (standing next to him) and how far along it is. */
+  private thawView(): HudState['thaw'] {
+    if (!this.alive || !this.ice) return null;
+    const s = thawTarget(this.ice, this.myTeam, this.renderPos.x, this.renderPos.z);
+    return s ? { name: this.players.find((p) => p.id === s[0])?.n ?? '…', pct: s[5] } : null;
   }
 
   private resize(): void {
@@ -1415,6 +1545,7 @@ export class Engine implements MinimapSource {
     this.objectives.dispose();
     this.effects.dispose();
     this.abilityObjs.dispose();
+    this.infectFx?.dispose();
     this.mapObjs.dispose();
     this.vm.dispose();
     this.killVm.dispose();

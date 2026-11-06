@@ -1,7 +1,10 @@
-// League tournament in one room (any player starts it): every match is a round of free for all, places give
-// points (TOUR_POINTS, 1 just for playing) and after the last round the one with most points is the champion.
-import { TOUR_POINTS, type TournamentResult } from '@blockshot/shared';
+// League tournament in one room (any player starts it): every match is a round of the mode it was started with,
+// places give points (TOUR_POINTS, 1 just for playing) and after the last round the one with most points is the
+// champion. In team modes the winning team's players take the top places (by kills), then the losers.
+import { MODE_BY_ID, TOUR_POINTS, isTeamMode, type ModeId, type Team, type TournamentResult } from '@blockshot/shared';
+import { soloScore } from '../modes/scoring';
 import { isBot } from '../players/bot';
+import type { Player } from '../players/player';
 import { notice, roomInfo, type Room } from '../rooms/room';
 
 export interface Tournament {
@@ -12,16 +15,18 @@ export interface Tournament {
   table: Map<string, { pts: number; wins: number }>;
   /** id of the player who started it (they and the admin can stop it) */
   by: string;
+  /** the mode every round is played in */
+  mode: ModeId;
 }
 
-/** Starts a league of `rounds` rounds; the caller moves the room to free for all and restarts the match. */
-export function startTournament(room: Room, rounds: number, by = ''): void {
-  room.tournament = { rounds, round: 1, table: new Map(), by };
+/** Starts a league of `rounds` rounds of `mode`; the caller moves the room to that mode and restarts the match. */
+export function startTournament(room: Room, rounds: number, by = '', mode: ModeId = 'ffa'): void {
+  room.tournament = { rounds, round: 1, table: new Map(), by, mode };
   room.channel.broadcast('room:changed', [roomInfo(room)]);
   const who = room.players.get(by)?.name;
   notice(
     room,
-    `¡Empieza el torneo${who ? ` de ${who}` : ''}! ${rounds} rondas de todos contra todos: cada puesto suma puntos`,
+    `¡Empieza el torneo${who ? ` de ${who}` : ''}! ${rounds} rondas de ${MODE_BY_ID[mode].name}: cada puesto suma puntos`,
   );
 }
 
@@ -33,15 +38,17 @@ export function stopTournament(room: Room): void {
 }
 
 /**
- * The match that just ended was a round: points by place (most kills first, fewer deaths on a tie). Returns the
- * standings for the results screen; after the last round it names the champion and the league ends.
+ * The match that just ended was a round: points by place (the winning team first in team modes, then the mode's
+ * score, fewer deaths on a tie). Returns the standings for the results screen; after the last round it names the
+ * champion and the league ends.
  */
-export function scoreRound(room: Room): TournamentResult | undefined {
+export function scoreRound(room: Room, winnerTeam: Team = 0): TournamentResult | undefined {
   const t = room.tournament;
   if (!t) return undefined;
+  const lost = (p: Player) => (isTeamMode(room.modeId) && winnerTeam && p.team !== winnerTeam ? 1 : 0);
   const players = [...room.players.values()]
     .filter((p) => !isBot(p) && p.played)
-    .sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
+    .sort((a, b) => lost(a) - lost(b) || soloScore(room, b) - soloScore(room, a) || a.deaths - b.deaths);
   const gained = new Map<string, number>();
   players.forEach((p, i) => {
     const pts = TOUR_POINTS[i] ?? 1;

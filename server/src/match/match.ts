@@ -51,7 +51,7 @@ export function endMatch(room: Room, winnerName: string, winnerTeam: Team = 0): 
       best: bestPlays(room),
       restartIn: MATCH_RESTART_MS,
       // The round's points first: after the last round the vote goes back to any mode
-      tour: scoreRound(room),
+      tour: scoreRound(room, winnerTeam),
       vote: startVote(room),
     },
   ]);

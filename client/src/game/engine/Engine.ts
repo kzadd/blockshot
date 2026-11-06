@@ -60,7 +60,7 @@ import type { HudState, DamageMark, SoundMark, SpectateView, WatchSight } from '
 import type { MinimapSource, MinimapView } from '../hud/Minimap';
 import type { Look } from '../../characters/looks';
 import { wearKevlar } from '../render/gear';
-import { loadGun, THIRD_PERSON_GUN } from '../render/gunAssets';
+import { loadGun, scaleOutside, THIRD_PERSON_GUN } from '../render/gunAssets';
 import { buildCharacter, buildGun, type CharacterModel } from '../render/models';
 import { preloadProps, prop } from '../render/props';
 import { buildWorld } from '../render/world';
@@ -915,7 +915,7 @@ export class Engine implements MinimapSource {
     const wid = this.weapons.weaponId();
     void loadGun(wid, { finish: this.finish, color, camo, withFlash: true }).then((g) => {
       if (this.replay?.ghost !== ghost) return;
-      g.scale.setScalar(THIRD_PERSON_GUN);
+      scaleOutside(g, THIRD_PERSON_GUN);
       ghost.holdGun(g);
     });
     ghost.group.visible = false;

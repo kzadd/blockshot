@@ -33,7 +33,7 @@ import {
   type GunModel,
   type NameTag,
 } from '../render/models';
-import { loadGun, THIRD_PERSON_GUN } from '../render/gunAssets';
+import { loadGun, scaleOutside, THIRD_PERSON_GUN } from '../render/gunAssets';
 import { LASER_RANGE, LaserBeam, fitGunGear, laserOrigin, wearKevlar } from '../render/gear';
 import { damp, dampAngle } from './util';
 
@@ -376,7 +376,7 @@ export class RemotePlayers {
     if (!r.model) return;
     const hold = (g: GunModel) => {
       fitGunGear(g, r.ax);
-      g.scale.setScalar(THIRD_PERSON_GUN);
+      scaleOutside(g, THIRD_PERSON_GUN);
       r.model?.holdGun(g);
       r.gun = g;
     };

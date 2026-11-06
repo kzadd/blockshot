@@ -30,6 +30,7 @@ const VM_FOV = 60;
 const HOLDER_SCALE = 0.72;
 /** Aimed, the gun sits this many times further from the eye than its model asks: smaller, subtler optic and gun. */
 const ADS_FAR = 2.2;
+const HANDGUN_ADS_FAR = 1.25;
 /** Reflections for the metal parts: a tiny room environment, prefiltered once. */
 const ENV_INTENSITY = 0.55;
 const ENV_BLUR = 0.04;
@@ -41,9 +42,10 @@ const BOB_X = 0.014;
 const BOB_Y = 0.012;
 // Rest and aim positions: low and to the right, like Valorant/Krunker, clear of the ammo counter; high and close
 // enough for both gloves to show
-const HIP_X = 0.12;
-const HIP_Y = -0.125;
-const HIP_Z = -0.21;
+const HIP_X = 0.15;
+const HIP_Y = -0.15;
+// (far enough that compact guns, whose bulk sits by the grip, stay clear of the eye)
+const HIP_Z = -0.34;
 /** Slight muzzle-up pitch and inward yaw at the hip: the stock drops out of the bottom of the screen. */
 const HIP_RX = 0.04;
 const HIP_RY = 0.04;
@@ -313,9 +315,11 @@ export class ViewModel {
    */
   private aimZ(): number {
     const eye = this.gun?.userData.eyeZ;
-    if (eye === undefined) return (AIM_Z[this.gunId] ?? DEFAULT_AIM_Z) * ADS_FAR;
+    // Handguns stay closer: further out, the arm holding them stretches
+    const far = HIP_OFFSET[this.gunId] === HANDGUN_HIP ? HANDGUN_ADS_FAR : ADS_FAR;
+    if (eye === undefined) return (AIM_Z[this.gunId] ?? DEFAULT_AIM_Z) * far;
     const sight = this.gun!.userData.sightZ ?? 0;
-    return -(sight + (eye - sight) * ADS_FAR) * this.holder.scale.z;
+    return -(sight + (eye - sight) * far) * this.holder.scale.z;
   }
 
   /** How far the fists slide down the grip while aiming (handguns only). */

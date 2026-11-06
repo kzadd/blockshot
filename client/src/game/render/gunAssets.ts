@@ -297,6 +297,12 @@ const GRIP_TO_MUZZLE: Partial<Record<WeaponId, number>> = {
 export const GUN_SPACE = 1.3;
 /** Scale of a gun held by a body (third person, class screen): a bit over life size, so it reads at a distance. */
 export const THIRD_PERSON_GUN = 1.1 / GUN_SPACE;
+/** Real guns are thin next to the blocky bodies: seen from outside they are drawn this much wider (same size). */
+const OUTSIDE_THICK = 1.8;
+/** Scales a gun seen from outside (third person, class screen): `s` in length and height, wider side to side. */
+export const scaleOutside = (gun: THREE.Object3D, s: number): void => {
+  gun.scale.set(s * OUTSIDE_THICK, s, s);
+};
 /** Real overall length of each gun (m). */
 const REAL_LEN: Partial<Record<WeaponId, number>> = {
   rifle: 0.84,
